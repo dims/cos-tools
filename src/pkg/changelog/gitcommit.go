@@ -24,6 +24,7 @@ import (
 )
 
 const bugLinePrefix string = "BUG="
+const releaseNoteLinePrefix string = "RELEASE_NOTE="
 
 // Commit is a simplified struct of git.Commit
 // Useful for interfaces
@@ -33,6 +34,7 @@ type Commit struct {
 	CommitterName string
 	Subject       string
 	Bugs          []string
+	ReleaseNote   string
 	CommitTime    string
 }
 
@@ -68,12 +70,13 @@ func bugs(commit *git.Commit) []string {
 	msgSplit := strings.Split(commit.Message, "\n")
 	bugLine := ""
 	for _, line := range msgSplit {
+		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, bugLinePrefix) {
 			bugLine = line
 			break
 		}
 	}
-	if len(bugLine) < len(bugLinePrefix) {
+	if len(bugLine) <= len(bugLinePrefix) {
 		return output
 	}
 	bugList := strings.Split(bugLine[len(bugLinePrefix):], ",")
@@ -88,6 +91,17 @@ func bugs(commit *git.Commit) []string {
 	return output
 }
 
+func releaseNote(commit *git.Commit) string {
+	msgSplit := strings.Split(commit.Message, "\n")
+	for _, line := range msgSplit {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, releaseNoteLinePrefix) {
+			return line[len(releaseNoteLinePrefix):]
+		}
+	}
+	return ""
+}
+
 func commitTime(commit *git.Commit) string {
 	if commit.Committer != nil {
 		return commit.Committer.Time.AsTime().Format(time.RFC1123)
@@ -97,7 +111,7 @@ func commitTime(commit *git.Commit) string {
 
 // ParseGitCommit converts a git.Commit object into a
 // Commit object with processed fields
-func ParseGitCommit(commit *git.Commit) (*Commit, error) {
+func parseGitCommit(commit *git.Commit) (*Commit, error) {
 	if commit == nil {
 		return nil, errors.New("ParseCommit: Input should not be nil")
 	}
@@ -107,6 +121,7 @@ func ParseGitCommit(commit *git.Commit) (*Commit, error) {
 		CommitterName: committer(commit),
 		Subject:       subject(commit),
 		Bugs:          bugs(commit),
+		ReleaseNote:   releaseNote(commit),
 		CommitTime:    commitTime(commit),
 	}, nil
 }
@@ -119,7 +134,7 @@ func ParseGitCommitLog(commits []*git.Commit) ([]*Commit, error) {
 	}
 	output := make([]*Commit, len(commits))
 	for i, commit := range commits {
-		parsedCommit, err := ParseGitCommit(commit)
+		parsedCommit, err := parseGitCommit(commit)
 		if err != nil {
 			return nil, errors.New("ParseCommitLog: Input slice contains nil pointer")
 		}
