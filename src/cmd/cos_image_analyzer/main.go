@@ -10,11 +10,12 @@
 package main
 
 import (
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/binary"
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
 	"fmt"
 	"os"
 	"runtime"
+
+	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/binary"
+	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
 )
 
 func cosImageAnalyzer(img1Path, img2Path string) error {

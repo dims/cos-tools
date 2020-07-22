@@ -32,7 +32,7 @@ import (
 	"os"
 	"time"
 
-	"cos.googlesource.com/cos/tools/pkg/changelog"
+	"cos.googlesource.com/cos/tools/src/pkg/changelog"
 
 	"github.com/google/martian/log"
 	"github.com/urfave/cli/v2"

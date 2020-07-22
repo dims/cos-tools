@@ -2,7 +2,6 @@ package input
 
 import (
 	"bytes"
-	"cloud.google.com/go/storage"
 	"context"
 	"io"
 	"io/ioutil"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cloud.google.com/go/storage"
 )
 
 const contextTimeOut = time.Second * 50

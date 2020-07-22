@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"pkg/utils"
+	"cos.googlesource.com/cos/tools/src/pkg/utils"
 
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"

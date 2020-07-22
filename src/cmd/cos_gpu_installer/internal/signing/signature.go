@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"cos.googlesource.com/cos/tools/src/pkg/cos"
 	log "github.com/golang/glog"
-	"pkg/cos"
 	"github.com/pkg/errors"
 )
 

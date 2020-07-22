@@ -8,7 +8,7 @@ import (
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"
 
-	"pkg/utils"
+	"cos.googlesource.com/cos/tools/src/pkg/utils"
 )
 
 const (

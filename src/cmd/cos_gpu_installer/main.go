@@ -9,8 +9,8 @@ import (
 	log "github.com/golang/glog"
 	"github.com/google/subcommands"
 
-	"cmd/cos_gpu_installer/internal/commands"
-	"pkg/utils"
+	"cos.googlesource.com/cos/tools/src/cmd/cos_gpu_installer/internal/commands"
+	"cos.googlesource.com/cos/tools/src/pkg/utils"
 )
 
 func main() {

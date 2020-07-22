@@ -1,8 +1,9 @@
 package binary
 
 import (
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
 	"fmt"
+
+	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // Global variables
