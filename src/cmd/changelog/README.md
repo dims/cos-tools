@@ -17,6 +17,8 @@ Example: `./changelog --instance cos.googlesource.com --repo cos/manifest-snapsh
 
 `--repo | -r`: (optional) Specifies the repository for manifest-snapshot files within the Git on Borg instance. It will use "cos/manifest-snapshots" if not specified.
 
+`--debug | -d`: (optional) Enables debug messages.
+
 ## Output
 
 Creates 2 JSON files representing the changelog between 2 given build numbers. Each output file maps repositories to their repository changelog. A repository changelog consists of all the commits in a repository that were present in between the build numbers.

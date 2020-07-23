@@ -16,20 +16,24 @@ package changelog
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"testing"
 
-	"go.chromium.org/luci/auth"
 	"go.chromium.org/luci/common/api/gerrit"
-	"go.chromium.org/luci/hardcoded/chromeinfra"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 const cosInstance = "cos.googlesource.com"
 const defaultManifestRepo = "cos/manifest-snapshots"
 
-func getAuthenticator() *auth.Authenticator {
-	opts := chromeinfra.DefaultAuthOptions()
-	opts.Scopes = []string{gerrit.OAuthScope, auth.OAuthScopeEmail}
-	return auth.NewAuthenticator(context.Background(), auth.InteractiveLogin, opts)
+func getHTTPClient() (*http.Client, error) {
+	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
+	if err != nil || len(creds.JSON) == 0 {
+		return nil, fmt.Errorf("no application default credentials found - run `gcloud auth application-default login` and try again")
+	}
+	return oauth2.NewClient(oauth2.NoContext, creds.TokenSource), nil
 }
 
 func commitsMatch(commits []*Commit, expectedCommits []string) bool {
@@ -57,10 +61,10 @@ func mappingInLog(log map[string][]*Commit, check []string) bool {
 }
 
 func TestChangelog(t *testing.T) {
-	authenticator := getAuthenticator()
+	httpClient, err := getHTTPClient()
 
 	// Test invalid source
-	additions, misses, err := Changelog(authenticator, "15", "15043.0.0", cosInstance, defaultManifestRepo)
+	additions, misses, err := Changelog(httpClient, "15", "15043.0.0", cosInstance, defaultManifestRepo)
 	if additions != nil {
 		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
 	} else if misses != nil {
@@ -70,7 +74,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid target
-	additions, misses, err = Changelog(authenticator, "15043.0.0", "abx", cosInstance, defaultManifestRepo)
+	additions, misses, err = Changelog(httpClient, "15043.0.0", "abx", cosInstance, defaultManifestRepo)
 	if additions != nil {
 		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
 	} else if misses != nil {
@@ -80,7 +84,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid instance
-	additions, misses, err = Changelog(authenticator, "15036.0.0", "15041.0.0", "com", defaultManifestRepo)
+	additions, misses, err = Changelog(httpClient, "15036.0.0", "15041.0.0", "com", defaultManifestRepo)
 	if additions != nil {
 		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
 	} else if misses != nil {
@@ -90,7 +94,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid manifest repo
-	additions, misses, err = Changelog(authenticator, "15036.0.0", "15041.0.0", cosInstance, "cos/not-a-repo")
+	additions, misses, err = Changelog(httpClient, "15036.0.0", "15041.0.0", cosInstance, "cos/not-a-repo")
 	if additions != nil {
 		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
 	} else if misses != nil {
@@ -100,7 +104,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test build number higher than latest release
-	additions, misses, err = Changelog(authenticator, "15036.0.0", "99999.0.0", cosInstance, defaultManifestRepo)
+	additions, misses, err = Changelog(httpClient, "15036.0.0", "99999.0.0", cosInstance, defaultManifestRepo)
 	if additions != nil {
 		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
 	} else if misses != nil {
@@ -223,7 +227,7 @@ func TestChangelog(t *testing.T) {
 		"9bc12bb411f357188d008864f80dfba43210b9d8",
 		"bf0dd3757826b9bc9d7082f5f749ff7615d4bcb3",
 	}
-	additions, misses, err = Changelog(authenticator, source, target, cosInstance, defaultManifestRepo)
+	additions, misses, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo)
 	if err != nil {
 		t.Errorf("Changelog failed, expected no error, got %v", err)
 	} else if len(misses) != 0 {
@@ -262,7 +266,7 @@ func TestChangelog(t *testing.T) {
 		"mirrors/cros/chromiumos/repohooks",
 		"mirrors/cros/chromiumos/overlays/portage-stable",
 	}
-	additions, misses, err = Changelog(authenticator, source, target, cosInstance, defaultManifestRepo)
+	additions, misses, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo)
 	if err != nil {
 		t.Errorf("Changelog failed, expected no error, got %v", err)
 	} else if _, ok := misses["third_party/kernel"]; len(misses) != 1 && ok {

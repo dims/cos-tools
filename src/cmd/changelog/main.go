@@ -29,16 +29,17 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
-	"github.com/google/martian/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	"go.chromium.org/luci/auth"
 	"go.chromium.org/luci/common/api/gerrit"
-	"go.chromium.org/luci/hardcoded/chromeinfra"
 )
 
 // Default Manifest location
@@ -47,46 +48,54 @@ const (
 	defaultManifestRepo string = "cos/manifest-snapshots"
 )
 
-func getAuthenticator() *auth.Authenticator {
-	opts := chromeinfra.DefaultAuthOptions()
-	opts.Scopes = []string{gerrit.OAuthScope, auth.OAuthScopeEmail}
-	return auth.NewAuthenticator(context.Background(), auth.InteractiveLogin, opts)
+func getHTTPClient() (*http.Client, error) {
+	log.Info("Creating HTTP client")
+	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
+	if err != nil || len(creds.JSON) == 0 {
+		return nil, fmt.Errorf("no application default credentials found - run `gcloud auth application-default login` and try again")
+	}
+	return oauth2.NewClient(oauth2.NoContext, creds.TokenSource), nil
 }
 
 func writeChangelogAsJSON(source string, target string, changes map[string][]*changelog.Commit) error {
+	fileName := fmt.Sprintf("%s -> %s.json", source, target)
+	log.Infof("Writing changelog to %s\n", fileName)
 	jsonData, err := json.MarshalIndent(changes, "", "    ")
 	if err != nil {
-		return fmt.Errorf("writeChangelogAsJSON: Error marshalling changelog from: %s to: %s\n%v", source, target, err)
+		return fmt.Errorf("writeChangelogAsJSON: error marshalling changelog from: %s to: %s\n%v", source, target, err)
 	}
-	fileName := fmt.Sprintf("%s -> %s.json", source, target)
 	if err = ioutil.WriteFile(fileName, jsonData, 0644); err != nil {
-		return fmt.Errorf("writeChangelogAsJSON: Error writing changelog to file: %s\n%v", fileName, err)
+		return fmt.Errorf("writeChangelogAsJSON: error writing changelog to file: %s\n%v", fileName, err)
 	}
 	return nil
 }
 
-func generateChangelog(source, target, instance, manifestRepo string) {
+func generateChangelog(source, target, instance, manifestRepo string) error {
 	start := time.Now()
-	authenticator := getAuthenticator()
-	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(authenticator, source, target, instance, manifestRepo)
+	httpClient, err := getHTTPClient()
 	if err != nil {
-		log.Infof("generateChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
+		return fmt.Errorf("generateChangelog: failed to create http client: \n%v", err)
+	}
+	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo)
+	if err != nil {
+		return fmt.Errorf("generateChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v",
 			source, target, instance, manifestRepo, err)
-		os.Exit(1)
 	}
 	if err := writeChangelogAsJSON(source, target, sourceToTargetChanges); err != nil {
-		log.Infof("generateChangelog: error writing first changelog with source: %s and target: %s\n%v\n",
+		log.Errorf("generateChangelog: error writing first changelog with source: %s and target: %s\n%v\n",
 			source, target, err)
 	}
 	if err := writeChangelogAsJSON(target, source, targetToSourceChanges); err != nil {
-		log.Infof("generateChangelog: Error writing second changelog with source: %s and target: %s\n%v\n",
+		log.Errorf("generateChangelog: Error writing second changelog with source: %s and target: %s\n%v\n",
 			target, source, err)
 	}
 	log.Infof("Retrieved changelog in %s\n", time.Since(start))
+	return nil
 }
 
 func main() {
 	var instance, manifestRepo string
+	var debug bool
 	app := &cli.App{
 		Name:  "changelog",
 		Usage: "get commits between builds",
@@ -105,20 +114,29 @@ func main() {
 				Usage:       "`REPO` containing Manifest file",
 				Destination: &manifestRepo,
 			},
+			&cli.BoolFlag{
+				Name:        "debug",
+				Value:       false,
+				Aliases:     []string{"d"},
+				Usage:       "Toggle debug messages",
+				Destination: &debug,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			if c.NArg() < 2 {
 				return errors.New("Must specify source and target build number")
 			}
+			if debug {
+				log.SetLevel(log.DebugLevel)
+			}
 			source := c.Args().Get(0)
 			target := c.Args().Get(1)
-			generateChangelog(source, target, instance, manifestRepo)
-			return nil
+			return generateChangelog(source, target, instance, manifestRepo)
 		},
 	}
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Infof("main: error running app with arguments: %v:\n%v", os.Args, err)
+		log.Errorf("main: error running app with arguments: %v:\n%v", os.Args, err)
 		os.Exit(1)
 	}
 }
