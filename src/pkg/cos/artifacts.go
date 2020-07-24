@@ -42,6 +42,11 @@ type GCSDownloader struct {
 	Internal  bool
 }
 
+// NewGCSDownloader creates a GCSDownloader instance.
+func NewGCSDownloader(e *EnvReader, i bool) *GCSDownloader {
+	return &GCSDownloader{e, i}
+}
+
 // DownloadKernelSrc downloads COS kernel sources to destination directory.
 func (d *GCSDownloader) DownloadKernelSrc(destDir string) error {
 	return d.DownloadArtifact(destDir, kernelSrcArchive)

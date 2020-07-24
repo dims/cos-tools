@@ -207,55 +207,65 @@ func TestInstallCrossToolchain(t *testing.T) {
 
 func TestDisableKernelOptionFromGrubCfg(t *testing.T) {
 	for _, tc := range []struct {
-		testName           string
-		kernelOption       string
-		grubCfg            string
-		expectedNewGrubCfg string
-		expectedNeedReboot bool
+		testName       string
+		kernelCmdLine  string
+		expectedReturn bool
 	}{
 		{
-			"LoadPin",
-			"loadpin.enabled",
-
-			`BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap ` +
-				`loglevel=7 noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 ` +
-				`systemd.unified_cgroup_hierarchy=false systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 ` +
-				`dm_verity.error_behavior=3 dm_verity.max_bios=-1 dm_verity.dev_wait=1 i915.modeset=1 cros_efi root=/dev/dm-0 ` +
-				`"dm=1 vroot none ro 1,0 2539520 verity payload=PARTUUID=36547742-9356-EF4E-B9AD-F8DED2F6D087 ` +
-				`hashtree=PARTUUID=36547742-9356-EF4E-B9AD-F8DED2F6D087 hashstart=2539520 alg=sha256 ` +
-				`root_hexdigest=0ff80250bd97ad47a65e7cd330ab70bcf5013d7a86817dca59fcac77f0ba1a8f ` +
-				`salt=414038a6ed9b1f528c327aff4eac16ad5ca4a6699d142ae096e90374af907c34`,
-
-			`BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap ` +
-				`loglevel=7 noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 ` +
-				`systemd.unified_cgroup_hierarchy=false systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 ` +
-				`dm_verity.error_behavior=3 dm_verity.max_bios=-1 dm_verity.dev_wait=1 i915.modeset=1 cros_efi loadpin.enabled=0 root=/dev/dm-0 ` +
-				`"dm=1 vroot none ro 1,0 2539520 verity payload=PARTUUID=36547742-9356-EF4E-B9AD-F8DED2F6D087 ` +
-				`hashtree=PARTUUID=36547742-9356-EF4E-B9AD-F8DED2F6D087 hashstart=2539520 alg=sha256 ` +
-				`root_hexdigest=0ff80250bd97ad47a65e7cd330ab70bcf5013d7a86817dca59fcac77f0ba1a8f ` +
-				`salt=414038a6ed9b1f528c327aff4eac16ad5ca4a6699d142ae096e90374af907c34`,
-			true,
+			testName: "OptionsPresent",
+			kernelCmdLine: `BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap loglevel=7 ` +
+				`noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 systemd.unified_cgroup_hierarchy=false ` +
+				`systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 dm_verity.error_behavior=3 dm_verity.max_bios=-1 ` +
+				`dm_verity.dev_wait=1 i915.modeset=1 cros_efi module.sig_enforce=1 modules-load=loadpin_trigger ` +
+				`loadpin.exclude=kernel-module root=/dev/dm-0 "dm=1 vroot none ro 1,0 4077568 verity ` +
+				`payload=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 hashtree=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 ` +
+				`hashstart=4077568 alg=sha256 root_hexdigest=8a2cfc7097aa7ddfe4101611fad9dd1df59f9c29cfa9b1a5d18f55ae68c9eed5 ` +
+				`salt=65697f247db9275b9e9830d275ca6b830c156187403f6210b2ebcb11c8beaa57"`,
+			expectedReturn: true,
 		},
 		{
-			"LoadPinEnabled",
-			"loadpin.enabled",
-			"cros_efi loadpin.enabled=1",
-			"cros_efi loadpin.enabled=0",
-			true,
+			testName: "MissingLoadpinExclude",
+			kernelCmdLine: `BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap loglevel=7 ` +
+				`noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 systemd.unified_cgroup_hierarchy=false ` +
+				`systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 dm_verity.error_behavior=3 dm_verity.max_bios=-1 ` +
+				`dm_verity.dev_wait=1 i915.modeset=1 cros_efi module.sig_enforce=1 modules-load=loadpin_trigger ` +
+				`root=/dev/dm-0 "dm=1 vroot none ro 1,0 4077568 verity ` +
+				`payload=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 hashtree=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 ` +
+				`hashstart=4077568 alg=sha256 root_hexdigest=8a2cfc7097aa7ddfe4101611fad9dd1df59f9c29cfa9b1a5d18f55ae68c9eed5 ` +
+				`salt=65697f247db9275b9e9830d275ca6b830c156187403f6210b2ebcb11c8beaa57"`,
+			expectedReturn: false,
 		},
 		{
-			"LoadPinDisabled",
-			"loadpin.enabled",
-			"cros_efi loadpin.enabled=0",
-			"cros_efi loadpin.enabled=0",
-			false,
+			testName: "MissingLoadpinTrigger",
+			kernelCmdLine: `BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap loglevel=7 ` +
+				`noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 systemd.unified_cgroup_hierarchy=false ` +
+				`systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 dm_verity.error_behavior=3 dm_verity.max_bios=-1 ` +
+				`dm_verity.dev_wait=1 i915.modeset=1 cros_efi module.sig_enforce=1 ` +
+				`loadpin.exclude=kernel-module root=/dev/dm-0 "dm=1 vroot none ro 1,0 4077568 verity ` +
+				`payload=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 hashtree=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 ` +
+				`hashstart=4077568 alg=sha256 root_hexdigest=8a2cfc7097aa7ddfe4101611fad9dd1df59f9c29cfa9b1a5d18f55ae68c9eed5 ` +
+				`salt=65697f247db9275b9e9830d275ca6b830c156187403f6210b2ebcb11c8beaa57"`,
+			expectedReturn: false,
+		},
+		{
+			testName: "MissingSigEnforce",
+			kernelCmdLine: `BOOT_IMAGE=/syslinux/vmlinuz.A init=/usr/lib/systemd/systemd boot=local rootwait ro noresume noswap loglevel=7 ` +
+				`noinitrd console=ttyS0 security=apparmor virtio_net.napi_tx=1 systemd.unified_cgroup_hierarchy=false ` +
+				`systemd.legacy_systemd_cgroup_controller=false csm.disabled=1 dm_verity.error_behavior=3 dm_verity.max_bios=-1 ` +
+				`dm_verity.dev_wait=1 i915.modeset=1 cros_efi modules-load=loadpin_trigger ` +
+				`loadpin.exclude=kernel-module root=/dev/dm-0 "dm=1 vroot none ro 1,0 4077568 verity ` +
+				`payload=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 hashtree=PARTUUID=00CE255B-DB42-1E47-A62B-735C7A9A7397 ` +
+				`hashstart=4077568 alg=sha256 root_hexdigest=8a2cfc7097aa7ddfe4101611fad9dd1df59f9c29cfa9b1a5d18f55ae68c9eed5 ` +
+				`salt=65697f247db9275b9e9830d275ca6b830c156187403f6210b2ebcb11c8beaa57"`,
+			expectedReturn: false,
 		},
 	} {
-		newGrubCfg, needReboot := disableKernelOptionFromGrubCfg(tc.kernelOption, tc.grubCfg)
-		if newGrubCfg != tc.expectedNewGrubCfg || needReboot != tc.expectedNeedReboot {
-			t.Errorf("%v: Unexpected output:\nexpect grubcfg: %v\ngot grubcfg: %v\nexpect needReboot: %v, got needReboot: %v",
-				tc.testName, tc.expectedNewGrubCfg, newGrubCfg, tc.expectedNeedReboot, needReboot)
-		}
+		t.Run(tc.testName, func(t *testing.T) {
+			ret := CheckKernelModuleSigning(tc.kernelCmdLine)
+			if ret != tc.expectedReturn {
+				t.Errorf("Unexpected output:%v, expect: %v", ret, tc.expectedReturn)
+			}
+		})
 	}
 }
 

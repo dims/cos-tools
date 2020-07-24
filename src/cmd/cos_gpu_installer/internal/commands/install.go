@@ -3,6 +3,8 @@ package commands
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"path/filepath"
 
 	"flag"
@@ -28,7 +30,7 @@ const (
 type InstallCommand struct {
 	driverVersion    string
 	hostInstallDir   string
-	enforceSigning   bool
+	unsignedDriver   bool
 	internalDownload bool
 	debug            bool
 }
@@ -48,8 +50,10 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"The GPU driver verion to install. It will install the default GPU driver if the flag is not set explicitly.")
 	f.StringVar(&c.hostInstallDir, "dir", "/var/lib/nvidia",
 		"Host directory that GPU drivers should be installed to")
-	f.BoolVar(&c.enforceSigning, "enforce-signing", true,
-		"Whether to enforce GPU drivers being signed. Setting to false will disable kernel module signing security feature.")
+	f.BoolVar(&c.unsignedDriver, "allow-unsigned-driver", false,
+		"Whether to allow load unsigned GPU drivers. "+
+			"If this flag is set to true, module signing security features must be disabled on the host for driver installation to succeed. "+
+			"This flag is only for debugging.")
 	// TODO(mikewu): change this flag to a bucket prefix string.
 	f.BoolVar(&c.internalDownload, "internal-download", false,
 		"Whether to try to download files from Google internal server. This is only useful for internal developing.")
@@ -67,7 +71,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
 
-	downloader := &cos.GCSDownloader{envReader, c.internalDownload}
+	downloader := cos.NewGCSDownloader(envReader, c.internalDownload)
 	if c.driverVersion == "" {
 		defaultVersion, err := installer.GetDefaultGPUDriverVersion(downloader)
 		if err != nil {
@@ -78,19 +82,20 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 	log.Infof("Installing GPU driver version %s", c.driverVersion)
 
-	if !c.enforceSigning {
-		log.Info("Doesn't enforce signing. Need to disable module locking.")
-		if err := cos.DisableKernelModuleLocking(); err != nil {
-			c.logError(errors.Wrap(err, "failed to configure kernel module locking"))
-			return subcommands.ExitFailure
+	if c.unsignedDriver {
+		kernelCmdline, err := ioutil.ReadFile("/proc/cmdline")
+		if err != nil {
+			c.logError(fmt.Errorf("failed to read kernel command line: %v", err))
+		}
+		if !cos.CheckKernelModuleSigning(string(kernelCmdline)) {
+			log.Warning("Current kernel command line does not support unsigned kernel modules. Not enforcing kernel module signing may cause installation fail.")
 		}
 	}
-
 	hostInstallDir := filepath.Join(hostRootPath, c.hostInstallDir)
 	cacher := installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 	if isCached, err := cacher.IsCached(); isCached && err == nil {
 		log.Info("Found cached version, NOT building the drivers.")
-		if err := installer.ConfigureCachedInstalltion(hostInstallDir, c.enforceSigning); err != nil {
+		if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver); err != nil {
 			c.logError(errors.Wrap(err, "failed to configure cached installation"))
 			return subcommands.ExitFailure
 		}
@@ -121,7 +126,7 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 	}
 	defer func() { callback <- 0 }()
 
-	if c.enforceSigning {
+	if !c.unsignedDriver {
 		if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
 			return errors.Wrap(err, "failed to download driver signature")
 		}
@@ -140,7 +145,7 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		return errors.Wrap(err, "failed to install toolchain")
 	}
 
-	if err := installer.RunDriverInstaller(installerFile, c.enforceSigning); err != nil {
+	if err := installer.RunDriverInstaller(installerFile, !c.unsignedDriver); err != nil {
 		return errors.Wrap(err, "failed to run GPU driver installer")
 	}
 	if err := cacher.Cache(); err != nil {
