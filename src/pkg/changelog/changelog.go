@@ -47,9 +47,9 @@ const (
 	manifestFileName string = "snapshot.xml"
 
 	// These constants are used for exponential increase in Gitiles request size.
-	defaultPageSize          int32 = 1000
-	pageSizeGrowthMultiplier int32 = 5
-	maxPageSize              int32 = 10000
+	defaultPageSize          int = 1000
+	pageSizeGrowthMultiplier int = 5
+	maxPageSize              int = 10000
 )
 
 type repo struct {
@@ -66,14 +66,24 @@ type repo struct {
 }
 
 type commitsResult struct {
-	RepoURL string
-	Commits []*Commit
-	Err     error
+	RepoURL        string
+	Commits        []*Commit
+	HasMoreCommits bool
+	Err            error
 }
 
 type additionsResult struct {
-	Additions map[string][]*Commit
+	Additions map[string]*RepoLog
 	Err       error
+}
+
+// limitPageSize will restrict a request page size to min of pageSize (which grows exponentially)
+// or remaining request size
+func limitPageSize(pageSize, requestedSize int) int {
+	if requestedSize == -1 || pageSize <= requestedSize {
+		return pageSize
+	}
+	return requestedSize
 }
 
 func gerritClient(httpClient *http.Client, remoteURL string) (gitilesProto.GitilesClient, error) {
@@ -158,15 +168,17 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 }
 
 // commits get all commits that occur between committish and ancestor for a specific repo.
-func commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, outputChan chan commitsResult) {
+func commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
 	start := time.Now()
-	pageSize := defaultPageSize
+
+	pageSize := limitPageSize(defaultPageSize, querySize)
+	querySize -= pageSize
 	request := gitilesProto.LogRequest{
 		Project:            repo,
 		Committish:         committish,
 		ExcludeAncestorsOf: ancestor,
-		PageSize:           pageSize,
+		PageSize:           int32(pageSize),
 	}
 	response, err := client.Log(context.Background(), &request)
 	if err != nil {
@@ -174,6 +186,7 @@ func commits(client gitilesProto.GitilesClient, repo string, committish string, 
 			repo, committish, ancestor, err)}
 		return
 	}
+
 	// No nextPageToken means there were less than <defaultPageSize> commits total.
 	// We can immediately return.
 	if response.NextPageToken == "" {
@@ -184,21 +197,23 @@ func commits(client gitilesProto.GitilesClient, repo string, committish string, 
 				repo, committish, ancestor, err)}
 			return
 		}
-		outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits}
+		outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits, HasMoreCommits: (response.NextPageToken != "")}
 		return
 	}
 	// Retrieve remaining commits using exponential increase in pageSize.
 	allCommits := response.Log
-	for response.NextPageToken != "" {
+	for querySize > 0 && response.NextPageToken != "" {
 		if pageSize < maxPageSize {
 			pageSize *= pageSizeGrowthMultiplier
 		}
+		pageSize = limitPageSize(pageSize, querySize)
+		querySize -= pageSize
 		request := gitilesProto.LogRequest{
 			Project:            repo,
 			Committish:         committish,
 			ExcludeAncestorsOf: ancestor,
 			PageToken:          response.NextPageToken,
-			PageSize:           pageSize,
+			PageSize:           int32(pageSize),
 		}
 		response, err = client.Log(context.Background(), &request)
 		if err != nil {
@@ -215,14 +230,14 @@ func commits(client gitilesProto.GitilesClient, repo string, committish string, 
 			repo, committish, ancestor, err)}
 		return
 	}
-	outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits}
+	outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits, HasMoreCommits: (response.NextPageToken != "")}
 }
 
 // additions retrieves all commits that occured between 2 parsed manifest files for each repo.
 // Returns a map of repo name -> list of commits.
-func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[string]*repo, targetRepos map[string]*repo, outputChan chan additionsResult) {
+func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[string]*repo, targetRepos map[string]*repo, querySize int, outputChan chan additionsResult) {
 	log.Debug("Retrieving commit additions")
-	repoCommits := make(map[string][]*Commit)
+	repoCommits := make(map[string]*RepoLog)
 	commitsChan := make(chan commitsResult, len(targetRepos))
 	for repoURL, targetRepoInfo := range targetRepos {
 		cl := clients[targetRepoInfo.InstanceURL]
@@ -232,7 +247,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 		if sourceRepoInfo, ok := sourceRepos[repoURL]; ok {
 			ancestorCommittish = sourceRepoInfo.Committish
 		}
-		go commits(cl, repoURL, targetRepoInfo.Committish, ancestorCommittish, commitsChan)
+		go commits(cl, repoURL, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
 	}
 	for i := 0; i < len(targetRepos); i++ {
 		res := <-commitsChan
@@ -241,7 +256,12 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			return
 		}
 		if len(res.Commits) > 0 {
-			repoCommits[res.RepoURL] = res.Commits
+			repoCommits[res.RepoURL] = &RepoLog{
+				Commits:        res.Commits,
+				HasMoreCommits: res.HasMoreCommits,
+				SourceSHA:      sourceRepos[res.RepoURL].Committish,
+				TargetSHA:      targetRepos[res.RepoURL].Committish,
+			}
 		}
 	}
 	outputChan <- additionsResult{Additions: repoCommits}
@@ -257,11 +277,14 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 // a tag that links directly to snapshot.xml
 // Ex. For /refs/tags/15049.0.0, the argument should be 15049.0.0
 //
-// The host should be the GoB instance that Manifest files are hosted in
+// host should be the GoB instance that Manifest files are hosted in
 // ex. "cos.googlesource.com"
 //
-// The repo should be the repository that build manifest files
+// repo should be the repository that build manifest files
 // are located, ex. "cos/manifest-snapshots"
+//
+// querySize should be the number of commits that should be included in each
+// repository changelog. Specify as -1 to get all commits
 //
 // Outputs two changelogs
 // The first changelog contains new commits that were added to the target
@@ -269,7 +292,11 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 //
 // The second changelog contains all commits that are present in the source build
 // but not present in the target build
-func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string) (map[string][]*Commit, map[string][]*Commit, error) {
+func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, error) {
+	if httpClient == nil {
+		return nil, nil, errors.New("Changelog: httpClient should not be nil")
+	}
+
 	log.Infof("Retrieving changelog between %s and %s\n", sourceBuildNum, targetBuildNum)
 	clients := make(map[string]gitilesProto.GitilesClient)
 
@@ -302,15 +329,15 @@ func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum st
 
 	addChan := make(chan additionsResult, 1)
 	missChan := make(chan additionsResult, 1)
-	go additions(clients, sourceRepos, targetRepos, addChan)
-	go additions(clients, targetRepos, sourceRepos, missChan)
-	addRes := <-addChan
-	if addRes.Err != nil {
-		return nil, nil, fmt.Errorf("Changelog: failure when retrieving commit additions:\n%v", err)
-	}
+	go additions(clients, sourceRepos, targetRepos, querySize, addChan)
+	go additions(clients, targetRepos, sourceRepos, querySize, missChan)
 	missRes := <-missChan
 	if missRes.Err != nil {
 		return nil, nil, fmt.Errorf("Changelog: failure when retrieving missed commits:\n%v", err)
+	}
+	addRes := <-addChan
+	if addRes.Err != nil {
+		return nil, nil, fmt.Errorf("Changelog: failure when retrieving commit additions:\n%v", err)
 	}
 
 	return addRes.Additions, missRes.Additions, nil

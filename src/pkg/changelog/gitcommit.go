@@ -26,6 +26,14 @@ import (
 const bugLinePrefix string = "BUG="
 const releaseNoteLinePrefix string = "RELEASE_NOTE="
 
+// RepoLog contains a changelist for a particular repository
+type RepoLog struct {
+	Commits        []*Commit
+	SourceSHA      string
+	TargetSHA      string
+	HasMoreCommits bool
+}
+
 // Commit is a simplified struct of git.Commit
 // Useful for interfaces
 type Commit struct {

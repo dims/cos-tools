@@ -62,8 +62,8 @@ def check_changelog_schema(source, target):
         data = json.load(f)
         if len(data) == 0:
             return False
-        for repo, commit_log in data.items():
-            for commit in commit_log:
+        for repoName, repoLog in data.items():
+            for commit in repoLog['Commits']:
                 if not check_commit_schema(commit):
                     return False
     return True
@@ -71,9 +71,14 @@ def check_changelog_schema(source, target):
 
 class TestCLIApplication(unittest.TestCase):
 
-    def test_build(self):
+    def setUp(self):
         process = subprocess.run(["go", "build", "-o", "changelog","main.go"])
         assert process.returncode == 0
+
+    def tearDown(self):
+        delete_logs("15000.0.0", "15055.0.0")
+        delete_logs("15050.0.0", "15056.0.0")
+        delete_logs("15056.0.0", "15056.0.0")
 
     def test_basic_run(self):
         source = "15050.0.0"

@@ -57,7 +57,7 @@ func getHTTPClient() (*http.Client, error) {
 	return oauth2.NewClient(oauth2.NoContext, creds.TokenSource), nil
 }
 
-func writeChangelogAsJSON(source string, target string, changes map[string][]*changelog.Commit) error {
+func writeChangelogAsJSON(source string, target string, changes map[string]*changelog.RepoLog) error {
 	fileName := fmt.Sprintf("%s -> %s.json", source, target)
 	log.Infof("Writing changelog to %s\n", fileName)
 	jsonData, err := json.MarshalIndent(changes, "", "    ")
@@ -76,7 +76,7 @@ func generateChangelog(source, target, instance, manifestRepo string) error {
 	if err != nil {
 		return fmt.Errorf("generateChangelog: failed to create http client: \n%v", err)
 	}
-	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo)
+	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo, -1)
 	if err != nil {
 		return fmt.Errorf("generateChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v",
 			source, target, instance, manifestRepo, err)
