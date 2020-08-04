@@ -18,13 +18,14 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"time"
 
 	"go.chromium.org/luci/common/proto/git"
 )
 
-const bugLinePrefix string = "BUG="
-const releaseNoteLinePrefix string = "RELEASE_NOTE="
+const (
+	bugLinePrefix         string = "BUG="
+	releaseNoteLinePrefix string = "RELEASE_NOTE="
+)
 
 // RepoLog contains a changelist for a particular repository
 type RepoLog struct {
@@ -112,7 +113,7 @@ func releaseNote(commit *git.Commit) string {
 
 func commitTime(commit *git.Commit) string {
 	if commit.Committer != nil {
-		return commit.Committer.Time.AsTime().Format(time.RFC1123)
+		return commit.Committer.Time.AsTime().Format("Mon, 2 Jan 2006")
 	}
 	return "None"
 }

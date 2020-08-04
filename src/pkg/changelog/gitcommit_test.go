@@ -29,7 +29,7 @@ const (
 	parent        string = "7645df3136c5b5e43eb1af182b0c67d78ca2d517"
 	authorName    string = "Austin Yuan"
 	committerName string = "Boston Yuan"
-	timeVal       string = "Sat, 01 Feb 2020 08:15:00 UTC"
+	timeVal       string = "Sat, 1 Feb 2020"
 )
 
 var authorTime time.Time
@@ -339,9 +339,9 @@ BUG=56456651, chromium:777882, -1, b:9999999`),
 				case !reflect.DeepEqual(commit.Bugs, test.Bugs[i]):
 					t.Errorf("exptected bugs %#v, got %#v", test.Bugs[i], commit.Bugs)
 				case commit.ReleaseNote != test.ReleaseNote[i]:
-					t.Errorf("expected release note %s, got %s", test.ReleaseNote, commit.ReleaseNote)
+					t.Errorf("expected release note %s, got %s", test.ReleaseNote[i], commit.ReleaseNote)
 				case commit.CommitTime != test.CommitTime[i]:
-					t.Errorf("expected commit time %s, got %s", test.CommitTime, commit.CommitTime)
+					t.Errorf("expected commit time %s, got %s", test.CommitTime[i], commit.CommitTime)
 				}
 			}
 		})
