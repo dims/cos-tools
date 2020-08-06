@@ -115,6 +115,7 @@ func TestChangelog(t *testing.T) {
 
 	// Test 1 build number difference with only 1 repo change between them
 	// Ensure that commits are correctly inserted in proper order
+	// Check that changelog metadata correctly populated
 	source := "15050.0.0"
 	target := "15051.0.0"
 	expectedCommits := []string{
@@ -242,6 +243,10 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("Changelog failed, expected 108 changes for \"cos/overlays/board-overlays\", got %d", len(changes))
 	} else if !commitsMatch(boardOverlayLog.Commits, expectedCommits) {
 		t.Errorf("Changelog failed, Changelog output does not match expected commits or is not sorted")
+	} else if boardOverlayLog.SourceSHA != "612ca5ef5455534127d008e08c65aa29a2fd97a5" {
+		t.Errorf("Changelog failed, expected SourceSHA \"612ca5ef5455534127d008e08c65aa29a2fd97a5\", got %s", boardOverlayLog.SourceSHA)
+	} else if boardOverlayLog.TargetSHA != "6201c49afe667c8fa7796608a4d7162bb3f7f4f4" {
+		t.Errorf("Changelog failed, expected SourceSHA \"6201c49afe667c8fa7796608a4d7162bb3f7f4f4\", got %s", boardOverlayLog.TargetSHA)
 	}
 
 	// Test build numbers further apart from each other with multiple repo differences
@@ -303,6 +308,54 @@ func TestChangelog(t *testing.T) {
 			t.Errorf("Changelog failed, expected HasMoreCommits = True for repo: third_party/kernel, got False")
 		} else if repoLog.HasMoreCommits && len(repoLog.Commits) < querySize {
 			t.Errorf("Changelog failed, expected HasMoreCommits = False for repo: %s with %d commits, got True", repoName, len(repoLog.Commits))
+		}
+	}
+
+	// Test changelog handles manifest with non-matching repositories
+	source = "12871.1177.0"
+	target = "12871.1179.0"
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	if err != nil {
+		t.Errorf("Changelog failed, expected no error, got %v", err)
+	} else if len(removals) != 0 {
+		t.Errorf("Changelog failed, expected empty removals, got %v", removals)
+	} else if _, ok := additions["cos/cobble"]; !ok {
+		t.Errorf("Changelog failed, expected repo: third_party/kernel in additions")
+	}
+	for repoName, repoLog := range additions {
+		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
+			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
+		} else if repoName == "cos/cobble" {
+			if repoLog.HasMoreCommits {
+				t.Errorf("Changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
+			} else if repoLog.SourceSHA != "" {
+				t.Errorf("Changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
+			} else if repoLog.TargetSHA != "4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d" {
+				t.Errorf("Changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
+			}
+		}
+	}
+	source = "12871.1179.0"
+	target = "12871.1177.0"
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	if err != nil {
+		t.Errorf("Changelog failed, expected no error, got %v", err)
+	} else if len(additions) != 0 {
+		t.Errorf("Changelog failed, expected empty additions, got %v", additions)
+	} else if _, ok := removals["cos/cobble"]; !ok {
+		t.Errorf("Changelog failed, expected repo: third_party/kernel in additions")
+	}
+	for repoName, repoLog := range removals {
+		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
+			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
+		} else if repoName == "cos/cobble" {
+			if repoLog.HasMoreCommits {
+				t.Errorf("Changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
+			} else if repoLog.SourceSHA != "" {
+				t.Errorf("Changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
+			} else if repoLog.TargetSHA != "4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d" {
+				t.Errorf("Changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
+			}
 		}
 	}
 }

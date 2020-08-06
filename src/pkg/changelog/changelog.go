@@ -255,11 +255,15 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			outputChan <- additionsResult{Err: res.Err}
 			return
 		}
+		sourceSHA := ""
+		if sha, ok := sourceRepos[res.RepoURL]; ok {
+			sourceSHA = sha.Committish
+		}
 		if len(res.Commits) > 0 {
 			repoCommits[res.RepoURL] = &RepoLog{
 				Commits:        res.Commits,
 				HasMoreCommits: res.HasMoreCommits,
-				SourceSHA:      sourceRepos[res.RepoURL].Committish,
+				SourceSHA:      sourceSHA,
 				TargetSHA:      targetRepos[res.RepoURL].Committish,
 			}
 		}
