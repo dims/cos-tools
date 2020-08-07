@@ -1,0 +1,110 @@
+th {
+    font-weight: 440;
+    text-align: left;
+    padding-bottom: 0px;
+}
+
+th,
+td {
+    margin-bottom: 5px;
+    padding: 2px;
+}
+
+.changelog-form .text input {
+    height: 24px;
+    margin-bottom: 8px;
+    width: 135px;
+}
+
+.changelog-form .text .submit {
+    height: 24px;
+    width: 59px;
+}
+
+.changelog-form .text label {
+    margin: 4px;
+}
+
+.changelog-form .radio .external {
+    margin-left: 20px;
+}
+
+.sha-legend {
+    margin-top: 10px;
+}
+
+.sha-legend .legend-row {
+    display: flex;
+    flex-flow: row nowrap;
+    font-size: 14px;
+    margin: 3px 0px 3px 4px;
+}
+
+.sha-legend .circle {
+    border-radius: 50%;
+    height: 14px;
+    margin-right: 8px;
+    width: 14px;
+}
+
+.sha-legend .circle.addition {
+    background-color: #adef97;
+}
+
+.sha-legend .circle.removal {
+    background-color: #ffc0c0;
+}
+
+.repo-header {
+    margin: 24px 0px 12px 0px;
+}
+
+.repo-table {
+    border-spacing: 2px;
+    font-size: 14;
+    font-weight: 300;
+    margin: 4px 0px;
+    table-layout: fixed;
+}
+
+.commit-sha {
+    text-align: center;
+    width: 65px;
+}
+
+th.commit-sha {
+    text-align: left;
+}
+
+.addition {
+    background-color: #c2ffae;
+}
+
+.removal {
+    background-color: #ffdada
+}
+
+.commit-subject {
+    width: 520px;
+}
+
+.commit-bugs {
+    width: 115px;
+}
+
+.commit-author {
+    width: 150px;
+}
+
+.commit-committer {
+    width: 150px;
+}
+
+.commit-time {
+    width: 120px;
+}
+
+.gob-link {
+    font-size: 14;
+    padding-left: 2px;
+}

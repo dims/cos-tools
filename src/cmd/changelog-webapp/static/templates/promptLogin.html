@@ -1,0 +1,33 @@
+<html>
+<head>
+  <meta name="description" content="Google COS build information">
+  <link rel="stylesheet" href="/static/css/base.css">
+</head>
+<body>
+  <div class="navbar">
+    <p class="navbar-title">Container Optimized OS</p>
+  </div>
+  <div class="sidenav">
+    <a href="/">Home</a>
+    {{if (eq .ActivePage "changelog")}}
+      <a class="active" href="/changelog/">Changelog</a>
+    {{else}}
+      <a href="/changelog/">Changelog</a>
+    {{end}}
+    {{if (eq .ActivePage "locateCl")}}
+      <a class="active" href="/locatecl/">Locate CL</a>
+    {{else}}
+      <a href="/locatecl/">Locate CL</a>
+    {{end}}
+    <a href="/login/">Login</a>
+  </div>
+  <div class="main">
+    <div class="text-content">
+      <h1>Please sign in to use this feature</h1>
+      <p>This application requires OAuth authentication to communicate with Google Git repositories. Your account data
+        will not be used for any other purposes. To continue, please sign in by clicking <a href="/login/">here</a>.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
