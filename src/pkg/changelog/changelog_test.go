@@ -113,6 +113,16 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("Changelog failed, expected error, got nil")
 	}
 
+	// Test manifest with remote urls specified and no default URL
+	additions, removals, err = Changelog(httpClient, "1.0.0", "2.0.0", cosInstance, defaultManifestRepo, -1)
+	if additions == nil {
+		t.Errorf("Changelog failed, expected additions, got nil")
+	} else if removals == nil {
+		t.Errorf("Changelog failed, expected removals, got nil")
+	} else if err != nil {
+		t.Errorf("Changelog failed, expected no error, got %v", err)
+	}
+
 	// Test 1 build number difference with only 1 repo change between them
 	// Ensure that commits are correctly inserted in proper order
 	// Check that changelog metadata correctly populated

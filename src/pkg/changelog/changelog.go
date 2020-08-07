@@ -134,7 +134,9 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	// Extract the "name", "remote", and "revision" attributes from each project tag.
 	// Some projects do not have a "remote" attribute.
 	// If this is the case, they should use the default remoteURL.
-	remoteMap[""] = remoteMap[root.SelectElement("default").SelectAttr("remote").Value]
+	if root.SelectElement("default").SelectAttr("remote") != nil {
+		remoteMap[""] = remoteMap[root.SelectElement("default").SelectAttr("remote").Value]
+	}
 	repos := make(map[string]*repo)
 	for _, project := range root.SelectElements("project") {
 		repos[project.SelectAttr("name").Value] = &repo{
