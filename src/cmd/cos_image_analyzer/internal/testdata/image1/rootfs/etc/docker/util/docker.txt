@@ -1,0 +1,1 @@
+docker configurations for image 1

@@ -23,6 +23,18 @@ type FlagInfo struct {
 	CommitSelected bool
 	// Release Notes
 	ReleaseNotesSelected bool
+
+	//Verbosity of output
+	Verbose bool
+
+	// File used to compress output from Rootfs and OS-Config difference
+	// (either user provided or default CompressRootfs.txt)
+	CompressRootfsFile string
+
+	// File used to compress output from Stateful-partition difference
+	// (either user provided or default CompressStateful.txt)
+	CompressStatefulFile string
+
 	// Output
 	OutputSelected string
 }

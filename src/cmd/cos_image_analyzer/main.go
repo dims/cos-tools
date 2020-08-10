@@ -23,13 +23,20 @@ func cosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo)
 	imageDiff := &output.ImageDiff{}
 
 	err := *new(error)
-	if err := binary.GetBinaryInfo(image1); err != nil {
+	if err := binary.GetBinaryInfo(image1, flagInfo); err != nil {
 		return fmt.Errorf("failed to get GetBinaryInfo from image %v: %v", flagInfo.Image1, err)
 	}
-	if err := binary.GetBinaryInfo(image2); err != nil {
+	if err := binary.GetBinaryInfo(image2, flagInfo); err != nil {
 		return fmt.Errorf("failed to GetBinaryInfo from image %v: %v", flagInfo.Image2, err)
 	}
-	binaryDiff, err := binary.Diff(image1, image2)
+	if err := image1.Rename(flagInfo); err != nil {
+		return fmt.Errorf("failed to rename image %v: %v", flagInfo.Image1, err)
+	}
+	if err := image2.Rename(flagInfo); err != nil {
+		return fmt.Errorf("failed to rename image %v: %v", flagInfo.Image2, err)
+	}
+
+	binaryDiff, err := binary.Diff(image1, image2, flagInfo)
 	if err != nil {
 		return fmt.Errorf("failed to get Binary Difference: %v", err)
 	}
@@ -48,18 +55,11 @@ func cosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo)
 }
 
 // CallCosImageAnalyzer is wrapper that gets the images, calls cosImageAnalyzer, and cleans up
-func CallCosImageAnalyzer(flagInfo *input.FlagInfo) error {
-	image1, image2, err := input.GetImages(flagInfo)
-	defer image1.Cleanup()
-	defer image2.Cleanup()
-	if err != nil {
-		return fmt.Errorf("failed to get images: %v", err)
-	}
-
-	if err := image1.MountImage(); err != nil {
+func CallCosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo) error {
+	if err := image1.MountImage(flagInfo.BinaryTypesSelected); err != nil {
 		return fmt.Errorf("failed to mount first image %v: %v", flagInfo.Image1, err)
 	}
-	if err := image2.MountImage(); err != nil {
+	if err := image2.MountImage(flagInfo.BinaryTypesSelected); err != nil {
 		return fmt.Errorf("failed to mount second image %v: %v", flagInfo.Image2, err)
 	}
 	if err := cosImageAnalyzer(image1, image2, flagInfo); err != nil {
@@ -79,8 +79,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = CallCosImageAnalyzer(flagInfo); err != nil {
-		log.Printf("%v\n", err)
+	image1, image2, err := input.GetImages(flagInfo)
+	if err != nil {
+		log.Printf("failed to get images: %v", err)
+		if err := image1.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
+		}
+		if err := image2.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
+		}
 		os.Exit(1)
+	}
+
+	if err = CallCosImageAnalyzer(image1, image2, flagInfo); err != nil {
+		log.Printf("%v\n", err)
+		if err := image1.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
+		}
+		if err := image2.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
+		}
+		os.Exit(1)
+	}
+	if err := image1.Cleanup(); err != nil {
+		log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
+	}
+	if err := image2.Cleanup(); err != nil {
+		log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
 	}
 }

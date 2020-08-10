@@ -24,13 +24,17 @@ type ImageDiff struct {
 func (imageDiff *ImageDiff) Formater(flagInfo *input.FlagInfo) (string, error) {
 	if flagInfo.OutputSelected == "terminal" {
 		binaryStrings := ""
-		binaryFunctions := map[string]func(*input.FlagInfo) string{
-			"Version": imageDiff.BinaryDiff.FormatVersionDiff,
-			"BuildID": imageDiff.BinaryDiff.FormatBuildIDDiff,
+		binaryFunctions := map[string]func() string{
+			"Version":             imageDiff.BinaryDiff.FormatVersionDiff,
+			"BuildID":             imageDiff.BinaryDiff.FormatBuildIDDiff,
+			"Rootfs":              imageDiff.BinaryDiff.FormatRootfsDiff,
+			"Stateful-partition":  imageDiff.BinaryDiff.FormatStatefulDiff,
+			"OS-config":           imageDiff.BinaryDiff.FormatOSConfigDiff,
+			"Partition-structure": imageDiff.BinaryDiff.FormatPartitionStructureDiff,
 		}
 		for diff := range binaryFunctions {
 			if utilities.InArray(diff, flagInfo.BinaryTypesSelected) {
-				binaryStrings += binaryFunctions[diff](flagInfo)
+				binaryStrings += binaryFunctions[diff]()
 			}
 		}
 
