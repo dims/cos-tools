@@ -22,7 +22,7 @@ import (
 
 const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
-	defaultGPUDriverFile          = "default_version"
+	defaultGPUDriverFile          = "gpu_default_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
 )
@@ -140,9 +140,8 @@ func RunDriverInstaller(installerFilename string, needSigned bool) error {
 
 	if needSigned {
 		// Run installer to compile drivers. Expect the command to fail as the drivers are not signed yet.
-		if err := utils.RunCommandAndLogOutput(cmd, true); err != nil {
-			return errors.Wrap(err, "failed to run GPU driver installer")
-		}
+		utils.RunCommandAndLogOutput(cmd, true)
+
 		// sign GPU drivers.
 		kernelFiles, err := ioutil.ReadDir(filepath.Join(extractDir, "kernel"))
 		if err != nil {
@@ -184,9 +183,9 @@ func RunDriverInstaller(installerFilename string, needSigned bool) error {
 }
 
 // GetDefaultGPUDriverVersion gets the default GPU driver version.
-func GetDefaultGPUDriverVersion(downloader cos.ExtensionsDownloader) (string, error) {
+func GetDefaultGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
 	log.Info("Getting the default GPU driver version")
-	content, err := downloader.GetExtensionArtifact(cos.GpuExtension, defaultGPUDriverFile)
+	content, err := downloader.GetArtifact(defaultGPUDriverFile)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get default GPU driver version")
 	}

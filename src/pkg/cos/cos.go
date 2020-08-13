@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"cos.googlesource.com/cos/tools/src/pkg/utils"
 
@@ -25,63 +24,20 @@ var (
 	execCommand = exec.Command
 )
 
-// DisableKernelModuleLocking disables kernel modules signing enforcement and loadpin so that unsigned kernel modules
-// can be loaded to COS kernel.
-func DisableKernelModuleLocking() error {
-	log.Info("Checking if third party kernel modules can be installed")
+// CheckKernelModuleSigning checks whether kernel module signing related options present.
+func CheckKernelModuleSigning(kernelCmdline string) bool {
+	log.Info("Checking kernel module signing.")
 
-	mountDir, err := ioutil.TempDir("", "mountdir")
-	if err != nil {
-		return errors.Wrap(err, "failed to create mount dir")
-	}
-
-	if err := syscall.Mount(espPartition, mountDir, "vfat", 0, ""); err != nil {
-		return errors.Wrap(err, "failed to mount path")
-	}
-
-	grubCfgPath := filepath.Join(mountDir, "esp/efi/boot/grub.cfg")
-	grubCfg, err := ioutil.ReadFile(grubCfgPath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read grub config from %s", grubCfgPath)
-	}
-
-	grubCfgStr := string(grubCfg)
-	needReboot := false
 	for _, kernelOption := range []string{
-		"module.sig_enforce",
-		"loadpin.enforce",
-		"loadpin.enabled",
+		"loadpin.exclude=kernel-module",
+		"modules-load=loadpin_trigger",
+		"module.sig_enforce=1",
 	} {
-		if newGrubCfgStr, needRebootOption := disableKernelOptionFromGrubCfg(kernelOption, grubCfgStr); needRebootOption {
-			needReboot = true
-			grubCfgStr = newGrubCfgStr
+		if !strings.Contains(kernelCmdline, kernelOption) {
+			return false
 		}
 	}
-
-	if needReboot {
-		log.Info("Modifying grub config to disable module locking.")
-		if err := os.Rename(grubCfgPath, grubCfgPath+".orig"); err != nil {
-			return errors.Wrapf(err, "failed to rename file %s", grubCfgPath)
-		}
-		if err := ioutil.WriteFile(grubCfgPath, []byte(grubCfgStr), 0644); err != nil {
-			return errors.Wrapf(err, "failed to write to file %s", grubCfgPath)
-		}
-	} else {
-		log.Info("Module locking has been disabled.")
-	}
-
-	syscall.Sync()
-	if err := syscall.Unmount(mountDir, 0); err != nil {
-		return err
-	}
-
-	if needReboot {
-		log.Warning("Rebooting")
-		if err := syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART); err != nil {
-			return errors.Wrap(err, "failed to reboot")
-		}
-	}
-	return nil
+	return true
 }
 
 // SetCompilationEnv sets compilation environment variables (e.g. CC, CXX) for third-party kernel module compilation.
@@ -119,15 +75,14 @@ func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error
 	}
 	if empty, _ := utils.IsDirEmpty(destDir); !empty {
 		log.Info("Found existing toolchain. Skipping download and installation")
-		return nil
-	}
+	} else {
+		if err := downloader.DownloadToolchain(destDir); err != nil {
+			return errors.Wrap(err, "failed to download toolchain")
+		}
 
-	if err := downloader.DownloadToolchain(destDir); err != nil {
-		return errors.Wrap(err, "failed to download toolchain")
-	}
-
-	if err := exec.Command("tar", "xf", filepath.Join(destDir, toolchainArchive), "-C", destDir).Run(); err != nil {
-		return errors.Wrap(err, "failed to extract toolchain archive tarball")
+		if err := exec.Command("tar", "xf", filepath.Join(destDir, toolchainArchive), "-C", destDir).Run(); err != nil {
+			return errors.Wrap(err, "failed to extract toolchain archive tarball")
+		}
 	}
 
 	log.Info("Configuring environment variables for cross-compilation")

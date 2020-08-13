@@ -47,7 +47,7 @@ func (c *ListCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfa
 		return subcommands.ExitFailure
 	}
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
-	downloader := &cos.GCSDownloader{envReader, c.internalDownload}
+	downloader := cos.NewGCSDownloader(envReader, c.internalDownload)
 	artifacts, err := downloader.ListExtensionArtifacts("gpu")
 	if err != nil {
 		c.logError(errors.Wrap(err, "failed to list gpu extension artifacts"))
