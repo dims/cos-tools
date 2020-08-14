@@ -42,7 +42,7 @@ func cosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo)
 	}
 	imageDiff.BinaryDiff = binaryDiff
 
-	output, err := imageDiff.Formater(flagInfo)
+	output, err := imageDiff.Formater(image1.TempDir, image2.TempDir, flagInfo)
 	if err != nil {
 		return fmt.Errorf("failed to format image difference: %v", err)
 	}
@@ -68,43 +68,39 @@ func CallCosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagI
 	return nil
 }
 
+func analyze(flagInfo *input.FlagInfo) error {
+	var image1, image2 *input.ImageInfo
+	defer func() {
+		if err := image1.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
+		}
+		if err := image2.Cleanup(); err != nil {
+			log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
+		}
+	}()
+	var err error
+	image1, image2, err = input.GetImages(flagInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get images: %v", err)
+	}
+	if err := CallCosImageAnalyzer(image1, image2, flagInfo); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	if runtime.GOOS != "linux" {
 		fmt.Printf("Error: This is a Linux tool, can not run on %s", runtime.GOOS)
 	}
-
 	flagInfo, err := input.ParseFlags()
 	if err != nil {
 		log.Printf("failed to parse flags: %v\n", err)
 		os.Exit(1)
 	}
-
-	image1, image2, err := input.GetImages(flagInfo)
-	if err != nil {
-		log.Printf("failed to get images: %v", err)
-		if err := image1.Cleanup(); err != nil {
-			log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
-		}
-		if err := image2.Cleanup(); err != nil {
-			log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
-		}
-		os.Exit(1)
-	}
-
-	if err = CallCosImageAnalyzer(image1, image2, flagInfo); err != nil {
+	if err := analyze(flagInfo); err != nil {
 		log.Printf("%v\n", err)
-		if err := image1.Cleanup(); err != nil {
-			log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
-		}
-		if err := image2.Cleanup(); err != nil {
-			log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
-		}
 		os.Exit(1)
 	}
-	if err := image1.Cleanup(); err != nil {
-		log.Printf("failed to clean up image %v: %v", flagInfo.Image1, err)
-	}
-	if err := image2.Cleanup(); err != nil {
-		log.Printf("failed to clean up image %v: %v", flagInfo.Image2, err)
-	}
+	os.Exit(0)
 }

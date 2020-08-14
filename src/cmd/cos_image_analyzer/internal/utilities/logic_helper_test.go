@@ -71,3 +71,25 @@ func TestFileExists(t *testing.T) {
 		}
 	}
 }
+
+// test SliceToMapStr function
+func TestSliceToMapStr(t *testing.T) {
+	type test struct {
+		input []string
+		want  map[string]string
+	}
+
+	tests := []test{
+		{input: []string{"a", "b", "c", "d"}, want: map[string]string{"a": "", "b": "", "c": "", "d": ""}},
+		{input: []string{}, want: map[string]string{}},
+	}
+
+	for _, tc := range tests {
+		got := SliceToMapStr(tc.input)
+		for k, v := range tc.want {
+			if v != got[k] {
+				t.Fatalf("SliceToMapStr call expected: %v, got: %v", tc.want, got)
+			}
+		}
+	}
+}

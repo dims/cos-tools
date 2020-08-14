@@ -1,3 +1,0 @@
-/proc/
-/usr/lib/
-/docker/util/
