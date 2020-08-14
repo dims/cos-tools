@@ -76,12 +76,12 @@
       {{range $commit := $table.Additions}}
       <tr>
         <td class="commit-sha addition">
-          <a href={{$commit.SHA.URL}}>{{$commit.SHA.Name}}</a>
+          <a href={{$commit.SHA.URL}}  target="_blank">{{$commit.SHA.Name}}</a>
         </td>
         <td class="commit-subject">{{$commit.Subject}}</td>
         <td class="commit-bugs">
           {{range $bugAttr := $commit.Bugs}}
-          <a href={{$bugAttr.URL}}>{{$bugAttr.Name}}</a>
+          <a href={{$bugAttr.URL}}  target="_blank">{{$bugAttr.Name}}</a>
           {{end}}
         </td>
         <td class="commit-author">{{$commit.AuthorName}}</td>
@@ -92,18 +92,18 @@
       {{end}}
     </table>
     {{if (ne $table.AdditionsLink "")}}
-      <a class="gob-link" href={{$table.AdditionsLink}}>Show more commits</a>
+      <a class="gob-link" href={{$table.AdditionsLink}}  target="_blank">Show more commits</a>
     {{end}}
     <table class="repo-table">
       {{range $commit := $table.Removals}}
       <tr>
         <td class="commit-sha removal">
-          <a href={{$commit.SHA.URL}}>{{$commit.SHA.Name}}</a>
+          <a href={{$commit.SHA.URL}}  target="_blank">{{$commit.SHA.Name}}</a>
         </td>
         <td class="commit-subject">{{$commit.Subject}}</td>
         <td class="commit-bugs">
           {{range $bugAttr := $commit.Bugs}}
-          <a href={{$bugAttr.URL}}>{{$bugAttr.Name}}</a>
+          <a href={{$bugAttr.URL}}  target="_blank">{{$bugAttr.Name}}</a>
           {{end}}
         </td>
         <td class="commit-author">{{$commit.AuthorName}}</td>
@@ -114,7 +114,7 @@
       {{end}}
     </table>
     {{if (ne $table.RemovalsLink "")}}
-      <a class="gob-link" href={{$table.RemovalsLink}}>Show more commits</a>
+      <a class="gob-link" href={{$table.RemovalsLink}} target="_blank">Show more commits</a>
     {{end}}
     {{end}}
   </div>
