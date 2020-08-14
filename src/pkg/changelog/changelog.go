@@ -18,7 +18,7 @@
 // commits in the source build that aren't present in the target build. This
 // package uses concurrency to improve performance.
 //
-// This packages uses Gitiles to request information from a Git on Borg instance.
+// This package uses Gitiles to request information from a Git on Borg instance.
 // To generate a changelog, the package first retrieves the the manifest files for
 // the two requested builds using the provided manifest GoB instance and repository.
 // The package then parses the XML files and retrieves the committish and instance
@@ -30,26 +30,16 @@
 package changelog
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
+	"cos.googlesource.com/cos/tools/src/pkg/utils"
 	"github.com/beevik/etree"
 	log "github.com/sirupsen/logrus"
 	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"
-)
-
-const (
-	manifestFileName string = "snapshot.xml"
-
-	// These constants are used for exponential increase in Gitiles request size.
-	defaultPageSize          int = 1000
-	pageSizeGrowthMultiplier int = 5
-	maxPageSize              int = 10000
 )
 
 type repo struct {
@@ -75,15 +65,6 @@ type commitsResult struct {
 type additionsResult struct {
 	Additions map[string]*RepoLog
 	Err       error
-}
-
-// limitPageSize will restrict a request page size to min of pageSize (which grows exponentially)
-// or remaining request size
-func limitPageSize(pageSize, requestedSize int) int {
-	if requestedSize == -1 || pageSize <= requestedSize {
-		return pageSize
-	}
-	return requestedSize
 }
 
 func gerritClient(httpClient *http.Client, remoteURL string) (gitilesProto.GitilesClient, error) {
@@ -116,6 +97,9 @@ func createGerritClients(clients map[string]gitilesProto.GitilesClient, httpClie
 // of source committish when generating changelog.
 func repoMap(manifest string) (map[string]*repo, error) {
 	log.Debug("Mapping repository to instance URL and committish")
+	if manifest == "" {
+		return nil, fmt.Errorf("repoMap: manifest data is empty")
+	}
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(manifest); err != nil {
 		return nil, fmt.Errorf("repoMap: error parsing manifest xml:\n%v", err)
@@ -150,13 +134,7 @@ func repoMap(manifest string) (map[string]*repo, error) {
 // mappedManifest retrieves a Manifest file from GoB and unmarshals XML.
 func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum string) (map[string]*repo, error) {
 	log.Debugf("Retrieving manifest file for build %s\n", buildNum)
-	request := gitilesProto.DownloadFileRequest{
-		Project:    repo,
-		Committish: "refs/tags/" + buildNum,
-		Path:       manifestFileName,
-		Format:     1,
-	}
-	response, err := client.DownloadFile(context.Background(), &request)
+	response, err := utils.DownloadManifest(client, repo, buildNum)
 	if err != nil {
 		return nil, fmt.Errorf("mappedManifest: error downloading manifest file from repo %s:\n%v",
 			repo, err)
@@ -169,70 +147,22 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 	return mappedManifest, nil
 }
 
-// commits get all commits that occur between committish and ancestor for a specific repo.
+// commits retrieves a parsed list of commits between an ancestor and a committish
 func commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
-	start := time.Now()
-
-	pageSize := limitPageSize(defaultPageSize, querySize)
-	querySize -= pageSize
-	request := gitilesProto.LogRequest{
-		Project:            repo,
-		Committish:         committish,
-		ExcludeAncestorsOf: ancestor,
-		PageSize:           int32(pageSize),
-	}
-	response, err := client.Log(context.Background(), &request)
+	commits, hasMoreCommits, err := utils.Commits(client, repo, committish, ancestor, querySize)
 	if err != nil {
-		outputChan <- commitsResult{Err: fmt.Errorf("commits: Error retrieving log for repo: %s with committish: %s and ancestor %s:\n%v",
-			repo, committish, ancestor, err)}
-		return
+		outputChan <- commitsResult{Err: err}
 	}
-
-	// No nextPageToken means there were less than <defaultPageSize> commits total.
-	// We can immediately return.
-	if response.NextPageToken == "" {
-		log.Debugf("Retrieved %d commits from %s in %s\n", len(response.Log), repo, time.Since(start))
-		parsedCommits, err := ParseGitCommitLog(response.Log)
-		if err != nil {
-			outputChan <- commitsResult{Err: fmt.Errorf("commits: Error parsing log response for repo: %s with committish: %s and ancestor %s:\n%v",
-				repo, committish, ancestor, err)}
-			return
-		}
-		outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits, HasMoreCommits: (response.NextPageToken != "")}
-		return
-	}
-	// Retrieve remaining commits using exponential increase in pageSize.
-	allCommits := response.Log
-	for querySize > 0 && response.NextPageToken != "" {
-		if pageSize < maxPageSize {
-			pageSize *= pageSizeGrowthMultiplier
-		}
-		pageSize = limitPageSize(pageSize, querySize)
-		querySize -= pageSize
-		request := gitilesProto.LogRequest{
-			Project:            repo,
-			Committish:         committish,
-			ExcludeAncestorsOf: ancestor,
-			PageToken:          response.NextPageToken,
-			PageSize:           int32(pageSize),
-		}
-		response, err = client.Log(context.Background(), &request)
-		if err != nil {
-			outputChan <- commitsResult{Err: fmt.Errorf("commits: Error retrieving log for repo: %s with committish: %s and ancestor %s:\n%v",
-				repo, committish, ancestor, err)}
-			return
-		}
-		allCommits = append(allCommits, response.Log...)
-	}
-	log.Debugf("Retrieved %d commits from %s in %s\n", len(allCommits), repo, time.Since(start))
-	parsedCommits, err := ParseGitCommitLog(allCommits)
+	parsedCommits, err := ParseGitCommitLog(commits)
 	if err != nil {
-		outputChan <- commitsResult{Err: fmt.Errorf("commits: Error parsing log response for repo: %s with committish: %s and ancestor %s:\n%v",
-			repo, committish, ancestor, err)}
-		return
+		outputChan <- commitsResult{Err: err}
 	}
-	outputChan <- commitsResult{RepoURL: repo, Commits: parsedCommits, HasMoreCommits: (response.NextPageToken != "")}
+	outputChan <- commitsResult{
+		RepoURL:        repo,
+		Commits:        parsedCommits,
+		HasMoreCommits: hasMoreCommits,
+	}
 }
 
 // additions retrieves all commits that occured between 2 parsed manifest files for each repo.
@@ -276,8 +206,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 
 // Changelog generates a changelog between 2 build numbers
 //
-// authenticator is an auth.Authenticator object that is used to build authenticated
-// Gitiles clients
+// httpClient is a authorized http.Client object with Gerrit scope.
 //
 // sourceBuildNum and targetBuildNum should be build numbers. It should match
 // a tag that links directly to snapshot.xml
@@ -339,11 +268,11 @@ func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum st
 	go additions(clients, targetRepos, sourceRepos, querySize, missChan)
 	missRes := <-missChan
 	if missRes.Err != nil {
-		return nil, nil, fmt.Errorf("Changelog: failure when retrieving missed commits:\n%v", err)
+		return nil, nil, fmt.Errorf("Changelog: failure when retrieving missed commits:\n%v", missRes.Err)
 	}
 	addRes := <-addChan
 	if addRes.Err != nil {
-		return nil, nil, fmt.Errorf("Changelog: failure when retrieving commit additions:\n%v", err)
+		return nil, nil, fmt.Errorf("Changelog: failure when retrieving commit additions:\n%v", addRes.Err)
 	}
 
 	return addRes.Additions, missRes.Additions, nil
