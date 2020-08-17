@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -25,6 +26,8 @@ import (
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -39,10 +42,33 @@ var (
 	externalInstance     string
 	externalManifestRepo string
 	envQuerySize         string
-	staticBasePath       string
-	indexTemplate        *template.Template
-	changelogTemplate    *template.Template
-	promptLoginTemplate  *template.Template
+
+	staticBasePath          string
+	indexTemplate           *template.Template
+	changelogTemplate       *template.Template
+	promptLoginTemplate     *template.Template
+	locateCLTemplate        *template.Template
+	statusForbiddenTemplate *template.Template
+	basicTextTemplate       *template.Template
+
+	grpcCodeToHeader = map[string]string{
+		codes.Canceled.String():           "499 Client Closed Request",
+		codes.Unknown.String():            "500 Internal Server Error",
+		codes.InvalidArgument.String():    "400 Bad Request",
+		codes.DeadlineExceeded.String():   "504 Gateway Timeout",
+		codes.NotFound.String():           "404 Not Found",
+		codes.PermissionDenied.String():   "403 Forbidden",
+		codes.Unauthenticated.String():    "401 Unauthorized",
+		codes.ResourceExhausted.String():  "429 Too Many Requests",
+		codes.FailedPrecondition.String(): "400 Bad Request",
+		codes.Aborted.String():            "409 Conflict",
+		codes.OutOfRange.String():         "400 Bad Request",
+		codes.Unimplemented.String():      "501 Not Implemented",
+		codes.Internal.String():           "500 Internal Server Error",
+		codes.Unavailable.String():        "503 Service Unavailable",
+		codes.DataLoss.String():           "500 Internal Server Error",
+	}
+	gitiles403Desc = "unexpected HTTP 403 from Gitiles"
 )
 
 func init() {
@@ -66,6 +92,7 @@ func init() {
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
+	basicTextTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/error.html"))
 }
 
 type changelogData struct {
@@ -83,6 +110,16 @@ type changelogPage struct {
 	QuerySize  string
 	RepoTables []*repoTable
 	Internal   bool
+}
+
+type statusPage struct {
+	ActivePage string
+}
+
+type basicTextPage struct {
+	Header     string
+	Body       string
+	ActivePage string
 }
 
 type repoTable struct {
@@ -112,10 +149,6 @@ type shaAttr struct {
 type bugAttr struct {
 	Name string
 	URL  string
-}
-
-type promptLoginPage struct {
-	ActivePage string
 }
 
 // getIntVerifiedEnv retrieves an environment variable but checks that it can be
@@ -197,6 +230,39 @@ func createChangelogPage(data changelogData) *changelogPage {
 	return page
 }
 
+// handleError creates the error page for a given error
+func handleError(w http.ResponseWriter, inputErr error, currPage string) {
+	var header, text string
+	innerErr := inputErr
+	for errors.Unwrap(innerErr) != nil {
+		innerErr = errors.Unwrap(innerErr)
+	}
+	rpcStatus, ok := status.FromError(innerErr)
+	// Error is not a status code, display generic header
+	if !ok {
+		basicTextTemplate.Execute(w, &basicTextPage{
+			Header:     "An error occurred while fulfilling your request",
+			Body:       innerErr.Error(),
+			ActivePage: currPage,
+		})
+		return
+	}
+	code, text := rpcStatus.Code(), rpcStatus.Message()
+	// RPC status code misclassifies 403 error as internal for Gitiles requests
+	if text == gitiles403Desc {
+		code = codes.PermissionDenied
+	}
+	if _, ok := grpcCodeToHeader[code.String()]; !ok {
+		header = "An error occurred while fulfilling your request"
+	}
+	header = grpcCodeToHeader[code.String()]
+	basicTextTemplate.Execute(w, &basicTextPage{
+		Header:     header,
+		Body:       text,
+		ActivePage: currPage,
+	})
+}
+
 // HandleIndex serves the home page
 func HandleIndex(w http.ResponseWriter, r *http.Request) {
 	indexTemplate.Execute(w, nil)
@@ -204,17 +270,17 @@ func HandleIndex(w http.ResponseWriter, r *http.Request) {
 
 // HandleChangelog serves the changelog page
 func HandleChangelog(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
-		return
-	}
 	httpClient, err := HTTPClient(w, r, "/changelog/")
 	if err != nil {
 		log.Debug(err)
-		err = promptLoginTemplate.Execute(w, &promptLoginPage{ActivePage: "changelog"})
+		err = promptLoginTemplate.Execute(w, &statusPage{ActivePage: "changelog"})
 		if err != nil {
 			log.Errorf("HandleChangelog: error executing promptLogin template: %v", err)
 		}
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		return
 	}
 	source := r.FormValue("source")
@@ -236,7 +302,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("HandleChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
 			source, target, externalInstance, externalManifestRepo, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		handleError(w, err, "changelog")
 		return
 	}
 	page := createChangelogPage(changelogData{
