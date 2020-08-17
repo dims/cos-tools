@@ -15,6 +15,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"strings"
 	"text/template"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
 
 	log "github.com/sirupsen/logrus"
@@ -44,9 +46,20 @@ var (
 )
 
 func init() {
-	internalInstance = os.Getenv("COS_INTERNAL_INSTANCE")
-	internalManifestRepo = os.Getenv("COS_INTERNAL_MANIFEST_REPO")
-	externalInstance = os.Getenv("COS_EXTERNAL_INSTANCE")
+	var err error
+	client, err := secretmanager.NewClient(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to setup client: %v", err)
+	}
+	internalInstance, err = getSecret(client, os.Getenv("COS_INTERNAL_GOB_INSTANCE_NAME"))
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_GOB_INSTANCE_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_GOB_INSTANCE_NAME"), err)
+	}
+	internalManifestRepo, err = getSecret(client, os.Getenv("COS_INTERNAL_MANIFEST_REPO_NAME"))
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_MANIFEST_REPO_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_MANIFEST_REPO_NAME"), err)
+	}
+	externalInstance = os.Getenv("COS_EXTERNAL_GOB_INSTANCE")
 	externalManifestRepo = os.Getenv("COS_EXTERNAL_MANIFEST_REPO")
 	envQuerySize = getIntVerifiedEnv("CHANGELOG_QUERY_SIZE")
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
@@ -195,7 +208,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 		changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		return
 	}
-	httpClient, err := HTTPClient(r)
+	httpClient, err := HTTPClient(w, r, "/changelog/")
 	if err != nil {
 		log.Debug(err)
 		err = promptLoginTemplate.Execute(w, &promptLoginPage{ActivePage: "changelog"})

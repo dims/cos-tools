@@ -16,22 +16,26 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"github.com/gorilla/sessions"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
 const (
 	// Session variables
 	sessionName      = "changelog"
 	sessionKeyLength = 32
+	sessionAge       = 84600
 
 	// Oauth state generation variables
 	oauthStateCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
@@ -40,37 +44,85 @@ const (
 
 var config = &oauth2.Config{
 	ClientID:     os.Getenv("OAUTH_CLIENT_ID"),
-	ClientSecret: os.Getenv("OAUTH_CLIENT_SECRET"),
+	ClientSecret: "",
 	Endpoint:     google.Endpoint,
 	RedirectURL:  "https://cos-oss-interns-playground.uc.r.appspot.com/oauth2callback/",
 	Scopes:       []string{"https://www.googleapis.com/auth/gerritcodereview"},
 }
+var store *sessions.CookieStore
+var projectID = os.Getenv("COS_CHANGELOG_PROJECT_ID")
+var clientSecretName = os.Getenv("COS_CHANGELOG_CLIENT_SECRET_NAME")
+var sessionSecretName = os.Getenv("COS_CHANGELOG_SESSION_SECRET_NAME")
 
-var store = sessions.NewCookieStore([]byte(randomString(sessionKeyLength)))
+// ErrorSessionRetrieval indicates that a request has no session, or the
+// session was malformed.
+var ErrorSessionRetrieval = errors.New("No session found")
 
-func randomString(stringSize int) string {
+func init() {
+	var err error
+	client, err := secretmanager.NewClient(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to setup client: %v", err)
+	}
+	config.ClientSecret, err = getSecret(client, clientSecretName)
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret: %s\n%v", clientSecretName, err)
+	}
+
+	sessionSecret, err := getSecret(client, sessionSecretName)
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret :%s\n%v", sessionSecretName, err)
+	}
+	store = sessions.NewCookieStore([]byte(sessionSecret))
+	store.MaxAge(sessionAge)
+}
+
+// Retrieve secrets stored in Gcloud Secret Manager
+func getSecret(client *secretmanager.Client, secretName string) (string, error) {
+	accessRequest := &secretmanagerpb.AccessSecretVersionRequest{
+		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, secretName),
+	}
+	result, err := client.AccessSecretVersion(context.Background(), accessRequest)
+	if err != nil {
+		return "", fmt.Errorf("Failed to access secret at %s: %v", accessRequest.Name, err)
+	}
+	return string(result.Payload.Data), nil
+}
+
+func randomString(stringSize int, suffix string) string {
 	randWithSeed := rand.New(rand.NewSource(time.Now().UnixNano()))
 	stateArr := make([]byte, stringSize)
 	for i := range stateArr {
 		stateArr[i] = oauthStateCharset[randWithSeed.Intn(len(oauthStateCharset))]
 	}
-	return string(stateArr)
+	return string(stateArr) + suffix
 }
 
-// HTTPClient creates an authorized HTTP Client
-func HTTPClient(r *http.Request) (*http.Client, error) {
+func returnURLFromState(state string) string {
+	return state[oauthStateLength:]
+}
+
+// HTTPClient creates an authorized HTTP Client using stored token credentials.
+// Returns error if no session or a malformed session is detected.
+// Otherwise returns an HTTP Client with the stored Oauth access token.
+// If the access token is expired, automatically refresh the token
+func HTTPClient(w http.ResponseWriter, r *http.Request, returnURL string) (*http.Client, error) {
 	var parsedExpiry time.Time
 	session, err := store.Get(r, sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("HTTPClient: No session found with sessionName %s", sessionName)
+	if err != nil || session.IsNew {
+		return nil, ErrorSessionRetrieval
 	}
 	for _, key := range []string{"accessToken", "refreshToken", "tokenType", "expiry"} {
 		if val, ok := session.Values[key]; !ok || val == nil {
-			return nil, fmt.Errorf("HTTPClient: Session missing key %s", key)
+			return nil, ErrorSessionRetrieval
 		}
 	}
 	if parsedExpiry, err = time.Parse(time.RFC3339, session.Values["expiry"].(string)); err != nil {
-		return nil, fmt.Errorf("HTTPClient: Token expiry is in an incorrect format")
+		return nil, ErrorSessionRetrieval
+	}
+	if parsedExpiry.Before(time.Now()) {
+		log.Debug("HTTPClient: Token expired, calling Oauth flow")
+		HandleLogin(w, r, returnURL)
 	}
 	token := &oauth2.Token{
 		AccessToken:  session.Values["accessToken"].(string),
@@ -81,9 +133,12 @@ func HTTPClient(r *http.Request) (*http.Client, error) {
 	return config.Client(context.Background(), token), nil
 }
 
-// HandleLogin handles login
-func HandleLogin(w http.ResponseWriter, r *http.Request) {
-	state := randomString(oauthStateLength)
+// HandleLogin initiates the Oauth flow.
+func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string) {
+	state := randomString(oauthStateLength, returnURL)
+	// Ignore store.Get() errors in HandleLogin because an error indicates the
+	// old session could not be deciphered. It returns a new session
+	// regardless.
 	session, _ := store.Get(r, sessionName)
 	session.Values["oauthState"] = state
 	err := session.Save(r, w)
@@ -97,7 +152,9 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
-// HandleCallback handles callback
+// HandleCallback handles the response from the Oauth callback URL.
+// It verifies response state and populates session with callback values.
+// Redirects to URL stored in the callback state on completion.
 func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Errorf("Could not parse query: %v\n", err)
@@ -113,7 +170,12 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if callbackState != session.Values["oauthState"].(string) {
+	if val, ok := session.Values["oauthState"]; !ok || val == nil {
+		http.Redirect(w, r, "/", http.StatusPermanentRedirect)
+		return
+	}
+	sessionState := session.Values["oauthState"].(string)
+	if callbackState != sessionState {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -136,5 +198,5 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusPermanentRedirect)
+	http.Redirect(w, r, returnURLFromState(sessionState), http.StatusPermanentRedirect)
 }

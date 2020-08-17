@@ -1,0 +1,23 @@
+runtime: go114
+instance_class: F2
+
+env_variables:
+  # Authentication variables
+  COS_CHANGELOG_PROJECT_ID: "cos-oss-interns-playground"  # Used to access project secrets from secret manager
+  OAUTH_CLIENT_ID: "1080882898042-86cke9tvtqd9vrfnd8dj8ub6m0stjv2u.apps.googleusercontent.com"
+  COS_CHANGELOG_CLIENT_SECRET_NAME: "cos-changelog-client-secret"
+  COS_CHANGELOG_SESSION_SECRET_NAME: "cos-changelog-session-secret"
+
+  # Webpage configuration
+  STATIC_BASE_PATH: "src/cmd/changelog-webapp/static/"
+  CHANGELOG_QUERY_SIZE: "50"
+
+  # External sources
+  COS_EXTERNAL_GERRIT_INSTANCE: "cos-review.googlesource.com"
+  COS_EXTERNAL_GOB_INSTANCE: "cos.googlesource.com"
+  COS_EXTERNAL_MANIFEST_REPO: "cos/manifest-snapshots"
+
+  # Internal source names (values are retrieved from secret manager)
+  COS_INTERNAL_GERRIT_INSTANCE_NAME: "cos-internal-gerrit-instance"
+  COS_INTERNAL_GOB_INSTANCE_NAME: "cos-internal-gob-instance"
+  COS_INTERNAL_MANIFEST_REPO_NAME: "cos-internal-manifest-repo"
