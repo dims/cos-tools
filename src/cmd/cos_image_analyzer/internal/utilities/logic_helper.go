@@ -1,10 +1,10 @@
 package utilities
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
 )
 
@@ -51,34 +51,37 @@ func FileExists(path, desiredType string) int {
 	return 1
 }
 
-// CopyFile copies a file over to a new destinaton
-// Input:
-//   (string) path - Local path to the file
-//   (string) dest - Destination to copy the file
-// Output:
-//   (string) copiedFile - path to the newly copied file
-func CopyFile(path, dest string) (string, error) {
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) || info.IsDir() {
-		return "", errors.New("Error: " + path + " is not a file")
-	}
-
-	sourceFile, err := os.Open(path)
+// WriteToNewFile creates a file and writes a string into it
+func WriteToNewFile(filename string, data string) error {
+	file, err := os.Create(filename)
 	if err != nil {
-		return "", errors.New("Error: failed to open file " + path)
+		return err
 	}
-	defer sourceFile.Close()
+	defer file.Close()
 
-	// Create new file
-	copiedFile := filepath.Join(dest, info.Name())
-	newFile, err := os.Create(copiedFile)
+	_, err = io.WriteString(file, data)
 	if err != nil {
-		return "", errors.New("Error: failed to create file " + copiedFile)
+		return err
 	}
-	defer newFile.Close()
+	return file.Sync()
+}
 
-	if _, err := io.Copy(newFile, sourceFile); err != nil {
-		return "", errors.New("Error: failed to copy " + path + " into " + copiedFile)
+// SliceToMapStr initializes a map with keys from input and empty strings as values
+func SliceToMapStr(input []string) map[string]string {
+	output := make(map[string]string)
+	for _, elem := range input {
+		output[elem] = ""
 	}
-	return copiedFile, nil
+	return output
+}
+
+// Unmount umounts a mounted directory and deletes its loop device
+func Unmount(mountedDirectory, loopDevice string) error {
+	if _, err := exec.Command("sudo", "umount", mountedDirectory).Output(); err != nil {
+		return fmt.Errorf("failed to umount directory %v: %v", mountedDirectory, err)
+	}
+	if _, err := exec.Command("sudo", "losetup", "-d", loopDevice).Output(); err != nil {
+		return fmt.Errorf("failed to delete loop device %v: %v", loopDevice, err)
+	}
+	return nil
 }

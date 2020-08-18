@@ -7,7 +7,7 @@ import (
 // test ReadFileToMap function
 func TestReadFileToMap(t *testing.T) {
 	// test normal file
-	testFile, sep := "../testdata/os-release-77", "="
+	testFile, sep := "../testdata/image2/rootfs/etc/os-release", "="
 	expectedMap := map[string]string{"BUILD_ID": "12371.273.0", "ID": "cos"}
 	resultMap, _ := ReadFileToMap(testFile, sep)
 

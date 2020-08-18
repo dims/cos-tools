@@ -43,7 +43,6 @@ func ReadFileToMap(filePath, sep string) (map[string]string, error) {
 //   (map[string]string) map2 - Second map to be compared
 //   (string) key - The key of the value be compared in both maps
 // Output:
-//   (stdout) terminal - If equal, print nothing. Else print difference
 //   (int) result - -1 for error, 0 for no difference, 1 for difference
 func CmpMapValues(map1, map2 map[string]string, key string) (int, error) {
 	value1, ok1 := map1[key]

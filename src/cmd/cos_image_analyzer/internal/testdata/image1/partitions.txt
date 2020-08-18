@@ -1,0 +1,22 @@
+Disk /img_disks/cos_81_12871_119_disk/disk.raw: 20971520 sectors, 10.0 GiB
+Sector size (logical): 512 bytes
+Disk identifier (GUID): 0274E604-5DE3-5E4E-A4FD-F4D00FBBD7AA
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 18874491
+Partitions will be aligned on 1-sector boundaries
+Total free space is 135145 sectors (66.0 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1         8704000        18874476   4.8 GiB     8300  STATE
+   2           20480           53247   16.0 MiB    7F00  KERN-A
+   3         4509696         8703999   2.0 GiB     7F01  ROOT-A
+   4           53248           86015   16.0 MiB    7F00  KERN-B
+   5          315392         4509695   2.0 GiB     7F01  ROOT-B
+   6           16448           16448   512 bytes   7F00  KERN-C
+   7           16449           16449   512 bytes   7F01  ROOT-C
+   8           86016          118783   16.0 MiB    8300  OEM
+   9           16450           16450   512 bytes   7F02  reserved
+  10           16451           16451   512 bytes   7F02  reserved
+  11              64           16447   8.0 MiB     EF02  RWFW
+  12          249856          315391   32.0 MiB    EF00  EFI-SYSTEM

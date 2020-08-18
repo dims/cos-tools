@@ -20,7 +20,7 @@ import (
 
 const sectorSize = 512
 const gcsObjFormat = ".tar.gz"
-const filemode = 0700
+const makeDirFilemode = 0700
 const timeOut = "7200s"
 const imageFormat = "vmdk"
 const name = "gcr.io/compute-image-tools/gce_vm_image_export:release"
@@ -30,8 +30,13 @@ type ImageInfo struct {
 	// Input Overhead
 	TempDir          string // Temporary directory holding the mounted image and disk file
 	DiskFile         string // Path to the DOS/MBR disk partition file
+	PartitionFile    string // Path to the file storing the disk partition structure from "sgdisk"
+	StatePartition1  string // Path to mounted directory of partition #1, stateful partition
 	RootfsPartition3 string // Path to mounted directory of partition #3, Rootfs-A
+	EFIPartition12   string // Path to mounted directory of partition #12, EFI-System
+	LoopDevice1      string // Active loop device for mounted image
 	LoopDevice3      string // Active loop device for mounted image
+	LoopDevice12     string // Active loop device for mounted image
 
 	// Binary info
 	Version string
@@ -40,6 +45,31 @@ type ImageInfo struct {
 	// Package info
 	// Commit info
 	// Release notes info
+}
+
+// Rename temporary directory and its contents once Version and BuildID are known
+func (image *ImageInfo) Rename(flagInfo *FlagInfo) error {
+	if image.Version != "" && image.BuildID != "" {
+		fullImageName := "cos-" + image.Version + "-" + image.BuildID
+		if err := os.Rename(image.TempDir, fullImageName); err != nil {
+			return fmt.Errorf("Error: Failed to rename directory %v to %v: %v", image.TempDir, fullImageName, err)
+		}
+		image.TempDir = fullImageName
+
+		if !flagInfo.LocalPtr {
+			image.DiskFile = filepath.Join(fullImageName, "disk.raw")
+		}
+		if image.RootfsPartition3 != "" {
+			image.RootfsPartition3 = filepath.Join(fullImageName, "rootfs")
+		}
+		if image.StatePartition1 != "" {
+			image.StatePartition1 = filepath.Join(fullImageName, "stateful")
+		}
+		if image.EFIPartition12 != "" {
+			image.EFIPartition12 = filepath.Join(fullImageName, "efi")
+		}
+	}
+	return nil
 }
 
 // getPartitionStart finds the start partition offset of the disk
@@ -79,6 +109,29 @@ func getPartitionStart(partition, diskRaw string) (int, error) {
 	return start, nil
 }
 
+// GetPartitionStructure returns the partition structure of .raw file
+// Input:
+//   (string) diskRaw - Path to the boot .raw file
+// Output:
+//   (string) partitionStructure - The output of the fdisk command
+func (image *ImageInfo) GetPartitionStructure() error {
+	if image.TempDir == "" {
+		return nil
+	}
+
+	out, err := exec.Command("sudo", "sgdisk", "-p", image.DiskFile).Output()
+	if err != nil {
+		return fmt.Errorf("failed to call sgdisk -p %v: %v", image.DiskFile, err)
+	}
+
+	partitionFile := filepath.Join(image.TempDir, "partitions.txt")
+	if err := utilities.WriteToNewFile(partitionFile, string(out[:])); err != nil {
+		return fmt.Errorf("failed create file %v and write %v: %v", partitionFile, string(out[:]), err)
+	}
+	image.PartitionFile = partitionFile
+	return nil
+}
+
 // mountDisk finds a free loop device and mounts a DOS/MBR disk file
 // Input:
 //   (string) diskFile - Name of DOS/MBR file (ex: disk.raw)
@@ -108,25 +161,54 @@ func mountDisk(diskFile, mountDir, partition string) (string, error) {
 
 // MountImage is an ImagInfo method that mounts partitions 1,3 and 12 of
 // the image into the temporary directory
-// Input: None
+// Input:
+//   (string) arr - List of binary types selected from the user
 // Output: nil on success, else error
-func (image *ImageInfo) MountImage() error {
+func (image *ImageInfo) MountImage(arr []string) error {
 	if image.TempDir == "" {
 		return nil
 	}
+	if utilities.InArray("Stateful-partition", arr) {
+		stateful := filepath.Join(image.TempDir, "stateful")
+		if err := os.Mkdir(stateful, makeDirFilemode); err != nil {
+			return fmt.Errorf("failed to create make directory %v: %v", stateful, err)
+		}
+		image.StatePartition1 = stateful
 
-	rootfs := filepath.Join(image.TempDir, "rootFS")
-	if err := os.Mkdir(rootfs, filemode); err != nil {
-		return fmt.Errorf("failed to create make directory %v: %v", rootfs, err)
+		loopDevice1, err := mountDisk(image.DiskFile, image.StatePartition1, "1")
+		if err != nil {
+			return fmt.Errorf("Failed to mount %v's partition #1 onto %v: %v", image.DiskFile, image.StatePartition1, err)
+		}
+		image.LoopDevice1 = loopDevice1
 	}
-	image.RootfsPartition3 = rootfs
 
-	loopDevice3, err := mountDisk(image.DiskFile, image.RootfsPartition3, "3")
-	if err != nil {
-		return fmt.Errorf("Failed to mount %v's partition #3 onto %v: %v", image.DiskFile, image.RootfsPartition3, err)
+	if utilities.InArray("Version", arr) || utilities.InArray("BuildID", arr) || utilities.InArray("Rootfs", arr) || utilities.InArray("Sysctl-settings", arr) || utilities.InArray("OS-config", arr) || utilities.InArray("Kernel-configs", arr) {
+		rootfs := filepath.Join(image.TempDir, "rootfs")
+		if err := os.Mkdir(rootfs, makeDirFilemode); err != nil {
+			return fmt.Errorf("failed to create make directory %v: %v", rootfs, err)
+		}
+		image.RootfsPartition3 = rootfs
+
+		loopDevice3, err := mountDisk(image.DiskFile, image.RootfsPartition3, "3")
+		if err != nil {
+			return fmt.Errorf("Failed to mount %v's partition #3 onto %v: %v", image.DiskFile, image.RootfsPartition3, err)
+		}
+		image.LoopDevice3 = loopDevice3
 	}
-	image.LoopDevice3 = loopDevice3
 
+	if utilities.InArray("Kernel-command-line", arr) {
+		efi := filepath.Join(image.TempDir, "efi")
+		if err := os.Mkdir(efi, makeDirFilemode); err != nil {
+			return fmt.Errorf("failed to create make directory %v: %v", efi, err)
+		}
+		image.EFIPartition12 = efi
+
+		loopDevice12, err := mountDisk(image.DiskFile, image.EFIPartition12, "12")
+		if err != nil {
+			return fmt.Errorf("Failed to mount %v's partition #12 onto %v: %v", image.DiskFile, image.EFIPartition12, err)
+		}
+		image.LoopDevice12 = loopDevice12
+	}
 	return nil
 }
 
@@ -309,13 +391,19 @@ func (image *ImageInfo) Cleanup() error {
 	if image.TempDir == "" {
 		return nil
 	}
-
-	if image.LoopDevice3 != "" {
-		if _, err := exec.Command("sudo", "umount", image.RootfsPartition3).Output(); err != nil {
-			return fmt.Errorf("failed to umount directory %v: %v", image.RootfsPartition3, err)
+	if image.LoopDevice1 != "" {
+		if err := utilities.Unmount(image.StatePartition1, image.LoopDevice1); err != nil {
+			return fmt.Errorf("failed to unmount mount directory %v and/or loop device %v: %v", image.StatePartition1, image.LoopDevice1, err)
 		}
-		if _, err := exec.Command("sudo", "losetup", "-d", image.LoopDevice3).Output(); err != nil {
-			return fmt.Errorf("failed to delete loop device %v: %v", image.LoopDevice3, err)
+	}
+	if image.LoopDevice3 != "" {
+		if err := utilities.Unmount(image.RootfsPartition3, image.LoopDevice3); err != nil {
+			return fmt.Errorf("failed to unmount mount directory %v and/or loop device %v: %v", image.RootfsPartition3, image.LoopDevice3, err)
+		}
+	}
+	if image.LoopDevice12 != "" {
+		if err := utilities.Unmount(image.EFIPartition12, image.LoopDevice12); err != nil {
+			return fmt.Errorf("failed to unmount mount directory %v and/or loop device %v: %v", image.EFIPartition12, image.LoopDevice12, err)
 		}
 	}
 

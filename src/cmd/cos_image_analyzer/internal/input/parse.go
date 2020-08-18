@@ -39,10 +39,6 @@ DESCRIPTION
 		input is one or two objects stored on Google Cloud Storage of type (.tar.gz). This flag temporarily downloads,
 		unzips, and loop device mounts the images into this tool's directory.
 
-	Authentication Flags:
-	-projectID
-		projectID of the Google Cloud Project holding the images. Mandatory for "-cos-cloud" input
-
 	Difference Flags:
 	-binary (string)
 		specify which type of binary difference to show. Types "Version", "BuildID", "Rootfs", "Kernel-command-line",
@@ -57,6 +53,21 @@ DESCRIPTION
 	-release-notes
 		specify whether to show release notes difference. Shows differences in human-written release notes between
 		the two images. To NOT list any release notes difference, set flag to false. (default true)
+
+	Attribute Flags
+	-verbose
+		include flag to increase verbosity of Rootfs, Stateful-partition, and OS-config differences. See the
+		"internal/binary/CompressRootfs.txt", "internal/binary/CompressStateful.txt", and "internal/binary/CompressOSConfigs.txt"
+		files to edit the default directories whose differences are compressed together.
+	-compress-rootfs (string)
+		to customize which directories are compressed in a non-verbose Rootfs and OS-config difference output, provide a local 
+		file path to a text file. Format of the file must be one root file path per line with an ending back slash and no commas.
+		By default the directory(s) that are compressed during a diff are /bin/, /lib/modules/, /lib64/, /usr/libexec/, /usr/bin/,
+		/usr/sbin/, /usr/lib64/, /usr/share/zoneinfo/, /usr/share/git/, /usr/lib/, and /sbin/.
+	-compress-stateful (string)
+		to customize which directories are compressed in a non-verbose Stateful-partition difference output, provide a local
+		file path to a text file. Format of file must be one root file path per line with no commas. By default the directory(s)
+		that are compressed during a diff are /var_overlay/db/. 
 
 	Output Flags:
 	-output (string)
@@ -97,6 +108,18 @@ func FlagErrorChecking(flagInfo *FlagInfo) error {
 		}
 	}
 
+	if res := utilities.FileExists(flagInfo.CompressRootfsFile, "txt"); res == -1 {
+		return errors.New("Error: " + flagInfo.CompressRootfsFile + " file does not exist")
+	} else if res == 0 {
+		return errors.New("Error: " + flagInfo.CompressRootfsFile + " is not a \".txt\" file")
+	}
+
+	if res := utilities.FileExists(flagInfo.CompressStatefulFile, "txt"); res == -1 {
+		return errors.New("Error: " + flagInfo.CompressStatefulFile + " file does not exist")
+	} else if res == 0 {
+		return errors.New("Error: " + flagInfo.CompressStatefulFile + " is not a \".txt\" file")
+	}
+
 	if flagInfo.OutputSelected != "terminal" && flagInfo.OutputSelected != "json" {
 		return errors.New("Error: \"-output\" flag must be ethier \"terminal\" or \"json\"")
 	}
@@ -134,6 +157,10 @@ func ParseFlags() (*FlagInfo, error) {
 	flag.BoolVar(&flagInfo.PackageSelected, "package", true, "")
 	flag.BoolVar(&flagInfo.CommitSelected, "commit", true, "")
 	flag.BoolVar(&flagInfo.ReleaseNotesSelected, "release-notes", true, "")
+
+	flag.BoolVar(&flagInfo.Verbose, "verbose", false, "")
+	flag.StringVar(&flagInfo.CompressRootfsFile, "compress-rootfs", "internal/binary/CompressRootfs.txt", "")
+	flag.StringVar(&flagInfo.CompressStatefulFile, "compress-stateful", "internal/binary/CompressStateful.txt", "")
 
 	flag.StringVar(&flagInfo.OutputSelected, "output", "terminal", "")
 	flag.Parse()
