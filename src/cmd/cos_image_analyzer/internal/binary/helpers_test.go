@@ -29,7 +29,7 @@ Unique files in ../testdata/image2/rootfs/usr/lib`
 	} {
 		got, _ := directoryDiff(tc.dir1, tc.dir2, tc.root, tc.verbose, tc.compressedDirs)
 		if got != tc.want {
-			t.Fatalf("directoryDiff expected:\n$%v$\ngot:\n$%v$", tc.want, got)
+			t.Fatalf("directoryDiff expected:\n%v\ngot:\n%v", tc.want, got)
 		}
 	}
 }
@@ -55,7 +55,32 @@ func TestPureDiff(t *testing.T) {
 	} {
 		got, _ := pureDiff(tc.input1, tc.input2)
 		if got != tc.want {
-			t.Fatalf("PureDiff expected:\n$%v$\ngot:\n$%v$", tc.want, got)
+			t.Fatalf("PureDiff expected:\n%v\ngot:\n%v", tc.want, got)
+		}
+	}
+}
+
+// test getKclMap function
+func TestGetKclMap(t *testing.T) {
+
+	for _, tc := range []struct {
+		input []string
+		want  map[string]string
+	}{
+		{input: []string{"linux", "/syslinux/vmlinuz.A", "init=/usr/lib/systemd/systemd", "boot=local", "rootwait", "ro", "dm_verity.dev_wait=50"},
+			want: map[string]string{"syslinux/vmlinuz.A": "", "boot": "local", "dm_verity.dev_wait": "50", "init": "/usr/lib/systemd/systemd", "linux": "", "ro": "", "rootwait": ""}},
+
+		{input: []string{"linux", "/syslinux/vmlinuz.A", "init=/usr/lib32/systemd/", "ro", "dm_verity.dev_wait=2", "i915.modeset=1", "cros_efi"},
+			want: map[string]string{"syslinux/vmlinuz.A": "", "dm_verity.dev_wait": "2", "init": "/usr/lib32/systemd/", "linux": "", "ro": "", "i915.modeset": "1"}},
+
+		{input: []string{},
+			want: map[string]string{}},
+	} {
+		got := getKclMap(tc.input)
+		for param, value := range tc.want {
+			if value != got[param] {
+				t.Fatalf("getKclMap expected:\n%v\ngot:\n%v", tc.want, got)
+			}
 		}
 	}
 }

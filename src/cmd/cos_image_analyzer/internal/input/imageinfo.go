@@ -5,32 +5,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
-const sectorSize = 512
 const gcsObjFormat = ".tar.gz"
 const makeDirFilemode = 0700
 const timeOut = "7200s"
 const imageFormat = "vmdk"
 const name = "gcr.io/compute-image-tools/gce_vm_image_export:release"
+const pathToKernelConfigs = "usr/src/linux-headers-4.19.112+/.config"
+const pathToSysctlSettings = "/etc/sysctl.d/00-sysctl.conf" // Located in partition 3 Root-A
 
 // ImageInfo stores all relevant information on a COS image
 type ImageInfo struct {
 	// Input Overhead
 	TempDir          string // Temporary directory holding the mounted image and disk file
 	DiskFile         string // Path to the DOS/MBR disk partition file
-	PartitionFile    string // Path to the file storing the disk partition structure from "sgdisk"
 	StatePartition1  string // Path to mounted directory of partition #1, stateful partition
 	RootfsPartition3 string // Path to mounted directory of partition #3, Rootfs-A
 	EFIPartition12   string // Path to mounted directory of partition #12, EFI-System
@@ -39,12 +37,12 @@ type ImageInfo struct {
 	LoopDevice12     string // Active loop device for mounted image
 
 	// Binary info
-	Version string
-	BuildID string
-
-	// Package info
-	// Commit info
-	// Release notes info
+	Version            string // Major cos version
+	BuildID            string // Minor cos version
+	PartitionFile      string // Path to the file storing the disk partition structure from "sgdisk"
+	SysctlSettingsFile string // Path to the /etc/sysctrl.d/00-sysctl.conf file of an image
+	KernelCommandLine  string // The kernel command line boot-time parameters stored in partition 12 efi/boot/grub.cfg
+	KernelConfigsFile  string // Path to the ".config" file downloaded from GCS that holds a build's kernel configs
 }
 
 // Rename temporary directory and its contents once Version and BuildID are known
@@ -52,111 +50,27 @@ func (image *ImageInfo) Rename(flagInfo *FlagInfo) error {
 	if image.Version != "" && image.BuildID != "" {
 		fullImageName := "cos-" + image.Version + "-" + image.BuildID
 		if err := os.Rename(image.TempDir, fullImageName); err != nil {
-			return fmt.Errorf("Error: Failed to rename directory %v to %v: %v", image.TempDir, fullImageName, err)
+			return fmt.Errorf("failed to rename directory %v to %v: %v", image.TempDir, fullImageName, err)
 		}
 		image.TempDir = fullImageName
 
 		if !flagInfo.LocalPtr {
 			image.DiskFile = filepath.Join(fullImageName, "disk.raw")
 		}
-		if image.RootfsPartition3 != "" {
-			image.RootfsPartition3 = filepath.Join(fullImageName, "rootfs")
-		}
 		if image.StatePartition1 != "" {
 			image.StatePartition1 = filepath.Join(fullImageName, "stateful")
+		}
+		if image.RootfsPartition3 != "" {
+			image.RootfsPartition3 = filepath.Join(fullImageName, "rootfs")
 		}
 		if image.EFIPartition12 != "" {
 			image.EFIPartition12 = filepath.Join(fullImageName, "efi")
 		}
+		image.PartitionFile = filepath.Join(fullImageName, "partitions.txt")
+		image.KernelConfigsFile = filepath.Join(fullImageName, pathToKernelConfigs)
+		image.SysctlSettingsFile = filepath.Join(image.RootfsPartition3, pathToSysctlSettings)
 	}
 	return nil
-}
-
-// getPartitionStart finds the start partition offset of the disk
-// Input:
-//   (string) diskFile - Name of DOS/MBR file (ex: disk.raw)
-//   (string) partition - The partition number you are pulling the offset from
-// Output:
-//   (int) start - The start of the partition on the disk
-func getPartitionStart(partition, diskRaw string) (int, error) {
-	//create command
-	cmd1 := exec.Command("fdisk", "-l", diskRaw)
-	cmd2 := exec.Command("grep", diskRaw+partition)
-
-	reader, writer := io.Pipe()
-	var buf bytes.Buffer
-
-	cmd1.Stdout = writer
-	cmd2.Stdin = reader
-	cmd2.Stdout = &buf
-
-	cmd1.Start()
-	cmd2.Start()
-	cmd1.Wait()
-	writer.Close()
-	cmd2.Wait()
-	reader.Close()
-
-	words := strings.Fields(buf.String())
-	if len(words) < 2 {
-		return -1, errors.New("Error: " + diskRaw + " is not a valid DOS/MBR boot sector file")
-	}
-	start, err := strconv.Atoi(words[1])
-	if err != nil {
-		return -1, fmt.Errorf("failed to convert Ascii %v to string: %v", words[1], err)
-	}
-
-	return start, nil
-}
-
-// GetPartitionStructure returns the partition structure of .raw file
-// Input:
-//   (string) diskRaw - Path to the boot .raw file
-// Output:
-//   (string) partitionStructure - The output of the fdisk command
-func (image *ImageInfo) GetPartitionStructure() error {
-	if image.TempDir == "" {
-		return nil
-	}
-
-	out, err := exec.Command("sudo", "sgdisk", "-p", image.DiskFile).Output()
-	if err != nil {
-		return fmt.Errorf("failed to call sgdisk -p %v: %v", image.DiskFile, err)
-	}
-
-	partitionFile := filepath.Join(image.TempDir, "partitions.txt")
-	if err := utilities.WriteToNewFile(partitionFile, string(out[:])); err != nil {
-		return fmt.Errorf("failed create file %v and write %v: %v", partitionFile, string(out[:]), err)
-	}
-	image.PartitionFile = partitionFile
-	return nil
-}
-
-// mountDisk finds a free loop device and mounts a DOS/MBR disk file
-// Input:
-//   (string) diskFile - Name of DOS/MBR file (ex: disk.raw)
-//   (string) mountDir - Mount Destination
-//   (string) partition - The partition number you are pulling the offset from
-// Output:
-//   (string) loopDevice - Name of the loop device used to mount
-func mountDisk(diskFile, mountDir, partition string) (string, error) {
-	startOfPartition, err := getPartitionStart(partition, diskFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to get start of partition #%v: %v", partition, err)
-	}
-	offset := strconv.Itoa(sectorSize * startOfPartition)
-
-	out, err := exec.Command("sudo", "losetup", "--show", "-fP", diskFile).Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to create new loop device for %v: %v", diskFile, err)
-	}
-
-	loopDevice := string(out[:len(out)-1])
-	_, err = exec.Command("sudo", "mount", "-o", "ro,loop,offset="+offset, loopDevice, mountDir).Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to mount loop device %v at %v: %v", loopDevice, mountDir, err)
-	}
-	return loopDevice, nil
 }
 
 // MountImage is an ImagInfo method that mounts partitions 1,3 and 12 of
@@ -175,7 +89,7 @@ func (image *ImageInfo) MountImage(arr []string) error {
 		}
 		image.StatePartition1 = stateful
 
-		loopDevice1, err := mountDisk(image.DiskFile, image.StatePartition1, "1")
+		loopDevice1, err := utilities.MountDisk(image.DiskFile, image.StatePartition1, "1")
 		if err != nil {
 			return fmt.Errorf("Failed to mount %v's partition #1 onto %v: %v", image.DiskFile, image.StatePartition1, err)
 		}
@@ -189,7 +103,7 @@ func (image *ImageInfo) MountImage(arr []string) error {
 		}
 		image.RootfsPartition3 = rootfs
 
-		loopDevice3, err := mountDisk(image.DiskFile, image.RootfsPartition3, "3")
+		loopDevice3, err := utilities.MountDisk(image.DiskFile, image.RootfsPartition3, "3")
 		if err != nil {
 			return fmt.Errorf("Failed to mount %v's partition #3 onto %v: %v", image.DiskFile, image.RootfsPartition3, err)
 		}
@@ -203,7 +117,7 @@ func (image *ImageInfo) MountImage(arr []string) error {
 		}
 		image.EFIPartition12 = efi
 
-		loopDevice12, err := mountDisk(image.DiskFile, image.EFIPartition12, "12")
+		loopDevice12, err := utilities.MountDisk(image.DiskFile, image.EFIPartition12, "12")
 		if err != nil {
 			return fmt.Errorf("Failed to mount %v's partition #12 onto %v: %v", image.DiskFile, image.EFIPartition12, err)
 		}
@@ -222,13 +136,20 @@ func (image *ImageInfo) GetGcsImage(gcsPath string) error {
 	if gcsPath == "" {
 		return nil
 	}
-	gcsArray := strings.Split(gcsPath, "/")
-	if len(gcsArray) != 2 {
+	var gcsBucket, gcsObject string
+	if startOfBucket := strings.Index(gcsPath, "gs://"); startOfBucket < len(gcsPath)-5 {
+		gcsPath = gcsPath[startOfBucket+5:]
+	} else {
 		printUsage()
-		return errors.New("Error: Argument " + gcsPath + " is not a valid gcs path (\"/\" separators)")
+		return errors.New("Error: Argument " + gcsPath + " is not a valid gcs path \"gs://<bucket>/<object_path>.tar.gz\"")
 	}
-	gcsBucket := gcsArray[0]
-	gcsObject := gcsArray[1]
+	if startOfObject := strings.Index(gcsPath, "/"); startOfObject > 0 && startOfObject < len(gcsPath)-1 {
+		gcsBucket = gcsPath[:startOfObject]
+		gcsObject = gcsPath[startOfObject+1:]
+	} else {
+		printUsage()
+		return errors.New("Error: Argument " + gcsPath + " is not a valid gcs path \"gs://<bucket>/<object_path>.tar.gz\"")
+	}
 
 	tempDir, err := ioutil.TempDir(".", "tempDir") // Removed at end
 	if err != nil {
@@ -236,7 +157,7 @@ func (image *ImageInfo) GetGcsImage(gcsPath string) error {
 	}
 	image.TempDir = tempDir
 
-	tarFile, err := utilities.GcsDowndload(gcsBucket, gcsObject, image.TempDir)
+	tarFile, err := utilities.GcsDowndload(gcsBucket, gcsObject, image.TempDir, filepath.Base(gcsObject))
 	if err != nil {
 		return fmt.Errorf("failed to download GCS object %v from bucket %v: %v", gcsObject, gcsBucket, err)
 	}
@@ -246,35 +167,6 @@ func (image *ImageInfo) GetGcsImage(gcsPath string) error {
 		return fmt.Errorf("failed to unzip %v into %v: %v", tarFile, image.TempDir, err)
 	}
 	image.DiskFile = filepath.Join(image.TempDir, "disk.raw")
-	return nil
-}
-
-// ValidateLocalImages ensures the two images are one or two unique boot files
-// Input:
-//   (string) localPath1 - Local path to the first disk.raw file
-//   (string) localPath2 - Local path to the second disk.raw file
-// Output: nil on success, else error
-func ValidateLocalImages(localPath1, localPath2 string) error {
-	if localPath2 == "" {
-		if res := utilities.FileExists(localPath1, "raw"); res == -1 {
-			return errors.New("Error: " + localPath1 + " file does not exist")
-		} else if res == 0 {
-			return errors.New("Error: " + localPath1 + " is not a \".raw\" file")
-		}
-		return nil
-	}
-
-	if res := utilities.FileExists(localPath2, "raw"); res == -1 {
-		return errors.New("Error: " + localPath2 + " file does not exist")
-	} else if res == 0 {
-		return errors.New("Error: " + localPath2 + " is not a \".raw\" file")
-	}
-
-	info1, _ := os.Stat(localPath1)
-	info2, _ := os.Stat(localPath2)
-	if os.SameFile(info1, info2) {
-		return errors.New("Error: Identical image passed in. To analyze single image, pass in one argument")
-	}
 	return nil
 }
 
@@ -376,7 +268,7 @@ func (image *ImageInfo) GetCosImage(cosCloudPath, projectID string) error {
 		return fmt.Errorf("failed to export %v cos image to GCS bucket %v: %v", publicCosImage, gcsBucket, err)
 	}
 
-	gcsPath := filepath.Join(gcsBucket, publicCosImage+gcsObjFormat)
+	gcsPath := filepath.Join(gcsBucket, publicCosImage, gcsObjFormat)
 	if err := image.GetGcsImage(gcsPath); err != nil {
 		return fmt.Errorf("failed to download image stored on GCS for %v: %v", gcsPath, err)
 	}

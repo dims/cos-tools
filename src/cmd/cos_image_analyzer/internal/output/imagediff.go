@@ -17,11 +17,13 @@ type ImageDiff struct {
 // Formater is a ImageDiff function that outputs the image differences based on the "-output" flag.
 // Either to the terminal (default) or to a stored json object
 // Input:
+//   (string) image1 - Temp directory name of image1
+//   (string) image2 - Temp directory name of image2
 //   (*FlagInfo) flagInfo - A struct that holds input preference from the user
 // Output:
 //   ([]string) diffstrings/jsonObjectStr - Based on "-output" flag, either formated string
 //   for the terminal or a string json object
-func (imageDiff *ImageDiff) Formater(flagInfo *input.FlagInfo) (string, error) {
+func (imageDiff *ImageDiff) Formater(image1, image2 string, flagInfo *input.FlagInfo) (string, error) {
 	if flagInfo.OutputSelected == "terminal" {
 		binaryStrings := ""
 		binaryFunctions := map[string]func() string{
@@ -31,8 +33,11 @@ func (imageDiff *ImageDiff) Formater(flagInfo *input.FlagInfo) (string, error) {
 			"Stateful-partition":  imageDiff.BinaryDiff.FormatStatefulDiff,
 			"OS-config":           imageDiff.BinaryDiff.FormatOSConfigDiff,
 			"Partition-structure": imageDiff.BinaryDiff.FormatPartitionStructureDiff,
+			"Kernel-configs":      imageDiff.BinaryDiff.FormatKernelConfigsDiff,
+			"Kernel-command-line": imageDiff.BinaryDiff.FormatKernelCommandLineDiff,
+			"Sysctl-settings":     imageDiff.BinaryDiff.FormatSysctlSettingsDiff,
 		}
-		for diff := range binaryFunctions {
+		for _, diff := range input.BinaryDiffTypes {
 			if utilities.InArray(diff, flagInfo.BinaryTypesSelected) {
 				binaryStrings += binaryFunctions[diff]()
 			}
@@ -40,9 +45,9 @@ func (imageDiff *ImageDiff) Formater(flagInfo *input.FlagInfo) (string, error) {
 
 		if len(binaryStrings) > 0 {
 			if flagInfo.Image2 == "" {
-				binaryStrings = "================= Binary Info =================\n" + binaryStrings
+				binaryStrings = "================= Binary Info =================\nImage: " + image1 + "\n" + binaryStrings
 			} else {
-				binaryStrings = "================= Binary Differences =================\n" + binaryStrings
+				binaryStrings = "================= Binary Differences =================\nImages: " + image1 + " and " + image2 + "\n" + binaryStrings
 			}
 		}
 

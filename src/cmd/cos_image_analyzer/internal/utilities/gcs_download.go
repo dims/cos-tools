@@ -22,9 +22,10 @@ const base10 = 10
 //   (string) bucket - Name of the GCS bucket
 //   (string) object - Name of the GCS object
 //   (string) destDir - Destination for downloaded GCS object
+//   (string) name - Name for the downloaded file
 // Output:
 //   (string) downloadedFile - Path to downloaded GCS object
-func GcsDowndload(bucket, object, destDir string) (string, error) {
+func GcsDowndload(bucket, object, destDir, name string) (string, error) {
 	// Call API to download GCS object into tempDir
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
@@ -42,7 +43,7 @@ func GcsDowndload(bucket, object, destDir string) (string, error) {
 	}
 	defer rc.Close()
 
-	downloadedFile, err := os.Create(filepath.Join(destDir, object))
+	downloadedFile, err := os.Create(filepath.Join(destDir, name))
 	if err != nil {
 		return "", fmt.Errorf("failed to create file %v/%v: %v", destDir, object, err)
 	}
@@ -54,6 +55,6 @@ func GcsDowndload(bucket, object, destDir string) (string, error) {
 	}
 	bytesStr := strconv.FormatInt(bytesDownloaded, base10)
 
-	log.Print("Blob " + object + " downloaded. \n" + bytesStr + " Total Bytes")
+	log.Print("GCS object: ", object, " downloaded from GCS bucket: ", bucket, ". Total bytes ", bytesStr)
 	return downloadedFile.Name(), nil
 }
