@@ -17,6 +17,7 @@ import (
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/binary"
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/output"
+	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/packagediff"
 )
 
 func cosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo) error {
@@ -41,6 +42,20 @@ func cosImageAnalyzer(image1, image2 *input.ImageInfo, flagInfo *input.FlagInfo)
 		return fmt.Errorf("failed to get Binary Difference: %v", err)
 	}
 	imageDiff.BinaryDiff = binaryDiff
+
+	packageList1, err := packagediff.GetPackageInfo(image1, flagInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get package info from image %v: %v", flagInfo.Image1, err)
+	}
+	packageList2, err := packagediff.GetPackageInfo(image2, flagInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get package info from image %v: %v", flagInfo.Image2, err)
+	}
+	packageDiff, err := packagediff.Diff(packageList1, packageList2, flagInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get package difference: %v", err)
+	}
+	imageDiff.PackageDiff = packageDiff
 
 	output, err := imageDiff.Formater(image1.TempDir, image2.TempDir, flagInfo)
 	if err != nil {

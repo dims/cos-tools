@@ -6,12 +6,14 @@ import (
 
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/binary"
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
+	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/packagediff"
 	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // ImageDiff stores all of the differences between the two images
 type ImageDiff struct {
-	BinaryDiff *binary.Differences
+	BinaryDiff  *binary.Differences
+	PackageDiff *packagediff.Differences
 }
 
 // Formater is a ImageDiff function that outputs the image differences based on the "-output" flag.
@@ -51,7 +53,16 @@ func (imageDiff *ImageDiff) Formater(image1, image2 string, flagInfo *input.Flag
 			}
 		}
 
-		diffStrings := binaryStrings
+		packageStrings := imageDiff.PackageDiff.FormatPackageListDiff(image1, image2)
+		if len(packageStrings) > 0 {
+			if flagInfo.Image2 == "" {
+				packageStrings = "================= Package List =================\nImage: " + image1 + "\n" + packageStrings
+			} else {
+				packageStrings = "================= Package Differences =================\nImages: " + image1 + " and " + image2 + "\n" + packageStrings
+			}
+		}
+
+		diffStrings := binaryStrings + packageStrings
 		return diffStrings, nil
 	}
 	jsonObjectBytes, err := json.Marshal(imageDiff)

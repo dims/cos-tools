@@ -1,0 +1,28 @@
+{
+  "InstalledPackages": [
+        {
+      "Category": "sys-boot",
+      "Name": "shim",
+      "Version": "14.0.20180308",
+      "Revision": "4"
+        },
+        {
+      "Category": "chromeos-base",
+      "Name": "cloud-network-init",
+      "Version": "1.0.0",
+      "Revision": "4"
+        },
+        {
+      "Category": "sys-kernel",
+      "Name": "lakitu-kernel-4_19",
+      "Version": "4.19.127",
+      "Revision": "535"
+        },
+        {
+      "Category": "app-shells",
+      "Name": "dash",
+      "Version": "0.5.9.1",
+      "Revision": "7"
+        }
+    ]
+}

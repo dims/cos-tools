@@ -26,7 +26,7 @@ type FlagInfo struct {
 
 	// Verbosity of output
 	// If true, full Rootfs, Os-Config, and Stateful Partition output is shown.
-	// Else false (default), Rootfs and Stateful Partition directorties listed on files
+	// Else false (default), Rootfs and Stateful Partition directories listed on files
 	// 	pointed to by CompressRootfsFile and CompressStatefulFile respectively are compressed.
 	// 	For OS-configs difference, all /etc entries that are listed in CompressRootfsFile are ignored.
 	Verbose bool

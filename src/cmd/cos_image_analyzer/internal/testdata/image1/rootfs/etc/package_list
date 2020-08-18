@@ -1,0 +1,34 @@
+{
+  "InstalledPackages": [
+        {
+      "Category": "sys-boot",
+      "Name": "shim",
+      "Version": "14.0.20180308",
+      "Revision": "4"
+        },
+        {
+      "Category": "chromeos-launch",
+      "Name": "cloud-network-boot",
+      "Version": "1.0.0",
+      "Revision": "4"
+        },
+        {
+      "Category": "sys-kernel",
+      "Name": "lakitu-kernel-4_19",
+      "Version": "4.20.127",
+      "Revision": "533"
+        },
+        {
+      "Category": "sys-apps",
+      "Name": "findutils",
+      "Version": "4.9.10",
+      "Revision": "1"
+        },
+        {
+      "Category": "app-emulation",
+      "Name": "runc",
+      "Version": "1.0.0_rc10",
+      "Revision": "1"
+        }
+    ]
+}
