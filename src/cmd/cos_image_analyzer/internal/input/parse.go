@@ -24,8 +24,8 @@ var defaultCompressStateful = []string{"/var_overlay/db/"}
 // Custom usage function. See -h flag
 func printUsage() {
 	usageTemplate := `NAME
-	cos_image_analyzer - finds all meaningful differences of two COS Images (binary, package, commit, and release notes differences).
-		If only one image is passed in, its binary info, package info, commit log, and release-notes will be returned.
+	cos_image_analyzer - finds all meaningful differences of two COS Images (binary and package differences).
+		If only one image is passed in, its binary info and package info will be returned.
 
 SYNOPSIS
 	%s [-local] FILE-1 [FILE-2] (default true)
@@ -35,17 +35,22 @@ SYNOPSIS
 	%s -local -binary=Sysctl-settings,OS-config -package=false image-cos-77-12371-273-0/disk.raw
 
 	%s -gcs GCS-PATH-1 [GCS-PATH-2]
-		GCS-PATH - the GCS "bucket/object" path for the COS Image ("object" is type .tar.gz)
-		Ex: %s -gcs my-bucket/cos-images/cos-77-12371-273-0.tar.gz my-bucket/cos-images/cos-81-12871-119-0.tar.gz
+		GCS-PATH - the GCS "gs://bucket/object" path for the COS Image ("object" is type .tar.gz)
+		Ex: %s -gcs gs://my-bucket/cos-images/cos-77-12371-273-0.tar.gz gs://my-bucket/cos-images/cos-81-12871-119-0.tar.gz
 
 
 DESCRIPTION
 	Input Flags:
 	-local (default true, flag is optional)
-		input is one or two DOS/MBR disk file on the local filesystem.
+		input is one or two DOS/MBR disk file on the local filesystem. If the images are downloaded from
+		Google Cloud as a tarball, decompress the tarball first then pass the disk.raw file to the program.
 	-gcs
 		input is one or two objects stored on Google Cloud Storage of type (.tar.gz). This flag temporarily downloads,
 		unzips, and loop device mounts the images into this tool's directory.
+		To download images from Google Cloud Storage, you need to pass a service account credential to the program.
+		Folllow https://cloud.google.com/docs/authentication/production#create_service_account to create a service account and
+		download the service account key. Then point environment variable GOOGLE_APPLICATION_CREDENTIALS to the key file then
+		run the program.
 
 	Difference Flags:
 	-binary (string)
@@ -55,21 +60,21 @@ DESCRIPTION
 		comma. To NOT list any binary difference, set flag to "false". (default all types)
 	-package
 		specify whether to show package difference. Shows addition/removal of packages and package version updates.
-		To NOT list any package difference, set flag to false. (default true)
+		To NOT list any package difference, set flag to false. (default false)
 
 	Attribute Flags
 	-verbose
-		include flag to increase verbosity of Rootfs, Stateful-partition, and OS-config differences. See the
-		"internal/binary/CompressRootfs.txt", "internal/binary/CompressStateful.txt", and "internal/binary/CompressOSConfigs.txt"
-		files to edit the default directories whose differences are compressed together.
+		include flag to increase verbosity of Rootfs, Stateful-partition, and OS-config differences. See -compress-rootfs and
+		-compress-stateful flags descriptions for the directories that are compressed by default.
 	-compress-rootfs (string)
 		to customize which directories are compressed in a non-verbose Rootfs and OS-config difference output, provide a local
-		file path to a text file. Format of the file must be one root file path per line with an ending back slash and no commas.
+		file path to a .txt file. Format of the file must be one root file path per line with an ending back slash and no commas.
 		By default the directory(s) that are compressed during a diff are /bin/, /lib/modules/, /lib64/, /usr/libexec/, /usr/bin/,
-		/usr/sbin/, /usr/lib64/, /usr/share/zoneinfo/, /usr/share/git/, /usr/lib/, and /sbin/.
+		/usr/sbin/, /usr/lib64/, /usr/share/zoneinfo/, /usr/share/git/, /usr/lib/, /sbin/, /etc/ssh/, /etc/os-release/ and
+		/etc/package_list/.
 	-compress-stateful (string)
 		to customize which directories are compressed in a non-verbose Stateful-partition difference output, provide a local
-		file path to a text file. Format of file must be one root file path per line with no commas. By default the directory(s)
+		file path to a .txt file. Format of file must be one root file path per line with no commas. By default the directory(s)
 		that are compressed during a diff are /var_overlay/db/.
 
 	Output Flags:
@@ -78,6 +83,9 @@ DESCRIPTION
 
 OUTPUT
 	Based on the "-output" flag. Either "terminal" stdout or machine readable "json" format.
+
+NOTE
+	The root permission is needed for this program because it needs to mount images into your local filesystem to calculate difference.
 `
 	cmd := filepath.Base(os.Args[0])
 	usage := fmt.Sprintf(usageTemplate, cmd, cmd, cmd, cmd, cmd)
@@ -159,7 +167,7 @@ func ParseFlags() (*FlagInfo, error) {
 	flag.StringVar(&flagInfo.ProjectIDPtr, "projectID", "", "")
 
 	flag.StringVar(&flagInfo.BinaryDiffPtr, "binary", "", "")
-	flag.BoolVar(&flagInfo.PackageSelected, "package", true, "")
+	flag.BoolVar(&flagInfo.PackageSelected, "package", false, "")
 	flag.BoolVar(&flagInfo.CommitSelected, "commit", true, "")
 	flag.BoolVar(&flagInfo.ReleaseNotesSelected, "release-notes", true, "")
 

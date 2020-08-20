@@ -17,5 +17,6 @@ require (
 	github.com/urfave/cli/v2 v2.2.0
 	go.chromium.org/luci v0.0.0-20200722211809-bab0c30be68b
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	google.golang.org/api v0.28.0
 	google.golang.org/protobuf v1.25.0
 )

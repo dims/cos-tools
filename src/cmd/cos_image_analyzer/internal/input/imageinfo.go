@@ -157,7 +157,7 @@ func (image *ImageInfo) GetGcsImage(gcsPath string) error {
 	}
 	image.TempDir = tempDir
 
-	tarFile, err := utilities.GcsDowndload(gcsBucket, gcsObject, image.TempDir, filepath.Base(gcsObject))
+	tarFile, err := utilities.GcsDowndload(gcsBucket, gcsObject, image.TempDir, filepath.Base(gcsObject), true)
 	if err != nil {
 		return fmt.Errorf("failed to download GCS object %v from bucket %v: %v", gcsObject, gcsBucket, err)
 	}

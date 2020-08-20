@@ -46,7 +46,7 @@ func getPartitionStructure(image *input.ImageInfo) error {
 // it into the image's temporary directory
 func getKernelConfigs(image *input.ImageInfo) error {
 	gcsObject := filepath.Join(image.BuildID, kernelHeaderGCSObject)
-	tarFile, err := utilities.GcsDowndload(cosGCSBucket, gcsObject, image.TempDir, kernelHeaderGCSObject)
+	tarFile, err := utilities.GcsDowndload(cosGCSBucket, gcsObject, image.TempDir, kernelHeaderGCSObject, false)
 	if err != nil {
 		return fmt.Errorf("failed to download GCS object %v from bucket %v: %v", gcsObject, cosGCSBucket, err)
 	}
