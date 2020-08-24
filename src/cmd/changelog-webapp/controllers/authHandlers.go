@@ -171,7 +171,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if val, ok := session.Values["oauthState"]; !ok || val == nil {
-		http.Redirect(w, r, "/", http.StatusPermanentRedirect)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	sessionState := session.Values["oauthState"].(string)
