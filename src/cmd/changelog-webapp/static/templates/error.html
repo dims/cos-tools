@@ -13,12 +13,12 @@
     {{else}}
       <a href="/">Home</a>
     {{end}}
-    {{if (eq .ActivePage "changelog")}}
+    {{if (eq .ActivePage "/changelog/")}}
       <a class="active" href="/changelog/">Changelog</a>
     {{else}}
       <a href="/changelog/">Changelog</a>
     {{end}}
-    {{if (eq .ActivePage "locatebuild")}}
+    {{if (eq .ActivePage "/locatebuild/")}}
       <a class="active" href="/locatebuild/">Locate Build</a>
     {{else}}
       <a href="/locatebuild/">Locate Build</a>
@@ -27,8 +27,8 @@
   </div>
   <div class="main">
     <h1>{{ .Header }}</h1>
-    <p>{{ .Body }}</a>
-    </p>
+    <p>{{ .Body }}</p>
+    <a href={{.ActivePage}}>Go back</a>
   </div>
 </body>
 
