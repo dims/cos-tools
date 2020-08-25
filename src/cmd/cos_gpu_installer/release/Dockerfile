@@ -13,3 +13,4 @@ RUN apt-get update -qq && \
 
 COPY cos-gpu-installer /cos-gpu-installer
 ENTRYPOINT ["/cos-gpu-installer"]
+CMD ["install"]

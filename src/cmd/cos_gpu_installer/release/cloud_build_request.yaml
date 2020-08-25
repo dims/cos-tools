@@ -6,10 +6,7 @@ steps:
   args:
   - 'build'
   - '-t'
-  - 'gcr.io/${_PROJECT_ID}/cos-gpu-installer:latest'
-  - '-t'
   - 'gcr.io/${_PROJECT_ID}/cos-gpu-installer:${TAG_NAME}'
   - './'
 images:
-- 'gcr.io/${_PROJECT_ID}/cos-gpu-installer:latest'
 - 'gcr.io/${_PROJECT_ID}/cos-gpu-installer:${TAG_NAME}'

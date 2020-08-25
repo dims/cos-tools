@@ -287,13 +287,15 @@ func loadGPUDrivers(needSigned bool) error {
 			return errors.Wrap(err, "failed to load public key")
 		}
 	}
-	// Need to load modules in order due to module dependency.
 	gpuModules := map[string]string{
 		"nvidia":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia.ko"),
 		"nvidia_uvm": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-uvm.ko"),
 		"nvidia_drm": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-drm.ko"),
 	}
-	for moduleName, modulePath := range gpuModules {
+	// Need to load modules in order due to module dependency.
+	moduleNames := []string{"nvidia", "nvidia_uvm", "nvidia_drm"}
+	for _, moduleName := range moduleNames {
+		modulePath := gpuModules[moduleName]
 		if err := modules.LoadModule(moduleName, modulePath); err != nil {
 			return errors.Wrapf(err, "failed to load module %s", modulePath)
 		}

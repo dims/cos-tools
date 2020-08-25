@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"flag"
@@ -48,8 +49,9 @@ func (*InstallCommand) Usage() string { return "install [-dir <filepath>]\n" }
 func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.driverVersion, "version", "",
 		"The GPU driver verion to install. It will install the default GPU driver if the flag is not set explicitly.")
-	f.StringVar(&c.hostInstallDir, "dir", "/var/lib/nvidia",
-		"Host directory that GPU drivers should be installed to")
+	f.StringVar(&c.hostInstallDir, "host-dir", "",
+		"Host directory that GPU drivers should be installed to. "+
+		"It tries to read from the env NVIDIA_INSTALL_DIR_HOST if the flag is not set explicitly.")
 	f.BoolVar(&c.unsignedDriver, "allow-unsigned-driver", false,
 		"Whether to allow load unsigned GPU drivers. "+
 			"If this flag is set to true, module signing security features must be disabled on the host for driver installation to succeed. "+
@@ -90,6 +92,11 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		if !cos.CheckKernelModuleSigning(string(kernelCmdline)) {
 			log.Warning("Current kernel command line does not support unsigned kernel modules. Not enforcing kernel module signing may cause installation fail.")
 		}
+	}
+
+	// Read value from env NVIDIA_INSTALL_DIR_HOST if the flag is not set. This is to be compatible with old interface.
+	if c.hostInstallDir == "" {
+		c.hostInstallDir = os.Getenv("NVIDIA_INSTALL_DIR_HOST")
 	}
 	hostInstallDir := filepath.Join(hostRootPath, c.hostInstallDir)
 	cacher := installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
