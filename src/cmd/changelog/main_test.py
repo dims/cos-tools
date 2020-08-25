@@ -114,7 +114,7 @@ class TestChangelogFunctionality(unittest.TestCase):
 
     def test_large_run(self):
         source = "15055.0.0"
-        target = "15000.0.0"
+        target = "15030.0.0"
         instance = "cos.googlesource.com"
         repo = "cos/manifest-snapshots"
         delete_logs(source, target)
@@ -122,7 +122,7 @@ class TestChangelogFunctionality(unittest.TestCase):
         assert process.returncode == 0
         assert check_file_exists(source, target)
         assert check_file_exists(target, source)
-        assert check_changelog_schema(source, target)
+        assert check_empty_json_file(source, target)
         assert check_changelog_schema(target, source)
 
     def test_with_invalid_source(self):

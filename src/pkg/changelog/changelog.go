@@ -25,7 +25,7 @@
 // URL. A request is sent on a seperate thread for each repository, asking for a list
 // of commits that occurred between the source committish and the target committish.
 // Finally, the resulting git.Commit objects are converted to Commit objects, and
-// consolidated into a mapping of repositoryName -> []*Commit.
+// consolidated into a mapping of repository path -> []*Commit.
 
 package changelog
 
@@ -43,6 +43,8 @@ import (
 )
 
 type repo struct {
+	Repo string
+	Path string
 	// The Git on Borg instance to query from.
 	InstanceURL string
 	// A value that points to the last commit for a build on a given repo.
@@ -56,8 +58,9 @@ type repo struct {
 }
 
 type commitsResult struct {
-	RepoURL        string
 	Commits        []*Commit
+	Repo           string
+	Path           string
 	HasMoreCommits bool
 	Err            error
 }
@@ -65,6 +68,34 @@ type commitsResult struct {
 type additionsResult struct {
 	Additions map[string]*RepoLog
 	Err       error
+}
+
+// RepoLog contains a changelist for a particular repository
+type RepoLog struct {
+	Commits        []*Commit
+	Repo           string
+	SourceSHA      string
+	TargetSHA      string
+	HasMoreCommits bool
+}
+
+// Creates a unique identifier for a repo + branch pairing.
+// Path is used instead of dest-branch because some manifest files do not
+// indicate a dest-branch for a project.
+// Path itself is not sufficient to guarantee uniqueness, since some repos
+// share the same path.
+// ex. mirrors/cros/chromiumos/repohooks vs cos/repohooks
+func repoID(name, path string) string {
+	return name + path
+}
+
+// limitPageSize will restrict a request page size to min of pageSize (which grows exponentially)
+// or remaining request size
+func limitPageSize(pageSize, requestedSize int) int {
+	if requestedSize == -1 || pageSize <= requestedSize {
+		return pageSize
+	}
+	return requestedSize
 }
 
 func gerritClient(httpClient *http.Client, remoteURL string) (gitilesProto.GitilesClient, error) {
@@ -92,7 +123,7 @@ func createGerritClients(clients map[string]gitilesProto.GitilesClient, httpClie
 	return nil
 }
 
-// repoMap generates a mapping of repo name to instance URL and committish.
+// repoMap generates a mapping of repository ID to instance URL and committish.
 // This eliminates the need to track remote names and allows lookup
 // of source committish when generating changelog.
 func repoMap(manifest string) (map[string]*repo, error) {
@@ -123,7 +154,10 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	}
 	repos := make(map[string]*repo)
 	for _, project := range root.SelectElements("project") {
-		repos[project.SelectAttr("name").Value] = &repo{
+		name, path := project.SelectAttr("name").Value, project.SelectAttr("path").Value
+		repos[repoID(name, path)] = &repo{
+			Repo:        name,
+			Path:        path,
 			InstanceURL: remoteMap[project.SelectAttrValue("remote", "")],
 			Committish:  project.SelectAttr("revision").Value,
 		}
@@ -132,6 +166,7 @@ func repoMap(manifest string) (map[string]*repo, error) {
 }
 
 // mappedManifest retrieves a Manifest file from GoB and unmarshals XML.
+// Returns a mapping of repository ID to repository data.
 func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum string) (map[string]*repo, error) {
 	log.Debugf("Retrieving manifest file for build %s\n", buildNum)
 	response, err := utils.DownloadManifest(client, repo, buildNum)
@@ -147,8 +182,8 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 	return mappedManifest, nil
 }
 
-// commits retrieves a parsed list of commits between an ancestor and a committish
-func commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
+// commits get all commits that occur between committish and ancestor for a specific repo.
+func commits(client gitilesProto.GitilesClient, path string, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
 	commits, hasMoreCommits, err := utils.Commits(client, repo, committish, ancestor, querySize)
 	if err != nil {
@@ -159,8 +194,9 @@ func commits(client gitilesProto.GitilesClient, repo string, committish string, 
 		outputChan <- commitsResult{Err: err}
 	}
 	outputChan <- commitsResult{
-		RepoURL:        repo,
 		Commits:        parsedCommits,
+		Path:           path,
+		Repo:           repo,
 		HasMoreCommits: hasMoreCommits,
 	}
 }
@@ -171,15 +207,15 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 	log.Debug("Retrieving commit additions")
 	repoCommits := make(map[string]*RepoLog)
 	commitsChan := make(chan commitsResult, len(targetRepos))
-	for repoURL, targetRepoInfo := range targetRepos {
+	for repoID, targetRepoInfo := range targetRepos {
 		cl := clients[targetRepoInfo.InstanceURL]
 		// If the source Manifest file does not contain a target repo,
 		// count every commit since target repo creation as an addition
 		ancestorCommittish := ""
-		if sourceRepoInfo, ok := sourceRepos[repoURL]; ok {
+		if sourceRepoInfo, ok := sourceRepos[repoID]; ok {
 			ancestorCommittish = sourceRepoInfo.Committish
 		}
-		go commits(cl, repoURL, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
+		go commits(cl, targetRepoInfo.Path, targetRepoInfo.Repo, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
 	}
 	for i := 0; i < len(targetRepos); i++ {
 		res := <-commitsChan
@@ -187,16 +223,17 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			outputChan <- additionsResult{Err: res.Err}
 			return
 		}
-		sourceSHA := ""
-		if sha, ok := sourceRepos[res.RepoURL]; ok {
-			sourceSHA = sha.Committish
+		var sourceSHA string
+		if sourceData, ok := sourceRepos[repoID(res.Repo, res.Path)]; ok {
+			sourceSHA = sourceData.Committish
 		}
 		if len(res.Commits) > 0 {
-			repoCommits[res.RepoURL] = &RepoLog{
+			repoCommits[res.Path] = &RepoLog{
 				Commits:        res.Commits,
 				HasMoreCommits: res.HasMoreCommits,
+				Repo:           res.Repo,
 				SourceSHA:      sourceSHA,
-				TargetSHA:      targetRepos[res.RepoURL].Committish,
+				TargetSHA:      targetRepos[repoID(res.Repo, res.Path)].Committish,
 			}
 		}
 	}
