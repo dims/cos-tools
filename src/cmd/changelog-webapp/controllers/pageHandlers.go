@@ -147,11 +147,11 @@ type changelogPage struct {
 }
 
 type locateBuildPage struct {
-	CL            string
-	CLNum         string
-	BuildNum      string
-	GerritLink    string
-	Internal      bool
+	CL         string
+	CLNum      string
+	BuildNum   string
+	GerritLink string
+	Internal   bool
 }
 
 type statusPage struct {
@@ -216,11 +216,14 @@ func gobCommitLink(instance, repo, SHA string) string {
 	return fmt.Sprintf("https://%s/%s/+/%s", instance, repo, SHA)
 }
 
-func gobDiffLink(instance, repo, sourceSHA, targetSHA string) string {
+func gobDiffLink(instance, repo, sourceSHA, targetSHA string, diffLink bool) string {
+	if !diffLink {
+		return fmt.Sprintf("https://%s/%s/+log/%s?n=10000", instance, repo, targetSHA)
+	}
 	return fmt.Sprintf("https://%s/%s/+log/%s..%s?n=10000", instance, repo, sourceSHA, targetSHA)
 }
 
-func createRepoTableEntry(instance string, repo string, commit *changelog.Commit, isAddition bool) *repoTableEntry {
+func createRepoTableEntry(instance, repo string, commit *changelog.Commit, isAddition bool) *repoTableEntry {
 	entry := new(repoTableEntry)
 	entry.IsAddition = isAddition
 	entry.SHA = &shaAttr{Name: commit.SHA[:8], URL: gobCommitLink(instance, repo, commit.SHA)}
@@ -242,39 +245,41 @@ func createRepoTableEntry(instance string, repo string, commit *changelog.Commit
 
 func createChangelogPage(data changelogData) *changelogPage {
 	page := &changelogPage{Source: data.Source, Target: data.Target, QuerySize: envQuerySize, Internal: data.Internal}
-	for repoName, repoLog := range data.Additions {
-		table := &repoTable{Name: repoName}
-		for _, commit := range repoLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, repoName, commit, true)
+	for repoPath, addLog := range data.Additions {
+		diffLink := false
+		table := &repoTable{Name: repoPath}
+		for _, commit := range addLog.Commits {
+			tableEntry := createRepoTableEntry(data.Instance, addLog.Repo, commit, true)
 			table.Additions = append(table.Additions, tableEntry)
 		}
-		if _, ok := data.Removals[repoName]; ok {
-			for _, commit := range data.Removals[repoName].Commits {
-				tableEntry := createRepoTableEntry(data.Instance, repoName, commit, false)
+		if rmLog, ok := data.Removals[repoPath]; ok {
+			for _, commit := range data.Removals[repoPath].Commits {
+				tableEntry := createRepoTableEntry(data.Instance, rmLog.Repo, commit, false)
 				table.Removals = append(table.Removals, tableEntry)
 			}
-			if data.Removals[repoName].HasMoreCommits {
-				table.RemovalsLink = gobDiffLink(data.Instance, repoName, repoLog.TargetSHA, repoLog.SourceSHA)
+			if data.Removals[repoPath].HasMoreCommits {
+				diffLink = addLog.Repo == rmLog.Repo
+				table.RemovalsLink = gobDiffLink(data.Instance, rmLog.Repo, addLog.TargetSHA, rmLog.TargetSHA, diffLink)
 			}
 		}
-		if repoLog.HasMoreCommits {
-			table.AdditionsLink = gobDiffLink(data.Instance, repoName, repoLog.SourceSHA, repoLog.TargetSHA)
+		if addLog.HasMoreCommits {
+			table.AdditionsLink = gobDiffLink(data.Instance, addLog.Repo, addLog.SourceSHA, addLog.TargetSHA, diffLink)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 	}
 	// Add remaining repos that had removals but no additions
-	for repoName, repoLog := range data.Removals {
-		if _, ok := data.Additions[repoName]; ok {
+	for repoPath, repoLog := range data.Removals {
+		if _, ok := data.Additions[repoPath]; ok {
 			continue
 		}
-		table := &repoTable{Name: repoName}
+		table := &repoTable{Name: repoPath}
 		for _, commit := range repoLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, repoName, commit, false)
+			tableEntry := createRepoTableEntry(data.Instance, repoLog.Repo, commit, false)
 			table.Removals = append(table.Removals, tableEntry)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 		if repoLog.HasMoreCommits {
-			table.RemovalsLink = gobDiffLink(data.Instance, repoName, repoLog.TargetSHA, repoLog.SourceSHA)
+			table.RemovalsLink = gobDiffLink(data.Instance, repoLog.Repo, repoLog.SourceSHA, repoLog.TargetSHA, false)
 		}
 	}
 	return page
