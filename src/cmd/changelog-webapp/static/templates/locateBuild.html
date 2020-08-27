@@ -16,6 +16,8 @@
   </div>
   <div class="main">
     <h1>Locate Build with CL</h1>
+    <p class="feature-info">Find the first build containing a requested CL.</p>
+    <p class="feature-info">Note: It is possible that a COS build was not created using the build number returned. However, any COS build with build number greater than the returned build number should have the desired change present.</p>
     <form class="changelog-form" action="/locatebuild">
       <div class="text">
         {{if (ne .CL "")}}

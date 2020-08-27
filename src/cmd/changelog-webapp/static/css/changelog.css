@@ -10,10 +10,16 @@ td {
     padding: 2px;
 }
 
+.feature-info {
+    font-size: 14;
+    margin: 6px 0px;
+    width: 650px;
+}
+
 .changelog-form .text input {
     font-size: 14px;
     height: 26px;
-    margin-bottom: 8px;
+    margin: 8px 0px 8px 0px;
     width: 135px;
 }
 
