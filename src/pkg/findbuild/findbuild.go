@@ -304,6 +304,12 @@ func candidateBuildNums(client gitilesProto.GitilesClient, manifestRepo string, 
 // for the same repository and branch as the target CL.
 func manifestData(client gitilesProto.GitilesClient, manifestRepo string, buildNum string, targetData *clData, out chan manifestResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
+	// ChromeOS Gerrit sometimes returns 0.0.0 instead of 404
+	// Need to catch this build number to prevent seg fault on beevik/etree
+	if buildNum == "0.0.0" {
+		out <- manifestResponse{Err: fmt.Errorf("manifestData: 0.0.0 is a non-existant build")}
+		return
+	}
 	response, err := utils.DownloadManifest(client, manifestRepo, buildNum)
 	log.Debugf("Parsing manifest for build %s", buildNum)
 	if err != nil {
