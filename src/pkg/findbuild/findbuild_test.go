@@ -16,7 +16,6 @@ package findbuild
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -33,14 +32,6 @@ const (
 	externalManifestRepo      string = "cos/manifest-snapshots"
 	fallbackRepoPrefix        string = "mirrors/cros/"
 )
-
-func unwrappedError(err error) error {
-	innerErr := err
-	for errors.Unwrap(innerErr) != nil {
-		innerErr = errors.Unwrap(innerErr)
-	}
-	return innerErr
-}
 
 func getHTTPClient() (*http.Client, error) {
 	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
@@ -151,7 +142,7 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback:     false,
 			ShouldError:        false,
 		},
-		"reject cherry-picked change-id": {
+		"reject change-id": {
 			Change:         "I6cc721e6e61b3863e549045e68c1a2bd363efa0a",
 			GerritHost:     externalGerritURL,
 			GitilesHost:    externalGitilesURL,
@@ -176,6 +167,14 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 			ShouldError:    true,
 		},
+		"cl number provided": {
+			Change:         "I155670a3201794ded2124a07fe4bc2cdca4e6043",
+			GerritHost:     externalGerritURL,
+			GitilesHost:    externalGitilesURL,
+			ManifestRepo:   externalManifestRepo,
+			ShouldFallback: false,
+			ShouldError:    true,
+		},
 	}
 
 	httpClient, _ := getHTTPClient()
@@ -190,11 +189,10 @@ func TestFindCL(t *testing.T) {
 				CL:           test.Change,
 			}
 			res, err := FindBuild(req)
-			innerErr := unwrappedError(err)
-			if innerErr != ErrorCLNotFound && test.ShouldFallback {
+			if err != nil && err.HTTPCode() != "404" && test.ShouldFallback {
 				t.Fatalf("expected not found error, got %v", err)
 			}
-			if innerErr == ErrorCLNotFound {
+			if err != nil && err.HTTPCode() == "404" {
 				fallbackReq := &BuildRequest{
 					HTTPClient:   httpClient,
 					GerritHost:   test.FallbackGerritHost,

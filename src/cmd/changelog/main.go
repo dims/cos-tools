@@ -51,14 +51,6 @@ const (
 	fallbackRepoPrefix   = "mirrors/cros/"
 )
 
-func unwrappedError(err error) error {
-	innerErr := err
-	for errors.Unwrap(innerErr) != nil {
-		innerErr = errors.Unwrap(innerErr)
-	}
-	return innerErr
-}
-
 func getHTTPClient() (*http.Client, error) {
 	log.Debug("Creating HTTP client")
 	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
@@ -117,8 +109,8 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 		RepoPrefix:   "",
 		CL:           targetCL,
 	}
-	buildData, err := findbuild.FindBuild(req)
-	if unwrappedError(err) == findbuild.ErrorCLNotFound {
+	buildData, clErr := findbuild.FindBuild(req)
+	if clErr != nil && clErr.HTTPCode() == "404" {
 		log.Debugf("Query failed on Gerrit url %s and Gitiles url %s, retrying with fallback urls", externalGerritURL, externalGoBURL)
 		fallbackReq := &findbuild.BuildRequest{
 			HTTPClient:   httpClient,
@@ -128,10 +120,10 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 			RepoPrefix:   fallbackPrefix,
 			CL:           targetCL,
 		}
-		buildData, err = findbuild.FindBuild(fallbackReq)
+		buildData, clErr = findbuild.FindBuild(fallbackReq)
 	}
-	if err != nil {
-		return err
+	if clErr != nil {
+		return clErr
 	}
 	log.Infof("Build: %s", buildData.BuildNum)
 	return nil
