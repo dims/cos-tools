@@ -41,9 +41,10 @@ func main() {
 	http.HandleFunc("/changelog/", controllers.HandleChangelog)
 	http.HandleFunc("/locatebuild/", controllers.HandleLocateBuild)
 	http.HandleFunc("/login/", func(w http.ResponseWriter, r *http.Request) {
-		controllers.HandleLogin(w, r, "/")
+		controllers.HandleLogin(w, r, "/", true)
 	})
 	http.HandleFunc("/oauth2callback/", controllers.HandleCallback)
+	http.HandleFunc("/signout/", controllers.HandleSignOut)
 
 	if port == "" {
 		port = "8081"

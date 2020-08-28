@@ -6,6 +6,11 @@
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
+    {{if .SignedIn}}
+      <a class="signout" href="/signout/">Sign Out</a>
+    {{else}}
+      <a class="login" href="/login/">Login</a>
+    {{end}}
   </div>
   <div class="sidenav">
     {{if (eq .ActivePage "home")}}
@@ -23,7 +28,6 @@
     {{else}}
       <a href="/locatebuild/">Locate Build</a>
     {{end}}
-    <a href="/login/">Login</a>
   </div>
   <div class="main">
     <div class="text-content">
