@@ -40,9 +40,7 @@ func main() {
 	http.HandleFunc("/", controllers.HandleIndex)
 	http.HandleFunc("/changelog/", controllers.HandleChangelog)
 	http.HandleFunc("/locatebuild/", controllers.HandleLocateBuild)
-	http.HandleFunc("/login/", func(w http.ResponseWriter, r *http.Request) {
-		controllers.HandleLogin(w, r, "/", true)
-	})
+	http.HandleFunc("/login/", controllers.HandleLogin)
 	http.HandleFunc("/oauth2callback/", controllers.HandleCallback)
 	http.HandleFunc("/signout/", controllers.HandleSignOut)
 

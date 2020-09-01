@@ -6,7 +6,7 @@
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
-    <a class="login" href="/login/">Login</a>
+    <a class="login" href="/login/?redirect={{.ActivePage}}">Login</a>
   </div>
   <div class="sidenav">
     <a href="/">Home</a>
@@ -25,7 +25,8 @@
     <div class="text-content">
       <h1>Please sign in to use this feature</h1>
       <p>This application requires OAuth authentication to communicate with Google Git repositories. Your account data
-        will not be used for any other purposes. To continue, please sign in by clicking <a href="/login/">here</a>.
+        will not be used for any other purposes. To continue, please sign in by clicking 
+        <a href="/login/?redirect={{.ActivePage}}">here</a>.
       </p>
     </div>
   </div>

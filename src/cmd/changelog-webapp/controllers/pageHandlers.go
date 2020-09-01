@@ -327,7 +327,8 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	}
 	httpClient, err := HTTPClient(w, r)
 	if err != nil {
-		HandleLogin(w, r, "/changelog/", false)
+		loginURL := GetLoginURL("/changelog/", false)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 		return
 	}
 	added, removed, utilErr := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
@@ -382,7 +383,8 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	httpClient, err := HTTPClient(w, r)
 	if err != nil {
-		HandleLogin(w, r, "/locatebuild/", false)
+		loginURL := GetLoginURL("/locatebuild/", false)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 		return
 	}
 	buildData, didFallback, utilErr := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)

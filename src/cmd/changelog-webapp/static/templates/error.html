@@ -7,9 +7,9 @@
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
     {{if .SignedIn}}
-      <a class="signout" href="/signout/">Sign Out</a>
+      <a class="signout" href="/signout/?redirect={{.ActivePage}}">Sign Out</a>
     {{else}}
-      <a class="login" href="/login/">Login</a>
+      <a class="login" href="/login/?redirect={{.ActivePage}}">Login</a>
     {{end}}
   </div>
   <div class="sidenav">

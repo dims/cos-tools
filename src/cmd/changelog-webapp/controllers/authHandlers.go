@@ -103,6 +103,11 @@ func tokenExpired(r *http.Request) bool {
 	return err != nil || parsedExpiry.Before(time.Now())
 }
 
+// GetLoginURL returns a login URL to redirect the user to
+func GetLoginURL(redirect string, auto bool) string {
+	return fmt.Sprintf("/login/?redirect=%s&auto=%v", redirect, auto)
+}
+
 // SignedIn returns a bool indicating if the current request is signed in
 func SignedIn(r *http.Request) bool {
 	session, err := store.Get(r, sessionName)
@@ -131,7 +136,8 @@ func RequireToken(w http.ResponseWriter, r *http.Request, activePage string) boo
 	}
 	// If token is expired, auto refresh instead of prompting sign in
 	if tokenExpired(r) {
-		HandleLogin(w, r, activePage, false)
+		loginURL := GetLoginURL(activePage, true)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 		return true
 	}
 	return false
@@ -154,8 +160,19 @@ func HTTPClient(w http.ResponseWriter, r *http.Request) (*http.Client, error) {
 }
 
 // HandleLogin initiates the Oauth flow.
-func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string, explicitApproval bool) {
-	state := randomString(oauthStateLength, returnURL)
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Errorf("could not parse request: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	autoAuth := r.FormValue("auto") == "true"
+	redirect := r.FormValue("redirect")
+	if redirect == "" {
+		redirect = "/"
+	}
+
+	state := randomString(oauthStateLength, redirect)
 	// Ignore store.Get() errors because an error indicates the
 	// old session could not be deciphered. It returns a new session
 	// regardless.
@@ -168,10 +185,10 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string, expli
 		return
 	}
 	var authURL string
-	if explicitApproval {
-		authURL = config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
-	} else {
+	if autoAuth {
 		authURL = config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	} else {
+		authURL = config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 	}
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
