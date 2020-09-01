@@ -39,7 +39,7 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticBasePath))))
 	http.HandleFunc("/", controllers.HandleIndex)
 	http.HandleFunc("/changelog/", controllers.HandleChangelog)
-	http.HandleFunc("/locatebuild/", controllers.HandleLocateBuild)
+	http.HandleFunc("/findbuild/", controllers.HandleFindBuild)
 	http.HandleFunc("/login/", controllers.HandleLogin)
 	http.HandleFunc("/oauth2callback/", controllers.HandleCallback)
 	http.HandleFunc("/signout/", controllers.HandleSignOut)

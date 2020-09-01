@@ -51,7 +51,7 @@ var (
 	indexTemplate           *template.Template
 	changelogTemplate       *template.Template
 	promptLoginTemplate     *template.Template
-	locateBuildTemplate     *template.Template
+	findBuildTemplate       *template.Template
 	statusForbiddenTemplate *template.Template
 	basicTextTemplate       *template.Template
 )
@@ -87,7 +87,7 @@ func init() {
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
-	locateBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/locateBuild.html"))
+	findBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/findBuild.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
 	basicTextTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/error.html"))
 }
@@ -109,7 +109,7 @@ type changelogPage struct {
 	Internal   bool
 }
 
-type locateBuildPage struct {
+type findBuildPage struct {
 	CL         string
 	CLNum      string
 	BuildNum   string
@@ -301,7 +301,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		if err != nil {
-			log.Errorf("error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -312,7 +312,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if source == "" || target == "" {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
 		if err != nil {
-			log.Errorf("error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -353,16 +353,16 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleLocateBuild serves the Locate CL page
-func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
-	if RequireToken(w, r, "/locatebuild/") {
+// HandleFindBuild serves the Locate CL page
+func HandleFindBuild(w http.ResponseWriter, r *http.Request) {
+	if RequireToken(w, r, "/findbuild/") {
 		return
 	}
 	var err error
 	if err = r.ParseForm(); err != nil {
-		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+		err = findBuildTemplate.Execute(w, &findBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -370,9 +370,9 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	cl := r.FormValue("cl")
 	// If no CL value specified in request, display empty CL form
 	if cl == "" {
-		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+		err = findBuildTemplate.Execute(w, &findBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -383,14 +383,14 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	httpClient, err := HTTPClient(w, r)
 	if err != nil {
-		loginURL := GetLoginURL("/locatebuild/", false)
+		loginURL := GetLoginURL("/findbuild/", false)
 		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 		return
 	}
 	buildData, didFallback, utilErr := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
 	if utilErr != nil {
 		log.Errorf("error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
-		handleError(w, r, utilErr, "/locatebuild/")
+		handleError(w, r, utilErr, "/findbuild/")
 		return
 	}
 	var gerritLink string
@@ -399,16 +399,16 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	} else {
 		gerritLink = gerrit + "/q/" + buildData.CLNum
 	}
-	page := &locateBuildPage{
+	page := &findBuildPage{
 		CL:         cl,
 		CLNum:      buildData.CLNum,
 		BuildNum:   buildData.BuildNum,
 		Internal:   internal,
 		GerritLink: gerritLink,
 	}
-	err = locateBuildTemplate.Execute(w, page)
+	err = findBuildTemplate.Execute(w, page)
 	if err != nil {
-		log.Errorf("error executing locatebuild template: %v", err)
+		log.Errorf("error executing findbuild template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
