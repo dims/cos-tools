@@ -61,7 +61,7 @@ func repoListInLog(log map[string]*RepoLog, check []string) error {
 }
 
 func TestChangelog(t *testing.T) {
-	httpClient, err := getHTTPClient()
+	httpClient, _ := getHTTPClient()
 
 	// Test invalid source
 	additions, removals, err := Changelog(httpClient, "15", "15043.0.0", cosInstance, defaultManifestRepo, -1)
@@ -71,6 +71,8 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
 		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "404" {
+		t.Errorf("changelog failed, expected error code 404, got error code %s", err.HTTPCode())
 	}
 
 	// Test invalid target
@@ -81,6 +83,8 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
 		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "404" {
+		t.Errorf("changelog failed, expected error code 404, got error code %s", err.HTTPCode())
 	}
 
 	// Test invalid instance
@@ -91,6 +95,8 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
 		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "500" {
+		t.Errorf("changelog failed, expected error code 500, got error code %s", err.HTTPCode())
 	}
 
 	// Test invalid manifest repo
@@ -101,6 +107,8 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
 		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "404" {
+		t.Errorf("changelog failed, expected error code 404, got error code %s", err.HTTPCode())
 	}
 
 	// Test build number higher than latest release
@@ -111,6 +119,8 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
 		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "404" {
+		t.Errorf("changelog failed, expected error code 404, got error code %s", err.HTTPCode())
 	}
 
 	// Test manifest with remote urls specified and no default URL
@@ -379,5 +389,19 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("Changelog failed, expected non-empty additions, got %v", additions)
 	} else if len(removals) == 0 {
 		t.Errorf("Changelog failed, expected non-empty removals, got %v", removals)
+	}
+
+	// Test empty repository
+	source = "0.0.0"
+	target = "2.0.0"
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	if additions != nil {
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
+	} else if removals != nil {
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
+	} else if err == nil {
+		t.Errorf("changelog failed, expected error, got nil")
+	} else if err.HTTPCode() != "500" {
+		t.Errorf("changelog failed, expected error code 500, got error code %s", err.HTTPCode())
 	}
 }

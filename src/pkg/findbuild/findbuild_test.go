@@ -51,7 +51,7 @@ func TestFindCL(t *testing.T) {
 		ManifestRepo       string
 		OutputBuildNum     string
 		ShouldFallback     bool
-		ShouldError        bool
+		ExpectedError      string
 	}{
 		"invalid host": {
 			Change:         "3781",
@@ -59,7 +59,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    "zop.googlesource.com",
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "500",
 		},
 		"incorrect manifest repo": {
 			Change:         "3781",
@@ -67,7 +67,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   "cos/manifest",
 			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "500",
 		},
 		"master branch release version": {
 			Change:         "3280",
@@ -76,7 +76,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:   externalManifestRepo,
 			OutputBuildNum: "15085.0.0",
 			ShouldFallback: false,
-			ShouldError:    false,
 		},
 		"R85-13310.B branch release version": {
 			Change:         "3206",
@@ -85,7 +84,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:   externalManifestRepo,
 			OutputBuildNum: "13310.1025.0",
 			ShouldFallback: false,
-			ShouldError:    false,
 		},
 		"only CL in build diff": {
 			Change:         "3781",
@@ -94,7 +92,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:   externalManifestRepo,
 			OutputBuildNum: "12371.1072.0",
 			ShouldFallback: false,
-			ShouldError:    false,
 		},
 		"non-existant CL": {
 			Change:             "9999999999",
@@ -103,7 +100,7 @@ func TestFindCL(t *testing.T) {
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
 			ShouldFallback:     true,
-			ShouldError:        true,
+			ExpectedError:      "404",
 		},
 		"abandoned CL": {
 			Change:         "3743",
@@ -111,7 +108,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "406",
 		},
 		"under review CL": {
 			Change:         "1540",
@@ -119,7 +116,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "406",
 		},
 		"chromium CL": {
 			Change:             "2288114",
@@ -130,7 +127,6 @@ func TestFindCL(t *testing.T) {
 			FallbackPrefix:     fallbackRepoPrefix,
 			OutputBuildNum:     "15049.0.0",
 			ShouldFallback:     true,
-			ShouldError:        false,
 		},
 		"use commit SHA": {
 			Change:             "80809c436f1cae4cde117fce34b82f38bdc2fd36",
@@ -140,7 +136,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:       externalManifestRepo,
 			OutputBuildNum:     "12871.1183.0",
 			ShouldFallback:     false,
-			ShouldError:        false,
 		},
 		"reject change-id": {
 			Change:         "I6cc721e6e61b3863e549045e68c1a2bd363efa0a",
@@ -148,7 +143,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "400",
 		},
 		"third_party/kernel special branch case": {
 			Change:         "3302",
@@ -157,7 +152,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:   externalManifestRepo,
 			OutputBuildNum: "15088.0.0",
 			ShouldFallback: false,
-			ShouldError:    false,
 		},
 		"branch not in manifest": {
 			Change:         "1592",
@@ -165,15 +159,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ShouldError:    true,
-		},
-		"cl number provided": {
-			Change:         "I155670a3201794ded2124a07fe4bc2cdca4e6043",
-			GerritHost:     externalGerritURL,
-			GitilesHost:    externalGitilesURL,
-			ManifestRepo:   externalManifestRepo,
-			ShouldFallback: false,
-			ShouldError:    true,
+			ExpectedError:  "500",
 		},
 		"cl fallback earlier than earliest COS build": {
 			Change:             "3740",
@@ -183,7 +169,7 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:       externalManifestRepo,
 			FallbackPrefix:     fallbackRepoPrefix,
 			ShouldFallback:     true,
-			ShouldError:        true,
+			ExpectedError:      "404",
 		},
 	}
 
@@ -214,13 +200,13 @@ func TestFindCL(t *testing.T) {
 				res, err = FindBuild(fallbackReq)
 			}
 			switch {
-			case (err != nil) != test.ShouldError:
-				ShouldError := "no error"
-				if test.ShouldError {
-					ShouldError = "some error"
-				}
-				t.Fatalf("expected %s, got: %v", ShouldError, err)
-			case !test.ShouldError && res.BuildNum != test.OutputBuildNum:
+			case test.ExpectedError == "" && err != nil:
+				t.Fatalf("expected no error, got %v", err)
+			case test.ExpectedError != "" && err == nil:
+				t.Fatalf("expected error code %s, got nil err", test.ExpectedError)
+			case test.ExpectedError != "" && err != nil && test.ExpectedError != err.HTTPCode():
+				t.Fatalf("expected error code %s, got error code %s", test.ExpectedError, err.HTTPCode())
+			case test.ExpectedError == "" && res.BuildNum != test.OutputBuildNum:
 				t.Fatalf("expected output %s, got %s", test.OutputBuildNum, res)
 			}
 		})
