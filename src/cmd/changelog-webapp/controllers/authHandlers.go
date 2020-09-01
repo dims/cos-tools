@@ -56,16 +56,16 @@ func init() {
 	var err error
 	client, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		log.Fatalf("Failed to setup client: %v", err)
+		log.Fatalf("failed to setup client: %v", err)
 	}
 	config.ClientSecret, err = getSecret(client, clientSecretName)
 	if err != nil {
-		log.Fatalf("Failed to retrieve secret: %s\n%v", clientSecretName, err)
+		log.Fatalf("failed to retrieve secret: %s\n%v", clientSecretName, err)
 	}
 
 	sessionSecret, err := getSecret(client, sessionSecretName)
 	if err != nil {
-		log.Fatalf("Failed to retrieve secret :%s\n%v", sessionSecretName, err)
+		log.Fatalf("failed to retrieve secret :%s\n%v", sessionSecretName, err)
 	}
 	store = sessions.NewCookieStore([]byte(sessionSecret))
 }
@@ -77,7 +77,7 @@ func getSecret(client *secretmanager.Client, secretName string) (string, error) 
 	}
 	result, err := client.AccessSecretVersion(context.Background(), accessRequest)
 	if err != nil {
-		return "", fmt.Errorf("Failed to access secret at %s: %v", accessRequest.Name, err)
+		return "", fmt.Errorf("failed to access secret at %s: %v", accessRequest.Name, err)
 	}
 	return string(result.Payload.Data), nil
 }
@@ -124,7 +124,7 @@ func RequireToken(w http.ResponseWriter, r *http.Request, activePage string) boo
 	if !SignedIn(r) {
 		err := promptLoginTemplate.Execute(w, &statusPage{ActivePage: activePage})
 		if err != nil {
-			log.Errorf("RequireToken: error executing promptLogin template: %v", err)
+			log.Errorf("error executing promptLogin template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return true
@@ -163,7 +163,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string, expli
 	session.Values["oauthState"] = state
 	err := session.Save(r, w)
 	if err != nil {
-		log.Errorf("HandleLogin: Error saving key: %v", err)
+		log.Errorf("Error saving key: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -181,7 +181,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string, expli
 // Redirects to URL stored in the callback state on completion.
 func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		log.Errorf("Could not parse query: %v\n", err)
+		log.Errorf("could not parse query: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -190,7 +190,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	session, err := store.Get(r, sessionName)
 	if err != nil {
-		log.Errorf("HandleCallback: Error retrieving session: %v", err)
+		log.Errorf("error retrieving session: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -206,7 +206,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := config.Exchange(context.Background(), authCode)
 	if err != nil {
-		log.Errorf("HandleCallback: Error exchanging token: %v", token)
+		log.Errorf("error exchanging token: %v", token)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -217,7 +217,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	session.Values["expiry"] = token.Expiry.Format(time.RFC3339)
 	err = session.Save(r, w)
 	if err != nil {
-		log.Errorf("HandleCallback: Error saving session: %v", err)
+		log.Errorf("error saving session: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -228,7 +228,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 // session
 func HandleSignOut(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		log.Errorf("Could not parse request: %v\n", err)
+		log.Errorf("could not parse request: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -243,7 +243,7 @@ func HandleSignOut(w http.ResponseWriter, r *http.Request) {
 	session.Values["expiry"] = nil
 	err := session.Save(r, w)
 	if err != nil {
-		log.Errorf("HandleCallback: Error saving session: %v", err)
+		log.Errorf("error saving session: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)

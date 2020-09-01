@@ -213,7 +213,7 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 	for left < right {
 		mid := (left + right) / 2
 		if allManifests[mid].Committer == nil {
-			log.Errorf("Manifest %s has no committer", allManifests[mid].Id)
+			log.Errorf("manifest %s has no committer", allManifests[mid].Id)
 			return nil, utils.InternalError
 		}
 		currDate := allManifests[mid].Committer.Time.AsTime()
@@ -231,7 +231,7 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 	for left < right {
 		mid := (left+right)/2 + 1
 		if allManifests[mid].Committer == nil {
-			log.Errorf("Manifest %s has no committer", allManifests[mid].Id)
+			log.Errorf("manifest %s has no committer", allManifests[mid].Id)
 			return nil, utils.InternalError
 		}
 		currDate := allManifests[mid].Committer.Time.AsTime()
@@ -242,6 +242,9 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 		}
 	}
 	latestIdx := right
+	if allManifests[earliestIdx].Committer.Time.AsTime().After(targetData.Time) {
+		return nil, utils.FromFindBuildError("404", targetData.CLNum)
+	}
 	return allManifests[latestIdx : earliestIdx+1], nil
 }
 
@@ -256,7 +259,7 @@ func repoTags(client gitilesProto.GitilesClient, repo string) (*gitilesProto.Ref
 	defer cancel()
 	res, err := client.Refs(ctx, request)
 	if err != nil {
-		log.Errorf("Error retrieving tags:\n%v", err)
+		log.Errorf("error retrieving tags:\n%v", err)
 		return nil, err
 	}
 	return res, nil
@@ -304,12 +307,6 @@ func candidateBuildNums(client gitilesProto.GitilesClient, manifestRepo string, 
 // for the same repository and branch as the target CL.
 func manifestData(client gitilesProto.GitilesClient, manifestRepo string, buildNum string, targetData *clData, out chan manifestResponse, wg *sync.WaitGroup) {
 	defer wg.Done()
-	// ChromeOS Gerrit sometimes returns 0.0.0 instead of 404
-	// Need to catch this build number to prevent seg fault on beevik/etree
-	if buildNum == "0.0.0" {
-		out <- manifestResponse{Err: fmt.Errorf("manifestData: 0.0.0 is a non-existant build")}
-		return
-	}
 	response, err := utils.DownloadManifest(client, manifestRepo, buildNum)
 	log.Debugf("Parsing manifest for build %s", buildNum)
 	if err != nil {
@@ -444,12 +441,12 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 	}
 	gerritClient, err := gerrit.NewClient(request.HTTPClient, request.GerritHost)
 	if err != nil {
-		log.Errorf("Failed to establish Gerrit client for host %s:\n%v", request.GerritHost, err)
+		log.Errorf("failed to establish Gerrit client for host %s:\n%v", request.GerritHost, err)
 		return nil, utils.InternalError
 	}
 	gitilesClient, err := gitilesApi.NewRESTClient(request.HTTPClient, request.GitilesHost, true)
 	if err != nil {
-		log.Errorf("Failed to establish Gitiles client for host %s:\n%v", request.GitilesHost, err)
+		log.Errorf("failed to establish Gitiles client for host %s:\n%v", request.GitilesHost, err)
 		return nil, utils.InternalError
 	}
 	clData, clErr := getCLData(gerritClient, request.CL, request.RepoPrefix)

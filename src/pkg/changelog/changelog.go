@@ -130,12 +130,12 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	log.Debug("Mapping repository to instance URL and committish")
 	if manifest == "" {
 		log.Error("repoMap: manifest file is empty")
-		return nil, errors.New("Manifest file is empty")
+		return nil, errors.New("manifest file is empty")
 	}
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(manifest); err != nil {
 		log.Debug("repoMap: error parsing manifest xml:\n%w", err)
-		return nil, errors.New("Could not parse XML for manifest file associated with build")
+		return nil, errors.New("could not parse XML for manifest file associated with build")
 	}
 	root := doc.SelectElement("manifest")
 

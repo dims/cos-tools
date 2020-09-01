@@ -163,7 +163,7 @@ type bugAttr struct {
 func getIntVerifiedEnv(envName string) string {
 	output := os.Getenv(envName)
 	if _, err := strconv.Atoi(output); err != nil {
-		log.Errorf("getEnvAsInt: Failed to parse env variable %s with value %s: %v",
+		log.Errorf("failed to parse env variable %s with value %s: %v",
 			envName, os.Getenv(output), err)
 	}
 	return output
@@ -301,7 +301,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		if err != nil {
-			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+			log.Errorf("error executing locatebuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -312,7 +312,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if source == "" || target == "" {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
 		if err != nil {
-			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+			log.Errorf("error executing locatebuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -332,7 +332,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	}
 	added, removed, utilErr := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
 	if utilErr != nil {
-		log.Errorf("HandleChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
+		log.Errorf("error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
 			source, target, externalGoBInstance, externalManifestRepo, utilErr)
 		handleError(w, r, utilErr, "/changelog/")
 		return
@@ -347,7 +347,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	})
 	err = changelogTemplate.Execute(w, page)
 	if err != nil {
-		log.Errorf("HandleChangelog: error executing changelog template: %v", err)
+		log.Errorf("error executing changelog template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -361,7 +361,7 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	if err = r.ParseForm(); err != nil {
 		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+			log.Errorf("error executing locatebuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -371,7 +371,7 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	if cl == "" {
 		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+			log.Errorf("error executing locatebuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
@@ -387,7 +387,7 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	buildData, didFallback, utilErr := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
 	if utilErr != nil {
-		log.Errorf("HandleLocateBuild: error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
+		log.Errorf("error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
 		handleError(w, r, utilErr, "/locatebuild/")
 		return
 	}
@@ -406,7 +406,7 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	err = locateBuildTemplate.Execute(w, page)
 	if err != nil {
-		log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+		log.Errorf("error executing locatebuild template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -114,7 +114,7 @@ func commitTime(commit *git.Commit) string {
 // Commit object with processed fields
 func parseGitCommit(commit *git.Commit) (*Commit, error) {
 	if commit == nil {
-		return nil, errors.New("ParseCommit: Input should not be nil")
+		return nil, errors.New("parseCommit: Input should not be nil")
 	}
 	return &Commit{
 		SHA:           commit.Id,
@@ -131,13 +131,13 @@ func parseGitCommit(commit *git.Commit) (*Commit, error) {
 // into a slice of Commit objects with processed fields
 func ParseGitCommitLog(commits []*git.Commit) ([]*Commit, error) {
 	if commits == nil {
-		return nil, errors.New("ParseCommitLog: Input should not be nil")
+		return nil, errors.New("parseCommitLog: Input should not be nil")
 	}
 	output := make([]*Commit, len(commits))
 	for i, commit := range commits {
 		parsedCommit, err := parseGitCommit(commit)
 		if err != nil {
-			return nil, errors.New("ParseCommitLog: Input slice contains nil pointer")
+			return nil, errors.New("parseCommitLog: Input slice contains nil pointer")
 		}
 		output[i] = parsedCommit
 	}

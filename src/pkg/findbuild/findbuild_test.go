@@ -175,6 +175,16 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 			ShouldError:    true,
 		},
+		"cl fallback earlier than earliest COS build": {
+			Change:             "3740",
+			GerritHost:         externalGerritURL,
+			GitilesHost:        externalGitilesURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			ManifestRepo:       externalManifestRepo,
+			FallbackPrefix:     fallbackRepoPrefix,
+			ShouldFallback:     true,
+			ShouldError:        true,
+		},
 	}
 
 	httpClient, _ := getHTTPClient()
