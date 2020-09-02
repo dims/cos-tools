@@ -93,7 +93,6 @@ func init() {
 }
 
 type changelogData struct {
-	Instance  string
 	Source    string
 	Target    string
 	Additions map[string]*changelog.RepoLog
@@ -206,21 +205,21 @@ func createChangelogPage(data changelogData) *changelogPage {
 		diffLink := false
 		table := &repoTable{Name: repoPath}
 		for _, commit := range addLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, addLog.Repo, commit, true)
+			tableEntry := createRepoTableEntry(addLog.InstanceURL, addLog.Repo, commit, true)
 			table.Additions = append(table.Additions, tableEntry)
 		}
 		if rmLog, ok := data.Removals[repoPath]; ok {
 			for _, commit := range data.Removals[repoPath].Commits {
-				tableEntry := createRepoTableEntry(data.Instance, rmLog.Repo, commit, false)
+				tableEntry := createRepoTableEntry(rmLog.InstanceURL, rmLog.Repo, commit, false)
 				table.Removals = append(table.Removals, tableEntry)
 			}
 			if data.Removals[repoPath].HasMoreCommits {
 				diffLink = addLog.Repo == rmLog.Repo
-				table.RemovalsLink = gobDiffLink(data.Instance, rmLog.Repo, addLog.TargetSHA, rmLog.TargetSHA, diffLink)
+				table.RemovalsLink = gobDiffLink(rmLog.InstanceURL, rmLog.Repo, addLog.TargetSHA, rmLog.TargetSHA, diffLink)
 			}
 		}
 		if addLog.HasMoreCommits {
-			table.AdditionsLink = gobDiffLink(data.Instance, addLog.Repo, addLog.SourceSHA, addLog.TargetSHA, diffLink)
+			table.AdditionsLink = gobDiffLink(addLog.InstanceURL, addLog.Repo, addLog.SourceSHA, addLog.TargetSHA, diffLink)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 	}
@@ -231,12 +230,12 @@ func createChangelogPage(data changelogData) *changelogPage {
 		}
 		table := &repoTable{Name: repoPath}
 		for _, commit := range repoLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, repoLog.Repo, commit, false)
+			tableEntry := createRepoTableEntry(repoLog.InstanceURL, repoLog.Repo, commit, false)
 			table.Removals = append(table.Removals, tableEntry)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 		if repoLog.HasMoreCommits {
-			table.RemovalsLink = gobDiffLink(data.Instance, repoLog.Repo, repoLog.SourceSHA, repoLog.TargetSHA, false)
+			table.RemovalsLink = gobDiffLink(repoLog.InstanceURL, repoLog.Repo, repoLog.SourceSHA, repoLog.TargetSHA, false)
 		}
 	}
 	return page
@@ -339,7 +338,6 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := createChangelogPage(changelogData{
-		Instance:  instance,
 		Source:    source,
 		Target:    target,
 		Additions: added,

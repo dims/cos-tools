@@ -56,8 +56,20 @@ type repo struct {
 	Committish string
 }
 
+type commitsRequest struct {
+	Client      gitilesProto.GitilesClient
+	InstanceURL string
+	Path        string
+	Repo        string
+	Committish  string
+	Ancestor    string
+	QuerySize   int
+	OutputChan  chan commitsResult
+}
+
 type commitsResult struct {
 	Commits        []*Commit
+	InstanceURL    string
 	Repo           string
 	Path           string
 	HasMoreCommits bool
@@ -72,6 +84,7 @@ type additionsResult struct {
 // RepoLog contains a changelist for a particular repository
 type RepoLog struct {
 	Commits        []*Commit
+	InstanceURL    string
 	Repo           string
 	SourceSHA      string
 	TargetSHA      string
@@ -187,22 +200,23 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 }
 
 // commits get all commits that occur between committish and ancestor for a specific repo.
-func commits(client gitilesProto.GitilesClient, path string, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
-	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
-	commits, hasMoreCommits, err := utils.Commits(client, repo, committish, ancestor, querySize)
+func commits(req commitsRequest) {
+	log.Debugf("Fetching changelog for repo: %s on committish %s\n", req.Repo, req.Committish)
+	commits, hasMoreCommits, err := utils.Commits(req.Client, req.Repo, req.Committish, req.Ancestor, req.QuerySize)
 	if err != nil {
-		outputChan <- commitsResult{Err: utils.InternalError}
+		req.OutputChan <- commitsResult{Err: utils.InternalError}
 	}
 	parsedCommits, err := ParseGitCommitLog(commits)
 	if err != nil {
 		log.Errorf("commits: Error parsing Gitiles commits response\n%v", err)
-		outputChan <- commitsResult{Err: utils.InternalError}
+		req.OutputChan <- commitsResult{Err: utils.InternalError}
 		return
 	}
-	outputChan <- commitsResult{
+	req.OutputChan <- commitsResult{
 		Commits:        parsedCommits,
-		Path:           path,
-		Repo:           repo,
+		InstanceURL:    req.InstanceURL,
+		Path:           req.Path,
+		Repo:           req.Repo,
 		HasMoreCommits: hasMoreCommits,
 	}
 }
@@ -221,7 +235,17 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 		if sourceRepoInfo, ok := sourceRepos[repoID]; ok {
 			ancestorCommittish = sourceRepoInfo.Committish
 		}
-		go commits(cl, targetRepoInfo.Path, targetRepoInfo.Repo, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
+		commitsReq := commitsRequest{
+			Client:      cl,
+			Path:        targetRepoInfo.Path,
+			InstanceURL: targetRepoInfo.InstanceURL,
+			Repo:        targetRepoInfo.Repo,
+			Committish:  targetRepoInfo.Committish,
+			Ancestor:    ancestorCommittish,
+			QuerySize:   querySize,
+			OutputChan:  commitsChan,
+		}
+		go commits(commitsReq)
 	}
 	for i := 0; i < len(targetRepos); i++ {
 		res := <-commitsChan
@@ -237,6 +261,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			repoCommits[res.Path] = &RepoLog{
 				Commits:        res.Commits,
 				HasMoreCommits: res.HasMoreCommits,
+				InstanceURL:    res.InstanceURL,
 				Repo:           res.Repo,
 				SourceSHA:      sourceSHA,
 				TargetSHA:      targetRepos[repoID(res.Repo, res.Path)].Committish,
