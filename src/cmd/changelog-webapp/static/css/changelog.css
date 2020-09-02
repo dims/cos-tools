@@ -19,7 +19,7 @@ td {
 .changelog-form .text input {
     font-size: 14px;
     height: 26px;
-    margin: 8px 0px 8px 0px;
+    margin: 8px 2px;
     width: 135px;
 }
 
@@ -29,10 +29,7 @@ td {
 
 .changelog-form .text .submit {
     width: 59px;
-}
-
-.changelog-form .text label {
-    margin: 4px;
+    margin: 0px;
 }
 
 .changelog-form .radio .external {
