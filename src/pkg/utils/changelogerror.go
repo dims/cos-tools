@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"regexp"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -43,53 +42,48 @@ var (
 		codes.Unavailable.String():        "503",
 		codes.DataLoss.String():           "500",
 	}
-	httpStatus = map[string]string{
-		"400": "400 Bad Request",
-		"401": "401 Unauthorized",
-		"403": "403 Forbidden",
-		"404": "404 Not Found",
-		"406": "406 Not Acceptable",
-		"429": "429 Too Many Requests",
-		"500": "500 Internal Server Error",
-		"503": "503 Service Unavailable",
+
+	// ChangeIDUnsupported returns a ChangelogError object for findbuild indicating an
+	// invalid CL identifier was provided for findbuild
+	ChangeIDUnsupported = &UtilChangelogError{
+		httpCode: "400",
+		header:   "Change-ID Not Supported",
+		err:      "Change-ID is not a supported input format. Please enter either a CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) for a submitted CL.",
 	}
-	// Gitiles specific error messages
-	// Specifies a string format to allow the build number to be inserted
-	httpGitilesErrorFmt = map[string]string{
-		"404": "Build number %s not found. Please input a valid build number (example: 13310.1035.0).",
+
+	// ForbiddenError is a ChangelogError object indicating the user does not have
+	// permission to access a resource
+	ForbiddenError = &UtilChangelogError{
+		httpCode: "403",
+		header:   "No Access",
+		err:      "This account does not have access to internal repositories. Please retry with an authorized account, or select the external button to query from publically accessible sources.",
 	}
-	// Gerrit specific error messages
-	// Specifies a string format to allow CL number to be inserted
-	httpGerritErrorFmt = map[string]string{
-		"400": "%s is not a recognized CL identifier. Please enter either a CL-Number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) for a submitted CL.",
-		"404": "No build found for a CL with ID %s. Please enter either the CL-Number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.",
-		"406": "CL identifier %s maps to a CL that has not been submitted yet. A CL will not enter any build until it is successfully submitted. Please provide the CL identifier for a submitted CL.",
+
+	// InternalServerError is a ChangelogError object indicating an internal error
+	InternalServerError = &UtilChangelogError{
+		httpCode: "500",
+		header:   "Internal Server Error",
+		err:      "An unexpected error occurred while retrieving the requested information.",
 	}
-	// Standard error messages
-	httpErrorReplacement = map[string]string{
-		"403": "This account does not have access to internal repositories. Please retry with an authorized account, or select the external button to query from publically accessible builds.",
-		"429": "Our servers are currently experiencing heavy load. Please retry in a couple minutes.",
-		"500": "An unexpected error occurred while retrieving the requested information.",
-	}
+
 	gitiles403ErrMsg = "unexpected HTTP 403 from Gitiles"
 	gerritErrCodeRe  = regexp.MustCompile("status code\\s*(\\d+)")
-
-	// InternalError is a ChangelogError object indicating an internal error
-	InternalError = newError("500", httpErrorReplacement["500"])
 )
 
 // ChangelogError is the error type used by the changelog and findbuild package
 type ChangelogError interface {
 	error
 	HTTPCode() string
-	HTTPStatus() string
+	Header() string
+	HTMLError() string
 }
 
 // UtilChangelogError implements the ChangelogError interface
 type UtilChangelogError struct {
-	httpCode   string
-	httpStatus string
-	err        string
+	httpCode string
+	header   string
+	err      string
+	htmlErr  string
 }
 
 // HTTPCode retrieves the HTTP error code associated with the error
@@ -98,14 +92,23 @@ func (e *UtilChangelogError) HTTPCode() string {
 	return e.httpCode
 }
 
-// HTTPStatus retrieves the full HTTP status associated with the error
+// Header retrieves the full HTTP status associated with the error
 // ex. 400 Bad Request
-func (e *UtilChangelogError) HTTPStatus() string {
-	return e.httpStatus
+func (e *UtilChangelogError) Header() string {
+	return e.header
 }
 
+// Error returns the error string
 func (e *UtilChangelogError) Error() string {
 	return e.err
+}
+
+// HTMLError returns an HTML version of the error string
+func (e *UtilChangelogError) HTMLError() string {
+	if e.htmlErr != "" {
+		return e.htmlErr
+	}
+	return e.Error()
 }
 
 func unwrapError(err error) error {
@@ -116,48 +119,100 @@ func unwrapError(err error) error {
 	return innerErr
 }
 
-// newError creates a new UtilChangelogError
-func newError(httpCode, errString string) *UtilChangelogError {
-	output := UtilChangelogError{
-		httpCode: httpCode,
-		err:      errString,
+// BuildNotFound returns a ChangelogError object for changelog indicating
+// the desired build could not be found
+func BuildNotFound(buildNumber string) *UtilChangelogError {
+	return &UtilChangelogError{
+		httpCode: "404",
+		header:   "Build Not Found",
+		err:      fmt.Sprintf("Build number %s not found. Please input a valid build number (example: 13310.1035.0).", buildNumber),
 	}
-	if header, ok := httpStatus[httpCode]; ok {
-		output.httpStatus = header
-	} else {
-		log.Errorf("No HTTP status mapping for HTTP code %s", httpCode)
-		output.httpStatus = httpStatus["500"]
-	}
-	return &output
 }
 
-// FromChangelogError creates Changelog errors that are relevant to Changelog
-// functionality.
-func FromChangelogError(httpCode, buildNum string) *UtilChangelogError {
-	if errFmt, ok := httpGitilesErrorFmt[httpCode]; ok {
-		errStr := fmt.Sprintf(errFmt, buildNum)
-		return newError("404", errStr)
-	} else if replacementErr, ok := httpErrorReplacement[httpCode]; ok {
-		return newError(httpCode, replacementErr)
-	}
-	return InternalError
+func clLink(clID, instanceURL string) string {
+	return fmt.Sprintf("<a href=\"%s/q/%s\" target=\"_blank\">CL %s</a>", instanceURL, clID, clID)
 }
 
-// FromFindBuildError creates Changelog errors that are relevant to FindBuild
-// functionality.
-func FromFindBuildError(httpCode string, clID string) *UtilChangelogError {
-	if errFmt, ok := httpGerritErrorFmt[httpCode]; ok {
-		errStr := fmt.Sprintf(errFmt, clID)
-		return newError(httpCode, errStr)
-	} else if replacementErr, ok := httpErrorReplacement[httpCode]; ok {
-		return newError(httpCode, replacementErr)
+// CLNotFound returns a ChangelogError object for findbuild indicating the provided
+// CL could not be found
+func CLNotFound(clID string) *UtilChangelogError {
+	return &UtilChangelogError{
+		httpCode: "404",
+		header:   "CL Not Found",
+		err:      fmt.Sprintf("CL/Commit-SHA %s not found. Please enter either the CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.", clID),
 	}
-	return InternalError
+}
+
+// CLLandingNotFound returns a ChangelogError object for findbuild indicating
+// no build was found containing a CL
+func CLLandingNotFound(clID, instanceURL string) *UtilChangelogError {
+	errStrFmt := "No build was found containing %s."
+	link := clLink(clID, instanceURL)
+	return &UtilChangelogError{
+		httpCode: "404",
+		header:   "No Build Found",
+		err:      fmt.Sprintf(errStrFmt, "CL "+clID),
+		htmlErr:  fmt.Sprintf(errStrFmt, link),
+	}
+}
+
+// CLNotUsed returns a ChangelogError object for findbuild indicating
+// that the repository and branch associated with a CL was not found in any
+// manifest files
+func CLNotUsed(clID, repo, branch, instanceURL string) *UtilChangelogError {
+	errStrFmt := "%s modifies the %s repository on the %s branch, which was not used by builds near its submission time."
+	link := clLink(clID, instanceURL)
+	return &UtilChangelogError{
+		httpCode: "406",
+		header:   "CL Not Used",
+		err:      fmt.Sprintf(errStrFmt, "CL "+clID, repo, branch),
+		htmlErr:  fmt.Sprintf(errStrFmt, link, repo, branch),
+	}
+}
+
+// CLTooRecent returns a ChangelogError object for findbuild indicating the provided
+// CL could not be found
+func CLTooRecent(clID, instanceURL string) *UtilChangelogError {
+	errStrFmt := "%s was submitted too recently to be included in any builds. Please wait a couple hours and try again."
+	link := clLink(clID, instanceURL)
+	return &UtilChangelogError{
+		httpCode: "406",
+		header:   "CL Too Recent",
+		err:      fmt.Sprintf(errStrFmt, "CL "+clID),
+		htmlErr:  fmt.Sprintf(errStrFmt, link),
+	}
+}
+
+// CLNotSubmitted returns a ChangelogError object for findbuild indicating
+// that the provided CL has not been submitted
+func CLNotSubmitted(clID, instanceURL string) *UtilChangelogError {
+	errStrFmt := "%s has not been submitted yet. A CL will not enter any build until it is successfully submitted."
+	link := clLink(clID, instanceURL)
+	return &UtilChangelogError{
+		httpCode: "406",
+		header:   "CL Not Submitted",
+		err:      fmt.Sprintf(errStrFmt, "CL "+clID),
+		htmlErr:  fmt.Sprintf(errStrFmt, link),
+	}
+}
+
+// CLInvalidRelease returns a ChangelogError object for findbuild indicating
+// that the branch a CL was submitted in was not recognized as a release branch
+func CLInvalidRelease(clID, release, instanceURL string) *UtilChangelogError {
+	errStrFmt := "%s maps to release %s, which is not a valid release"
+	link := clLink(clID, instanceURL)
+	return &UtilChangelogError{
+		httpCode: "406",
+		header:   "Invalid Release Branch",
+		err:      fmt.Sprintf(errStrFmt, "CL "+clID, release),
+		htmlErr:  fmt.Sprintf(errStrFmt, link, release),
+	}
 }
 
 // GitilesErrCode parses a Gitiles error message and returns an HTTP error code
 // associated with the error. Returns 500 if no error code is found.
 func GitilesErrCode(err error) string {
+	err = unwrapError(err)
 	rpcStatus, ok := status.FromError(err)
 	if !ok {
 		return "500"
@@ -176,6 +231,7 @@ func GitilesErrCode(err error) string {
 // GerritErrCode parse a Gerrit error and returns an HTTP error code associated
 // with the error. Returns 500 if no error code is found.
 func GerritErrCode(err error) string {
+	err = unwrapError(err)
 	matches := gerritErrCodeRe.FindStringSubmatch(err.Error())
 	if len(matches) != 2 {
 		return "500"

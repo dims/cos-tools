@@ -61,13 +61,13 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 			ExpectedError:  "500",
 		},
-		"incorrect manifest repo": {
+		"no release match in repo": {
 			Change:         "3781",
 			GerritHost:     externalGerritURL,
 			GitilesHost:    externalGitilesURL,
-			ManifestRepo:   "cos/manifest",
+			ManifestRepo:   "not/arepo",
 			ShouldFallback: false,
-			ExpectedError:  "500",
+			ExpectedError:  "406",
 		},
 		"master branch release version": {
 			Change:         "3280",
@@ -159,7 +159,7 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:    externalGitilesURL,
 			ManifestRepo:   externalManifestRepo,
 			ShouldFallback: false,
-			ExpectedError:  "500",
+			ExpectedError:  "406",
 		},
 		"cl fallback earlier than earliest COS build": {
 			Change:             "3740",
@@ -170,6 +170,16 @@ func TestFindCL(t *testing.T) {
 			FallbackPrefix:     fallbackRepoPrefix,
 			ShouldFallback:     true,
 			ExpectedError:      "404",
+		},
+		"invalid release branch": {
+			Change:             "150",
+			GerritHost:         externalGerritURL,
+			GitilesHost:        externalGitilesURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			ManifestRepo:       externalManifestRepo,
+			FallbackPrefix:     fallbackRepoPrefix,
+			ShouldFallback:     true,
+			ExpectedError:      "406",
 		},
 	}
 

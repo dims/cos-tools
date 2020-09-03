@@ -271,8 +271,8 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 // handleError creates the error page for a given error
 func handleError(w http.ResponseWriter, r *http.Request, displayErr utils.ChangelogError, currPage string) {
 	err := basicTextTemplate.Execute(w, &basicTextPage{
-		Header:     displayErr.HTTPStatus(),
-		Body:       displayErr.Error(),
+		Header:     displayErr.Header(),
+		Body:       displayErr.HTMLError(),
 		ActivePage: currPage,
 		SignedIn:   SignedIn(r),
 	})

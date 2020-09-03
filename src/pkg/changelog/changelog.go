@@ -115,7 +115,7 @@ func gitilesClient(httpClient *http.Client, remoteURL string) (gitilesProto.Giti
 	cl, err := gitilesApi.NewRESTClient(httpClient, remoteURL, true)
 	if err != nil {
 		log.Errorf("gitilesClient: failed to create client for remote url %s", remoteURL)
-		return nil, utils.InternalError
+		return nil, utils.InternalServerError
 	}
 	return cl, nil
 }
@@ -188,13 +188,21 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 	if err != nil {
 		log.Errorf("mappedManifest: error downloading manifest file from repo %s for build %s:\n%v", repo, buildNum, err)
 		httpCode := utils.GitilesErrCode(err)
-		return nil, utils.FromChangelogError(httpCode, buildNum)
+		if httpCode == "403" {
+			return nil, utils.ForbiddenError
+		} else if httpCode == "404" {
+			return nil, utils.BuildNotFound(buildNum)
+		}
+		return nil, utils.InternalServerError
 	}
 	mappedManifest, err := repoMap(response.Contents)
 	if err != nil {
 		log.Errorf("mappedManifest: error retrieving mapped manifest file from repo %s for build %s:\n%v", repo, buildNum, err)
 		httpCode := utils.GitilesErrCode(err)
-		return nil, utils.FromChangelogError(httpCode, buildNum)
+		if httpCode == "404" {
+			return nil, utils.BuildNotFound(buildNum)
+		}
+		return nil, utils.InternalServerError
 	}
 	return mappedManifest, nil
 }
@@ -204,12 +212,12 @@ func commits(req commitsRequest) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", req.Repo, req.Committish)
 	commits, hasMoreCommits, err := utils.Commits(req.Client, req.Repo, req.Committish, req.Ancestor, req.QuerySize)
 	if err != nil {
-		req.OutputChan <- commitsResult{Err: utils.InternalError}
+		req.OutputChan <- commitsResult{Err: utils.InternalServerError}
 	}
 	parsedCommits, err := ParseGitCommitLog(commits)
 	if err != nil {
 		log.Errorf("commits: Error parsing Gitiles commits response\n%v", err)
-		req.OutputChan <- commitsResult{Err: utils.InternalError}
+		req.OutputChan <- commitsResult{Err: utils.InternalServerError}
 		return
 	}
 	req.OutputChan <- commitsResult{
@@ -298,7 +306,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
 	if httpClient == nil {
 		log.Error("httpClient is nil")
-		return nil, nil, utils.InternalError
+		return nil, nil, utils.InternalServerError
 	}
 
 	log.Infof("Retrieving changelog between %s and %s\n", sourceBuildNum, targetBuildNum)

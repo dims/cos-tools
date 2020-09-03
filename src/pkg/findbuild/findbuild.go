@@ -111,12 +111,13 @@ type BuildResponse struct {
 }
 
 type clData struct {
-	CLNum    string
-	Project  string
-	Release  string
-	Branch   string
-	Revision string
-	Time     time.Time
+	CLNum       string
+	InstanceURL string
+	Project     string
+	Release     string
+	Branch      string
+	Revision    string
+	Time        time.Time
 }
 
 type repoData struct {
@@ -134,7 +135,7 @@ type manifestResponse struct {
 }
 
 // queryCL retrieves the list of CLs matching a query from Gerrit
-func queryCL(client *gerrit.Client, clID string) (*gerrit.Change, utils.ChangelogError) {
+func queryCL(client *gerrit.Client, clID, instanceURL string) (*gerrit.Change, utils.ChangelogError) {
 	log.Debug("Retrieving CL List from Gerrit")
 	queryOptions := gerrit.ChangeQueryParams{
 		Query:   clID,
@@ -147,27 +148,32 @@ func queryCL(client *gerrit.Client, clID string) (*gerrit.Change, utils.Changelo
 	if err != nil {
 		log.Errorf("queryCL: Error retrieving change for input %s:\n%v", clID, err)
 		httpCode := utils.GerritErrCode(err)
-		return nil, utils.FromFindBuildError(httpCode, clID)
+		if httpCode == "403" {
+			return nil, utils.ForbiddenError
+		} else if httpCode == "404" {
+			return nil, utils.CLNotFound(clID)
+		}
+		return nil, utils.InternalServerError
 	}
 	if len(clList) == 0 {
 		log.Errorf("queryCL: CL with identifier %s not found", clID)
-		return nil, utils.FromFindBuildError("404", clID)
+		return nil, utils.CLNotFound(clID)
 	}
 	change := clList[0]
 	if change.ChangeID == clID {
 		log.Debugf("Provided CL identifier %s is a Change-ID, should be CL num or commit SHA", clID)
-		return nil, utils.FromFindBuildError("400", clID)
+		return nil, utils.ChangeIDUnsupported
 	}
 	if change.Submitted == "" {
 		log.Debugf("Provided CL identifier %s maps to an unsubmitted CL", clID)
-		return nil, utils.FromFindBuildError("406", clID)
+		return nil, utils.CLNotSubmitted(clID, instanceURL)
 	}
 	return change, nil
 }
 
-func getCLData(client *gerrit.Client, clID string, manifestPrefix string) (*clData, utils.ChangelogError) {
+func getCLData(client *gerrit.Client, clID, instanceURL, manifestPrefix string) (*clData, utils.ChangelogError) {
 	log.Debugf("Retrieving CL data from Gerrit for changeID: %s", clID)
-	change, err := queryCL(client, clID)
+	change, err := queryCL(client, clID, instanceURL)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +181,7 @@ func getCLData(client *gerrit.Client, clID string, manifestPrefix string) (*clDa
 	parsedTime, parseErr := time.Parse("2006-01-02 15:04:05.000000000", change.Submitted)
 	if parseErr != nil {
 		log.Errorf("getTargetData: Error parsing submission time %s for CL %d:\n%v", change.Submitted, change.ChangeNumber, err)
-		return nil, utils.InternalError
+		return nil, utils.InternalServerError
 	}
 	// If a repository has non-conventional branch names, need to convert the
 	// repository branch name to a release branch name
@@ -188,12 +194,13 @@ func getCLData(client *gerrit.Client, clID string, manifestPrefix string) (*clDa
 		}
 	}
 	return &clData{
-		CLNum:    strconv.Itoa(change.ChangeNumber),
-		Project:  manifestPrefix + change.Project,
-		Release:  release,
-		Branch:   change.Branch,
-		Revision: change.CurrentRevision,
-		Time:     parsedTime,
+		CLNum:       strconv.Itoa(change.ChangeNumber),
+		InstanceURL: instanceURL,
+		Project:     manifestPrefix + change.Project,
+		Release:     release,
+		Branch:      change.Branch,
+		Revision:    change.CurrentRevision,
+		Time:        parsedTime,
 	}, nil
 }
 
@@ -204,8 +211,12 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 	log.Debugf("Retrieving all manifest snapshots committed within %d days of CL submission", endBuildTime)
 	allManifests, _, err := utils.Commits(client, manifestRepo, "refs/heads/"+targetData.Release, "", -1)
 	if err != nil {
+		log.Errorf("error retrieving manifest commits within CL submission range: %v", err)
 		httpCode := utils.GitilesErrCode(err)
-		return nil, utils.FromFindBuildError(httpCode, targetData.CLNum)
+		if httpCode == "404" {
+			return nil, utils.CLInvalidRelease(targetData.CLNum, targetData.Release, targetData.InstanceURL)
+		}
+		return nil, utils.InternalServerError
 	}
 	// Find latest commit that occurs before the target commit time.
 	// allManifests is in reverse chronological order.
@@ -214,7 +225,7 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 		mid := (left + right) / 2
 		if allManifests[mid].Committer == nil {
 			log.Errorf("manifest %s has no committer", allManifests[mid].Id)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		}
 		currDate := allManifests[mid].Committer.Time.AsTime()
 		if currDate.Before(targetData.Time) {
@@ -232,7 +243,7 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 		mid := (left+right)/2 + 1
 		if allManifests[mid].Committer == nil {
 			log.Errorf("manifest %s has no committer", allManifests[mid].Id)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		}
 		currDate := allManifests[mid].Committer.Time.AsTime()
 		if currDate.After(endDate) {
@@ -242,8 +253,11 @@ func candidateManifestCommits(client gitilesProto.GitilesClient, manifestRepo st
 		}
 	}
 	latestIdx := right
-	if allManifests[earliestIdx].Committer.Time.AsTime().After(targetData.Time) {
-		return nil, utils.FromFindBuildError("404", targetData.CLNum)
+	if allManifests[earliestIdx].Committer.Time.AsTime().After(endDate) {
+		return nil, utils.CLLandingNotFound(targetData.CLNum, targetData.InstanceURL)
+	}
+	if allManifests[latestIdx].Committer.Time.AsTime().Before(targetData.Time) {
+		return nil, utils.CLTooRecent(targetData.CLNum, targetData.InstanceURL)
 	}
 	return allManifests[latestIdx : earliestIdx+1], nil
 }
@@ -279,8 +293,7 @@ func candidateBuildNums(client gitilesProto.GitilesClient, manifestRepo string, 
 	tags, err := repoTags(client, manifestRepo)
 	if err != nil {
 		log.Errorf("tagMapping: Failed to retrieve tags for project %s:\n%v", manifestRepo, err)
-		httpCode := utils.GerritErrCode(err)
-		return nil, utils.FromFindBuildError(httpCode, targetData.CLNum)
+		return nil, utils.InternalServerError
 	}
 	log.Debug("Retrieving associated build number for each manifest commit")
 	gitTagsMap := map[string]string{}
@@ -292,10 +305,10 @@ func candidateBuildNums(client gitilesProto.GitilesClient, manifestRepo string, 
 		tag, ok := gitTagsMap[commit.Id]
 		if !ok {
 			log.Errorf("candidateBuildNums: No ref tag found for commit sha %s in repository %s", commit.Id, manifestRepo)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		} else if len(tag) <= 10 {
 			log.Errorf("candidateBuildNums: Ref tag: %s for commit sha %s is malformed", tag, commit.Id)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		}
 		// Remove refs/tags/ prefix for each git tag
 		output[i] = gitTagsMap[commit.Id][10:]
@@ -313,7 +326,6 @@ func manifestData(client gitilesProto.GitilesClient, manifestRepo string, buildN
 		out <- manifestResponse{Err: err}
 		return
 	}
-
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(response.Contents); err != nil {
 		out <- manifestResponse{Err: err}
@@ -385,7 +397,7 @@ func getRepoData(client gitilesProto.GitilesClient, manifestRepo string, targetD
 		}
 		if output.RemoteURL != "" && output.RemoteURL != curr.RemoteURL {
 			log.Errorf("getRepoData: Remote URL for repository %s changed in build %s", targetData.Project, curr.BuildNum)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		}
 		output.RemoteURL = curr.RemoteURL
 		// Since a manifest file may not use the repository/branch used by a
@@ -404,7 +416,7 @@ func getRepoData(client gitilesProto.GitilesClient, manifestRepo string, targetD
 	}
 	if len(output.Candidates) == 0 {
 		log.Debugf("getRepoData: No builds found for CL %s", targetData.CLNum)
-		return nil, utils.FromFindBuildError("404", targetData.CLNum)
+		return nil, utils.CLNotUsed(targetData.CLNum, targetData.Project, targetData.Branch, targetData.InstanceURL)
 	}
 	return &output, nil
 }
@@ -420,7 +432,7 @@ func firstBuild(changelog []*git.Commit, targetData *clData, candidates map[stri
 		}
 	}
 	if targetIdx == -1 {
-		return "", utils.FromFindBuildError("404", targetData.CLNum)
+		return "", utils.CLLandingNotFound(targetData.CLNum, targetData.InstanceURL)
 	}
 	for i := targetIdx; i >= 0; i-- {
 		currSHA := changelog[i].Id
@@ -428,7 +440,7 @@ func firstBuild(changelog []*git.Commit, targetData *clData, candidates map[stri
 			return buildNum, nil
 		}
 	}
-	return "", utils.FromFindBuildError("404", targetData.CLNum)
+	return "", utils.CLLandingNotFound(targetData.CLNum, targetData.InstanceURL)
 }
 
 // FindBuild locates the first build that a CL was introduced to.
@@ -437,19 +449,19 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 	start := time.Now()
 	if request == nil {
 		log.Error("expected non-nil request")
-		return nil, utils.InternalError
+		return nil, utils.InternalServerError
 	}
 	gerritClient, err := gerrit.NewClient(request.HTTPClient, request.GerritHost)
 	if err != nil {
 		log.Errorf("failed to establish Gerrit client for host %s:\n%v", request.GerritHost, err)
-		return nil, utils.InternalError
+		return nil, utils.InternalServerError
 	}
 	gitilesClient, err := gitilesApi.NewRESTClient(request.HTTPClient, request.GitilesHost, true)
 	if err != nil {
 		log.Errorf("failed to establish Gitiles client for host %s:\n%v", request.GitilesHost, err)
-		return nil, utils.InternalError
+		return nil, utils.InternalServerError
 	}
-	clData, clErr := getCLData(gerritClient, request.CL, request.RepoPrefix)
+	clData, clErr := getCLData(gerritClient, request.CL, request.GerritHost, request.RepoPrefix)
 	if clErr != nil {
 		return nil, clErr
 	}
@@ -463,13 +475,12 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 		gitilesClient, err = gitilesApi.NewRESTClient(request.HTTPClient, repoData.RemoteURL, true)
 		if err != nil {
 			log.Errorf("failed to establish Gitiles client for host %s:\n%v", repoData.RemoteURL, err)
-			return nil, utils.InternalError
+			return nil, utils.InternalServerError
 		}
 	}
 	changelog, _, err := utils.Commits(gitilesClient, clData.Project, repoData.TargetSHA, repoData.SourceSHA, -1)
 	if err != nil {
-		httpCode := utils.GerritErrCode(err)
-		return nil, utils.FromFindBuildError(httpCode, clData.CLNum)
+		return nil, utils.InternalServerError
 	}
 	buildNum, clErr := firstBuild(changelog, clData, repoData.Candidates)
 	if clErr != nil {
