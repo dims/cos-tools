@@ -125,7 +125,7 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 	if clErr != nil {
 		return clErr
 	}
-	log.Infof("Build: %s", buildData.BuildNum)
+	fmt.Printf("Build: %s\n", buildData.BuildNum)
 	return nil
 }
 
