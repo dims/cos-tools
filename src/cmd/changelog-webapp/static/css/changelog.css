@@ -1,5 +1,5 @@
 th {
-    font-weight: 440;
+    font-weight: bold;
     text-align: left;
     padding-bottom: 0px;
 }
@@ -69,7 +69,6 @@ td {
 .repo-table {
     border-spacing: 2px;
     font-size: 14;
-    font-weight: 300;
     margin: 4px 0px;
     table-layout: fixed;
 }

@@ -2,7 +2,6 @@ html,
 body {
   background-color: #f8f8f8;
   font-family: 'Roboto', 'Noto', sans-serif;
-  font-weight: 300;
   margin: 0;
   overflow-x: hidden;
   padding: 0;
@@ -50,7 +49,6 @@ label {
 .navbar-title {
   color: #f8f8f8;
   font-size: 24;
-  font-weight: 350;
   padding-left: 25px;
 }
 
@@ -59,7 +57,6 @@ a.signout {
   color: #f8f8f8;
   float: right;
   font-size: 16;
-  font-weight: 16px;
   margin-left: auto;
   padding-right: 25px;
 }
@@ -92,7 +89,7 @@ a.signout {
 
 .sidenav a:hover {
   color: #3d3d3d;
-  font-weight: 550;
+  font-weight: bold;
 }
 
 .main {
