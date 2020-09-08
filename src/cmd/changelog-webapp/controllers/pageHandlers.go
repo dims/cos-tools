@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
+	"cos.googlesource.com/cos/tools/src/pkg/findbuild"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -37,17 +39,22 @@ const (
 )
 
 var (
-	internalInstance     string
-	internalManifestRepo string
-	externalInstance     string
-	externalManifestRepo string
-	envQuerySize         string
+	internalGerritInstance         string
+	internalFallbackGerritInstance string
+	internalGoBInstance            string
+	internalManifestRepo           string
+	externalGerritInstance         string
+	externalFallbackGerritInstance string
+	externalGoBInstance            string
+	externalManifestRepo           string
+	fallbackRepoPrefix             string
+	envQuerySize                   string
 
 	staticBasePath          string
 	indexTemplate           *template.Template
 	changelogTemplate       *template.Template
 	promptLoginTemplate     *template.Template
-	locateCLTemplate        *template.Template
+	locateBuildTemplate     *template.Template
 	statusForbiddenTemplate *template.Template
 	basicTextTemplate       *template.Template
 
@@ -68,7 +75,8 @@ var (
 		codes.Unavailable.String():        "503 Service Unavailable",
 		codes.DataLoss.String():           "500 Internal Server Error",
 	}
-	gitiles403Desc = "unexpected HTTP 403 from Gitiles"
+	gitiles403Desc  = "unexpected HTTP 403 from Gitiles"
+	gerritErrCodeRe = regexp.MustCompile("status code\\s*(\\d+)")
 )
 
 func init() {
@@ -77,7 +85,15 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed to setup client: %v", err)
 	}
-	internalInstance, err = getSecret(client, os.Getenv("COS_INTERNAL_GOB_INSTANCE_NAME"))
+	internalGerritInstance, err = getSecret(client, os.Getenv("COS_INTERNAL_GERRIT_INSTANCE_NAME"))
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_GERRIT_INSTANCE_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_GERRIT_INSTANCE_NAME"), err)
+	}
+	internalFallbackGerritInstance, err = getSecret(client, os.Getenv("COS_INTERNAL_FALLBACK_GERRIT_INSTANCE_NAME"))
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_FALLBACK_GERRIT_INSTANCE_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_FALLBACK_GERRIT_INSTANCE_NAME"), err)
+	}
+	internalGoBInstance, err = getSecret(client, os.Getenv("COS_INTERNAL_GOB_INSTANCE_NAME"))
 	if err != nil {
 		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_GOB_INSTANCE_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_GOB_INSTANCE_NAME"), err)
 	}
@@ -85,12 +101,16 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_MANIFEST_REPO_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_MANIFEST_REPO_NAME"), err)
 	}
-	externalInstance = os.Getenv("COS_EXTERNAL_GOB_INSTANCE")
+	externalGerritInstance = os.Getenv("COS_EXTERNAL_GERRIT_INSTANCE")
+	externalFallbackGerritInstance = os.Getenv("COS_EXTERNAL_FALLBACK_GERRIT_INSTANCE")
+	externalGoBInstance = os.Getenv("COS_EXTERNAL_GOB_INSTANCE")
 	externalManifestRepo = os.Getenv("COS_EXTERNAL_MANIFEST_REPO")
+	fallbackRepoPrefix = os.Getenv("COS_FALLBACK_REPO_PREFIX")
 	envQuerySize = getIntVerifiedEnv("CHANGELOG_QUERY_SIZE")
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
+	locateBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/locateBuild.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
 	basicTextTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/error.html"))
 }
@@ -110,6 +130,14 @@ type changelogPage struct {
 	QuerySize  string
 	RepoTables []*repoTable
 	Internal   bool
+}
+
+type locateBuildPage struct {
+	CL            string
+	CLNum         string
+	BuildNum      string
+	GerritLink    string
+	Internal      bool
 }
 
 type statusPage struct {
@@ -160,6 +188,14 @@ func getIntVerifiedEnv(envName string) string {
 			envName, os.Getenv(output), err)
 	}
 	return output
+}
+
+func unwrappedError(err error) error {
+	innerErr := err
+	for errors.Unwrap(innerErr) != nil {
+		innerErr = errors.Unwrap(innerErr)
+	}
+	return innerErr
 }
 
 func gobCommitLink(instance, repo, SHA string) string {
@@ -230,6 +266,34 @@ func createChangelogPage(data changelogData) *changelogPage {
 	return page
 }
 
+func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob, repo, cl string, internal bool) (*findbuild.BuildResponse, bool, error) {
+	didFallback := false
+	request := &findbuild.BuildRequest{
+		HTTPClient:   httpClient,
+		GerritHost:   gerrit,
+		GitilesHost:  gob,
+		ManifestRepo: repo,
+		RepoPrefix:   "",
+		CL:           cl,
+	}
+	buildData, err := findbuild.FindBuild(request)
+	innerErr := unwrappedError(err)
+	if innerErr == findbuild.ErrorCLNotFound {
+		log.Debugf("Cl %s not found in Gerrit instance, using fallback", cl)
+		fallbackRequest := &findbuild.BuildRequest{
+			HTTPClient:   httpClient,
+			GerritHost:   fallbackGerrit,
+			GitilesHost:  gob,
+			ManifestRepo: repo,
+			RepoPrefix:   fallbackRepoPrefix,
+			CL:           cl,
+		}
+		buildData, err = findbuild.FindBuild(fallbackRequest)
+		didFallback = true
+	}
+	return buildData, didFallback, err
+}
+
 // handleError creates the error page for a given error
 func handleError(w http.ResponseWriter, inputErr error, currPage string) {
 	var header, text string
@@ -280,28 +344,34 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
+		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
+		if err != nil {
+			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+		}
 		return
 	}
 	source := r.FormValue("source")
 	target := r.FormValue("target")
 	// If no source/target values specified in request, display empty changelog page
 	if source == "" || target == "" {
-		changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
+		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
+		if err != nil {
+			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+		}
 		return
 	}
 	querySize, err := strconv.Atoi(r.FormValue("n"))
 	if err != nil {
 		querySize, _ = strconv.Atoi(envQuerySize)
 	}
-	internal, instance, manifestRepo := false, externalInstance, externalManifestRepo
+	internal, instance, manifestRepo := false, externalGoBInstance, externalManifestRepo
 	if r.FormValue("internal") == "true" {
-		internal, instance, manifestRepo = true, internalInstance, internalManifestRepo
+		internal, instance, manifestRepo = true, internalGoBInstance, internalManifestRepo
 	}
 	added, removed, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
 	if err != nil {
 		log.Errorf("HandleChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
-			source, target, externalInstance, externalManifestRepo, err)
+			source, target, externalGoBInstance, externalManifestRepo, err)
 		handleError(w, err, "changelog")
 		return
 	}
@@ -316,5 +386,62 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	err = changelogTemplate.Execute(w, page)
 	if err != nil {
 		log.Errorf("HandleChangelog: error executing changelog template: %v", err)
+	}
+}
+
+// HandleLocateBuild serves the Locate CL page
+func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
+	httpClient, err := HTTPClient(w, r, "/locatebuild/")
+	// Require login to access if no session found
+	if err != nil {
+		log.Debug(err)
+		err = promptLoginTemplate.Execute(w, &statusPage{ActivePage: "locatebuild"})
+		if err != nil {
+			log.Errorf("HandleLocateBuild: error executing promptLogin template: %v", err)
+		}
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+		if err != nil {
+			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+		}
+		return
+	}
+	cl := r.FormValue("cl")
+	// If no CL value specified in request, display empty CL form
+	if cl == "" {
+		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+		if err != nil {
+			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+		}
+		return
+	}
+	internal, gerrit, fallbackGerrit, gob, repo := false, externalGerritInstance, externalFallbackGerritInstance, externalGoBInstance, externalManifestRepo
+	if r.FormValue("internal") == "true" {
+		internal, gerrit, fallbackGerrit, gob, repo = true, internalGerritInstance, internalFallbackGerritInstance, internalGoBInstance, internalManifestRepo
+	}
+	buildData, didFallback, err := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
+	if err != nil {
+		log.Errorf("HandleLocateBuild: error retrieving build for CL %s with internal set to %t\n%v", cl, internal, err)
+		handleError(w, err, "locatebuild")
+		return
+	}
+	var gerritLink string
+	if didFallback {
+		gerritLink = fallbackGerrit + "/q/" + buildData.CLNum
+	} else {
+		gerritLink = gerrit + "/q/" + buildData.CLNum
+	}
+	page := &locateBuildPage{
+		CL:         cl,
+		CLNum:      buildData.CLNum,
+		BuildNum:   buildData.BuildNum,
+		Internal:   internal,
+		GerritLink: gerritLink,
+	}
+	err = locateBuildTemplate.Execute(w, page)
+	if err != nil {
+		log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
 	}
 }

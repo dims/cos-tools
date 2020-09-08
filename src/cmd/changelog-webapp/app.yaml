@@ -11,13 +11,16 @@ env_variables:
   # Webpage configuration
   STATIC_BASE_PATH: "src/cmd/changelog-webapp/static/"
   CHANGELOG_QUERY_SIZE: "50"
+  COS_FALLBACK_REPO_PREFIX: "mirrors/cros/"
 
   # External sources
-  COS_EXTERNAL_GERRIT_INSTANCE: "cos-review.googlesource.com"
+  COS_EXTERNAL_GERRIT_INSTANCE: "https://cos-review.googlesource.com"
+  COS_EXTERNAL_FALLBACK_GERRIT_INSTANCE: "https://chromium-review.googlesource.com"
   COS_EXTERNAL_GOB_INSTANCE: "cos.googlesource.com"
   COS_EXTERNAL_MANIFEST_REPO: "cos/manifest-snapshots"
 
   # Internal source names (values are retrieved from secret manager)
   COS_INTERNAL_GERRIT_INSTANCE_NAME: "cos-internal-gerrit-instance"
+  COS_INTERNAL_FALLBACK_GERRIT_INSTANCE_NAME: "cos-internal-fallback-gerrit-instance"
   COS_INTERNAL_GOB_INSTANCE_NAME: "cos-internal-gob-instance"
   COS_INTERNAL_MANIFEST_REPO_NAME: "cos-internal-manifest-repo"
