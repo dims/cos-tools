@@ -6,6 +6,11 @@
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
+    {{if .SignedIn}}
+      <a class="signout" href="/signout/?redirect={{.ActivePage}}">Sign Out</a>
+    {{else}}
+      <a class="login" href="/login/?redirect={{.ActivePage}}">Login</a>
+    {{end}}
   </div>
   <div class="sidenav">
     {{if (eq .ActivePage "home")}}
@@ -18,17 +23,18 @@
     {{else}}
       <a href="/changelog/">Changelog</a>
     {{end}}
-    {{if (eq .ActivePage "/locatebuild/")}}
-      <a class="active" href="/locatebuild/">Locate Build</a>
+    {{if (eq .ActivePage "/findbuild/")}}
+      <a class="active" href="/findbuild/">Find Build</a>
     {{else}}
-      <a href="/locatebuild/">Locate Build</a>
+      <a href="/findbuild/">Find Build</a>
     {{end}}
-    <a href="/login/">Login</a>
   </div>
   <div class="main">
-    <h1>{{ .Header }}</h1>
-    <p>{{ .Body }}</p>
-    <a href={{.ActivePage}}>Go back</a>
+    <div class="text-content">
+      <h1>{{ .Header }}</h1>
+      <p>{{ .Body }}</p>
+      <a href={{.ActivePage}}>Go back</a>
+    </div>
   </div>
 </body>
 

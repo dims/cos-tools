@@ -16,7 +16,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -35,7 +34,6 @@ const (
 	// Session variables
 	sessionName      = "changelog"
 	sessionKeyLength = 32
-	sessionAge       = 84600
 
 	// Oauth state generation variables
 	oauthStateCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
@@ -54,27 +52,22 @@ var projectID = os.Getenv("COS_CHANGELOG_PROJECT_ID")
 var clientSecretName = os.Getenv("COS_CHANGELOG_CLIENT_SECRET_NAME")
 var sessionSecretName = os.Getenv("COS_CHANGELOG_SESSION_SECRET_NAME")
 
-// ErrorSessionRetrieval indicates that a request has no session, or the
-// session was malformed.
-var ErrorSessionRetrieval = errors.New("No session found")
-
 func init() {
 	var err error
 	client, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		log.Fatalf("Failed to setup client: %v", err)
+		log.Fatalf("failed to setup client: %v", err)
 	}
 	config.ClientSecret, err = getSecret(client, clientSecretName)
 	if err != nil {
-		log.Fatalf("Failed to retrieve secret: %s\n%v", clientSecretName, err)
+		log.Fatalf("failed to retrieve secret: %s\n%v", clientSecretName, err)
 	}
 
 	sessionSecret, err := getSecret(client, sessionSecretName)
 	if err != nil {
-		log.Fatalf("Failed to retrieve secret :%s\n%v", sessionSecretName, err)
+		log.Fatalf("failed to retrieve secret :%s\n%v", sessionSecretName, err)
 	}
 	store = sessions.NewCookieStore([]byte(sessionSecret))
-	store.MaxAge(sessionAge)
 }
 
 // Retrieve secrets stored in Gcloud Secret Manager
@@ -84,7 +77,7 @@ func getSecret(client *secretmanager.Client, secretName string) (string, error) 
 	}
 	result, err := client.AccessSecretVersion(context.Background(), accessRequest)
 	if err != nil {
-		return "", fmt.Errorf("Failed to access secret at %s: %v", accessRequest.Name, err)
+		return "", fmt.Errorf("failed to access secret at %s: %v", accessRequest.Name, err)
 	}
 	return string(result.Payload.Data), nil
 }
@@ -102,27 +95,60 @@ func returnURLFromState(state string) string {
 	return state[oauthStateLength:]
 }
 
-// HTTPClient creates an authorized HTTP Client using stored token credentials.
-// Returns error if no session or a malformed session is detected.
-// Otherwise returns an HTTP Client with the stored Oauth access token.
-// If the access token is expired, automatically refresh the token
-func HTTPClient(w http.ResponseWriter, r *http.Request, returnURL string) (*http.Client, error) {
+// tokenExpired indicates whether the Oauth token associated with a request is expired
+func tokenExpired(r *http.Request) bool {
 	var parsedExpiry time.Time
+	session, _ := store.Get(r, sessionName)
+	parsedExpiry, err := time.Parse(time.RFC3339, session.Values["expiry"].(string))
+	return err != nil || parsedExpiry.Before(time.Now())
+}
+
+// GetLoginURL returns a login URL to redirect the user to
+func GetLoginURL(redirect string, auto bool) string {
+	return fmt.Sprintf("/login/?redirect=%s&auto=%v", redirect, auto)
+}
+
+// SignedIn returns a bool indicating if the current request is signed in
+func SignedIn(r *http.Request) bool {
 	session, err := store.Get(r, sessionName)
 	if err != nil || session.IsNew {
-		return nil, ErrorSessionRetrieval
+		return false
 	}
 	for _, key := range []string{"accessToken", "refreshToken", "tokenType", "expiry"} {
 		if val, ok := session.Values[key]; !ok || val == nil {
-			return nil, ErrorSessionRetrieval
+			return false
 		}
 	}
-	if parsedExpiry, err = time.Parse(time.RFC3339, session.Values["expiry"].(string)); err != nil {
-		return nil, ErrorSessionRetrieval
+	return true
+}
+
+// RequireToken will check if the user has a valid, unexpired Oauth token.
+// If not, it will initiate the Oauth flow.
+// Returns a bool indicating if the user was redirected
+func RequireToken(w http.ResponseWriter, r *http.Request, activePage string) bool {
+	if !SignedIn(r) {
+		err := promptLoginTemplate.Execute(w, &statusPage{ActivePage: activePage})
+		if err != nil {
+			log.Errorf("error executing promptLogin template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return true
 	}
-	if parsedExpiry.Before(time.Now()) {
-		log.Debug("HTTPClient: Token expired, calling Oauth flow")
-		HandleLogin(w, r, returnURL)
+	// If token is expired, auto refresh instead of prompting sign in
+	if tokenExpired(r) {
+		loginURL := GetLoginURL(activePage, true)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+		return true
+	}
+	return false
+}
+
+// HTTPClient creates an authorized HTTP Client using stored token credentials.
+func HTTPClient(w http.ResponseWriter, r *http.Request) (*http.Client, error) {
+	session, _ := store.Get(r, sessionName)
+	parsedExpiry, err := time.Parse(time.RFC3339, session.Values["expiry"].(string))
+	if err != nil {
+		return nil, err
 	}
 	token := &oauth2.Token{
 		AccessToken:  session.Values["accessToken"].(string),
@@ -134,21 +160,36 @@ func HTTPClient(w http.ResponseWriter, r *http.Request, returnURL string) (*http
 }
 
 // HandleLogin initiates the Oauth flow.
-func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string) {
-	state := randomString(oauthStateLength, returnURL)
-	// Ignore store.Get() errors in HandleLogin because an error indicates the
+func HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Errorf("could not parse request: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	autoAuth := r.FormValue("auto") == "true"
+	redirect := r.FormValue("redirect")
+	if redirect == "" {
+		redirect = "/"
+	}
+
+	state := randomString(oauthStateLength, redirect)
+	// Ignore store.Get() errors because an error indicates the
 	// old session could not be deciphered. It returns a new session
 	// regardless.
 	session, _ := store.Get(r, sessionName)
 	session.Values["oauthState"] = state
 	err := session.Save(r, w)
 	if err != nil {
-		log.Errorf("HandleLogin: Error saving key: %v", err)
+		log.Errorf("Error saving key: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	var authURL string
+	if autoAuth {
+		authURL = config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	} else {
+		authURL = config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	}
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
@@ -157,7 +198,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, returnURL string) {
 // Redirects to URL stored in the callback state on completion.
 func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		log.Errorf("Could not parse query: %v\n", err)
+		log.Errorf("could not parse query: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -166,7 +207,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	session, err := store.Get(r, sessionName)
 	if err != nil {
-		log.Errorf("HandleCallback: Error retrieving session: %v", err)
+		log.Errorf("error retrieving session: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -182,7 +223,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := config.Exchange(context.Background(), authCode)
 	if err != nil {
-		log.Errorf("HandleCallback: Error exchanging token: %v", token)
+		log.Errorf("error exchanging token: %v", token)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -193,10 +234,34 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	session.Values["expiry"] = token.Expiry.Format(time.RFC3339)
 	err = session.Save(r, w)
 	if err != nil {
-		log.Errorf("HandleCallback: Error saving session: %v", err)
+		log.Errorf("error saving session: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	http.Redirect(w, r, returnURLFromState(sessionState), http.StatusTemporaryRedirect)
+}
 
-	http.Redirect(w, r, returnURLFromState(sessionState), http.StatusPermanentRedirect)
+// HandleSignOut signs out the user by removing token information from the
+// session
+func HandleSignOut(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Errorf("could not parse request: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	redirect := r.FormValue("redirect")
+	if redirect == "" {
+		redirect = "/"
+	}
+	session, _ := store.Get(r, sessionName)
+	session.Values["accessToken"] = nil
+	session.Values["refreshToken"] = nil
+	session.Values["tokenType"] = nil
+	session.Values["expiry"] = nil
+	err := session.Save(r, w)
+	if err != nil {
+		log.Errorf("error saving session: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 }

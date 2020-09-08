@@ -16,11 +16,9 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -28,8 +26,7 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
 	"cos.googlesource.com/cos/tools/src/pkg/findbuild"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"cos.googlesource.com/cos/tools/src/pkg/utils"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -54,43 +51,9 @@ var (
 	indexTemplate           *template.Template
 	changelogTemplate       *template.Template
 	promptLoginTemplate     *template.Template
-	locateBuildTemplate     *template.Template
+	findBuildTemplate       *template.Template
 	statusForbiddenTemplate *template.Template
 	basicTextTemplate       *template.Template
-
-	grpcCodeToHTTP = map[string]string{
-		codes.Unknown.String():            "500",
-		codes.InvalidArgument.String():    "400",
-		codes.NotFound.String():           "404",
-		codes.PermissionDenied.String():   "403",
-		codes.Unauthenticated.String():    "401",
-		codes.ResourceExhausted.String():  "429",
-		codes.FailedPrecondition.String(): "400",
-		codes.OutOfRange.String():         "400",
-		codes.Internal.String():           "500",
-		codes.Unavailable.String():        "503",
-		codes.DataLoss.String():           "500",
-	}
-	httpCodeToHeader = map[string]string{
-		"400": "400 Bad Request",
-		"401": "401 Unauthorized",
-		"403": "403 Forbidden",
-		"404": "404 Not Found",
-		"429": "429 Too Many Requests",
-		"500": "500 Internal Server Error",
-		"503": "503 Service Unavailable",
-	}
-	httpCodeToDesc = map[string]string{
-		"400": "The request could not be understood.",
-		"401": "You are currently unauthenticated. Please login to access this resource.",
-		"403": "This account does not have access to internal repositories. Please retry with an authorized account, or select the external button to query from publically accessible builds.",
-		"404": "The requested resource was not found. Please verify that you are using a valid input.",
-		"429": "Our servers are currently experiencing heavy load. Please retry in a couple minutes.",
-		"500": "Something went wrong on our end. Please try again later.",
-		"503": "This service is temporarily offline. Please try again later.",
-	}
-	gitiles403Desc  = "unexpected HTTP 403 from Gitiles"
-	gerritErrCodeRe = regexp.MustCompile("status code\\s*(\\d+)")
 )
 
 func init() {
@@ -124,7 +87,7 @@ func init() {
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
-	locateBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/locateBuild.html"))
+	findBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/findBuild.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
 	basicTextTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/error.html"))
 }
@@ -146,22 +109,24 @@ type changelogPage struct {
 	Internal   bool
 }
 
-type locateBuildPage struct {
-	CL            string
-	CLNum         string
-	BuildNum      string
-	GerritLink    string
-	Internal      bool
+type findBuildPage struct {
+	CL         string
+	CLNum      string
+	BuildNum   string
+	GerritLink string
+	Internal   bool
 }
 
 type statusPage struct {
 	ActivePage string
+	SignedIn   bool
 }
 
 type basicTextPage struct {
 	Header     string
 	Body       string
 	ActivePage string
+	SignedIn   bool
 }
 
 type repoTable struct {
@@ -198,29 +163,24 @@ type bugAttr struct {
 func getIntVerifiedEnv(envName string) string {
 	output := os.Getenv(envName)
 	if _, err := strconv.Atoi(output); err != nil {
-		log.Errorf("getEnvAsInt: Failed to parse env variable %s with value %s: %v",
+		log.Errorf("failed to parse env variable %s with value %s: %v",
 			envName, os.Getenv(output), err)
 	}
 	return output
-}
-
-func unwrappedError(err error) error {
-	innerErr := err
-	for errors.Unwrap(innerErr) != nil {
-		innerErr = errors.Unwrap(innerErr)
-	}
-	return innerErr
 }
 
 func gobCommitLink(instance, repo, SHA string) string {
 	return fmt.Sprintf("https://%s/%s/+/%s", instance, repo, SHA)
 }
 
-func gobDiffLink(instance, repo, sourceSHA, targetSHA string) string {
+func gobDiffLink(instance, repo, sourceSHA, targetSHA string, diffLink bool) string {
+	if !diffLink {
+		return fmt.Sprintf("https://%s/%s/+log/%s?n=10000", instance, repo, targetSHA)
+	}
 	return fmt.Sprintf("https://%s/%s/+log/%s..%s?n=10000", instance, repo, sourceSHA, targetSHA)
 }
 
-func createRepoTableEntry(instance string, repo string, commit *changelog.Commit, isAddition bool) *repoTableEntry {
+func createRepoTableEntry(instance, repo string, commit *changelog.Commit, isAddition bool) *repoTableEntry {
 	entry := new(repoTableEntry)
 	entry.IsAddition = isAddition
 	entry.SHA = &shaAttr{Name: commit.SHA[:8], URL: gobCommitLink(instance, repo, commit.SHA)}
@@ -242,45 +202,47 @@ func createRepoTableEntry(instance string, repo string, commit *changelog.Commit
 
 func createChangelogPage(data changelogData) *changelogPage {
 	page := &changelogPage{Source: data.Source, Target: data.Target, QuerySize: envQuerySize, Internal: data.Internal}
-	for repoName, repoLog := range data.Additions {
-		table := &repoTable{Name: repoName}
-		for _, commit := range repoLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, repoName, commit, true)
+	for repoPath, addLog := range data.Additions {
+		diffLink := false
+		table := &repoTable{Name: repoPath}
+		for _, commit := range addLog.Commits {
+			tableEntry := createRepoTableEntry(data.Instance, addLog.Repo, commit, true)
 			table.Additions = append(table.Additions, tableEntry)
 		}
-		if _, ok := data.Removals[repoName]; ok {
-			for _, commit := range data.Removals[repoName].Commits {
-				tableEntry := createRepoTableEntry(data.Instance, repoName, commit, false)
+		if rmLog, ok := data.Removals[repoPath]; ok {
+			for _, commit := range data.Removals[repoPath].Commits {
+				tableEntry := createRepoTableEntry(data.Instance, rmLog.Repo, commit, false)
 				table.Removals = append(table.Removals, tableEntry)
 			}
-			if data.Removals[repoName].HasMoreCommits {
-				table.RemovalsLink = gobDiffLink(data.Instance, repoName, repoLog.TargetSHA, repoLog.SourceSHA)
+			if data.Removals[repoPath].HasMoreCommits {
+				diffLink = addLog.Repo == rmLog.Repo
+				table.RemovalsLink = gobDiffLink(data.Instance, rmLog.Repo, addLog.TargetSHA, rmLog.TargetSHA, diffLink)
 			}
 		}
-		if repoLog.HasMoreCommits {
-			table.AdditionsLink = gobDiffLink(data.Instance, repoName, repoLog.SourceSHA, repoLog.TargetSHA)
+		if addLog.HasMoreCommits {
+			table.AdditionsLink = gobDiffLink(data.Instance, addLog.Repo, addLog.SourceSHA, addLog.TargetSHA, diffLink)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 	}
 	// Add remaining repos that had removals but no additions
-	for repoName, repoLog := range data.Removals {
-		if _, ok := data.Additions[repoName]; ok {
+	for repoPath, repoLog := range data.Removals {
+		if _, ok := data.Additions[repoPath]; ok {
 			continue
 		}
-		table := &repoTable{Name: repoName}
+		table := &repoTable{Name: repoPath}
 		for _, commit := range repoLog.Commits {
-			tableEntry := createRepoTableEntry(data.Instance, repoName, commit, false)
+			tableEntry := createRepoTableEntry(data.Instance, repoLog.Repo, commit, false)
 			table.Removals = append(table.Removals, tableEntry)
 		}
 		page.RepoTables = append(page.RepoTables, table)
 		if repoLog.HasMoreCommits {
-			table.RemovalsLink = gobDiffLink(data.Instance, repoName, repoLog.TargetSHA, repoLog.SourceSHA)
+			table.RemovalsLink = gobDiffLink(data.Instance, repoLog.Repo, repoLog.SourceSHA, repoLog.TargetSHA, false)
 		}
 	}
 	return page
 }
 
-func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob, repo, cl string, internal bool) (*findbuild.BuildResponse, bool, error) {
+func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob, repo, cl string, internal bool) (*findbuild.BuildResponse, bool, utils.ChangelogError) {
 	didFallback := false
 	request := &findbuild.BuildRequest{
 		HTTPClient:   httpClient,
@@ -291,8 +253,7 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 		CL:           cl,
 	}
 	buildData, err := findbuild.FindBuild(request)
-	innerErr := unwrappedError(err)
-	if innerErr == findbuild.ErrorCLNotFound {
+	if err != nil && err.HTTPCode() == "404" {
 		log.Debugf("Cl %s not found in Gerrit instance, using fallback", cl)
 		fallbackRequest := &findbuild.BuildRequest{
 			HTTPClient:   httpClient,
@@ -308,88 +269,40 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 	return buildData, didFallback, err
 }
 
-// parseGRPCError retrieves the header and description to display for a gRPC error
-func parseGRPCError(inputErr error) (string, string, error) {
-	rpcStatus, ok := status.FromError(inputErr)
-	if !ok {
-		return "", "", fmt.Errorf("parseGRPCError: Error %v is not a gRPC error", inputErr)
-	}
-	code, text := rpcStatus.Code(), rpcStatus.Message()
-	// RPC status code misclassifies 403 error as 500 error for Gitiles requests
-	if text == gitiles403Desc {
-		code = codes.PermissionDenied
-	}
-	if httpCode, ok := grpcCodeToHTTP[code.String()]; ok {
-		if _, ok := httpCodeToHeader[httpCode]; !ok {
-			log.Errorf("parseGRPCError: No error header mapping found for HTTP code %s", httpCode)
-			return "", "", fmt.Errorf("parseGRPCError: No error header mapping found for HTTP code %s", httpCode)
-		}
-		if _, ok := httpCodeToDesc[httpCode]; !ok {
-			log.Errorf("parseGRPCError: No error description mapping found for HTTP code %s", httpCode)
-			return "", "", fmt.Errorf("parseGRPCError: No error description mapping found for HTTP code %s", httpCode)
-		}
-		return httpCodeToHeader[httpCode], httpCodeToDesc[httpCode], nil
-	}
-	return "", "", fmt.Errorf("parseGRPCError: gRPC error code %s not supported", code.String())
-}
-
-// parseGitilesError retrieves the header and description to display for a Gerrit error
-func parseGerritError(inputErr error) (string, string, error) {
-	matches := gerritErrCodeRe.FindStringSubmatch(inputErr.Error())
-	if len(matches) != 2 {
-		return "", "", fmt.Errorf("parseGerritError: error %v is not a Gerrit error", inputErr)
-	}
-	httpCode := matches[1]
-	if _, ok := httpCodeToHeader[httpCode]; !ok {
-		log.Errorf("parseGerritError: No error header mapping found for HTTP code %s", httpCode)
-		return "", "", fmt.Errorf("parseGerritError: No error header mapping found for HTTP code %s", httpCode)
-	}
-	if _, ok := httpCodeToDesc[httpCode]; !ok {
-		log.Errorf("parseGerritError: No error description mapping found for HTTP code %s", httpCode)
-		return "", "", fmt.Errorf("parseGerritError: No error description mapping found for HTTP code %s", httpCode)
-	}
-	return httpCodeToHeader[httpCode], httpCodeToDesc[httpCode], nil
-}
-
 // handleError creates the error page for a given error
-func handleError(w http.ResponseWriter, inputErr error, currPage string) {
-	innerErr := unwrappedError(inputErr)
-	header := "An error occurred while handling this request"
-	body := innerErr.Error()
-	if tmpHeader, tmpBody, err := parseGRPCError(innerErr); err == nil {
-		header = tmpHeader
-		body = tmpBody
-	} else if tmpHeader, tmpBody, err := parseGerritError(innerErr); err == nil {
-		header = tmpHeader
-		body = tmpBody
-	}
-	basicTextTemplate.Execute(w, &basicTextPage{
-		Header:     header,
-		Body:       body,
+func handleError(w http.ResponseWriter, r *http.Request, displayErr utils.ChangelogError, currPage string) {
+	err := basicTextTemplate.Execute(w, &basicTextPage{
+		Header:     displayErr.HTTPStatus(),
+		Body:       displayErr.Error(),
 		ActivePage: currPage,
+		SignedIn:   SignedIn(r),
 	})
+	if err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleIndex serves the home page
 func HandleIndex(w http.ResponseWriter, r *http.Request) {
-	indexTemplate.Execute(w, nil)
+	err := indexTemplate.Execute(w, &statusPage{SignedIn: SignedIn(r)})
+	if err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // HandleChangelog serves the changelog page
 func HandleChangelog(w http.ResponseWriter, r *http.Request) {
-	httpClient, err := HTTPClient(w, r, "/changelog/")
-	if err != nil {
-		log.Debug(err)
-		err = promptLoginTemplate.Execute(w, &statusPage{ActivePage: "changelog"})
-		if err != nil {
-			log.Errorf("HandleChangelog: error executing promptLogin template: %v", err)
-		}
+	if RequireToken(w, r, "/changelog/") {
 		return
 	}
+	var err error
 	if err := r.ParseForm(); err != nil {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		if err != nil {
-			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -399,7 +312,8 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if source == "" || target == "" {
 		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
 		if err != nil {
-			log.Errorf("HandleChangelog: error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -411,11 +325,17 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("internal") == "true" {
 		internal, instance, manifestRepo = true, internalGoBInstance, internalManifestRepo
 	}
-	added, removed, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
+	httpClient, err := HTTPClient(w, r)
 	if err != nil {
-		log.Errorf("HandleChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
-			source, target, externalGoBInstance, externalManifestRepo, err)
-		handleError(w, err, "/changelog/")
+		loginURL := GetLoginURL("/changelog/", false)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+		return
+	}
+	added, removed, utilErr := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
+	if utilErr != nil {
+		log.Errorf("error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
+			source, target, externalGoBInstance, externalManifestRepo, utilErr)
+		handleError(w, r, utilErr, "/changelog/")
 		return
 	}
 	page := createChangelogPage(changelogData{
@@ -428,35 +348,32 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	})
 	err = changelogTemplate.Execute(w, page)
 	if err != nil {
-		log.Errorf("HandleChangelog: error executing changelog template: %v", err)
+		log.Errorf("error executing changelog template: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-// HandleLocateBuild serves the Locate CL page
-func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
-	httpClient, err := HTTPClient(w, r, "/locatebuild/")
-	// Require login to access if no session found
-	if err != nil {
-		log.Debug(err)
-		err = promptLoginTemplate.Execute(w, &statusPage{ActivePage: "locatebuild"})
-		if err != nil {
-			log.Errorf("HandleLocateBuild: error executing promptLogin template: %v", err)
-		}
+// HandleFindBuild serves the Locate CL page
+func HandleFindBuild(w http.ResponseWriter, r *http.Request) {
+	if RequireToken(w, r, "/findbuild/") {
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+	var err error
+	if err = r.ParseForm(); err != nil {
+		err = findBuildTemplate.Execute(w, &findBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 	cl := r.FormValue("cl")
 	// If no CL value specified in request, display empty CL form
 	if cl == "" {
-		err = locateBuildTemplate.Execute(w, &locateBuildPage{Internal: true})
+		err = findBuildTemplate.Execute(w, &findBuildPage{Internal: true})
 		if err != nil {
-			log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+			log.Errorf("error executing findbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -464,10 +381,16 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("internal") == "true" {
 		internal, gerrit, fallbackGerrit, gob, repo = true, internalGerritInstance, internalFallbackGerritInstance, internalGoBInstance, internalManifestRepo
 	}
-	buildData, didFallback, err := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
+	httpClient, err := HTTPClient(w, r)
 	if err != nil {
-		log.Errorf("Handlelocatebuild: error retrieving build for CL %s with internal set to %t\n%v", cl, internal, err)
-		handleError(w, err, "/locatebuild/")
+		loginURL := GetLoginURL("/findbuild/", false)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+		return
+	}
+	buildData, didFallback, utilErr := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
+	if utilErr != nil {
+		log.Errorf("error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
+		handleError(w, r, utilErr, "/findbuild/")
 		return
 	}
 	var gerritLink string
@@ -476,15 +399,16 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	} else {
 		gerritLink = gerrit + "/q/" + buildData.CLNum
 	}
-	page := &locateBuildPage{
+	page := &findBuildPage{
 		CL:         cl,
 		CLNum:      buildData.CLNum,
 		BuildNum:   buildData.BuildNum,
 		Internal:   internal,
 		GerritLink: gerritLink,
 	}
-	err = locateBuildTemplate.Execute(w, page)
+	err = findBuildTemplate.Execute(w, page)
 	if err != nil {
-		log.Errorf("HandleLocateBuild: error executing locatebuild template: %v", err)
+		log.Errorf("error executing findbuild template: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -6,6 +6,7 @@
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
+    <a class="login" href="/login/?redirect={{.ActivePage}}">Login</a>
   </div>
   <div class="sidenav">
     <a href="/">Home</a>
@@ -14,18 +15,18 @@
     {{else}}
       <a href="/changelog/">Changelog</a>
     {{end}}
-    {{if (eq .ActivePage "/locatebuild/")}}
-      <a class="active" href="/locatebuild/">Locate Build</a>
+    {{if (eq .ActivePage "/findbuild/")}}
+      <a class="active" href="/findbuild/">Find Build</a>
     {{else}}
-      <a href="/locatebuild/">Locate Build</a>
+      <a href="/findbuild/">Find Build</a>
     {{end}}
-    <a href="/login/">Login</a>
   </div>
   <div class="main">
     <div class="text-content">
       <h1>Please sign in to use this feature</h1>
       <p>This application requires OAuth authentication to communicate with Google Git repositories. Your account data
-        will not be used for any other purposes. To continue, please sign in by clicking <a href="/login/">here</a>.
+        will not be used for any other purposes. To continue, please sign in by clicking 
+        <a href="/login/?redirect={{.ActivePage}}">here</a>.
       </p>
     </div>
   </div>

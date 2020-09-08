@@ -46,3 +46,6 @@ All commits that were present in the source build number but not present in the 
 ## FindCL output
 
 Prints the first build number that includes the input CL.
+
+## Notes
+* Changelog only supports querying from build numbers from [COS GoB](cos.googlesource.com). It does not support build numbers generated using [ChromiumOS GoB](https://chromium.googlesource.com/).

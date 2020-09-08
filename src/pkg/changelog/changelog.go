@@ -25,13 +25,12 @@
 // URL. A request is sent on a seperate thread for each repository, asking for a list
 // of commits that occurred between the source committish and the target committish.
 // Finally, the resulting git.Commit objects are converted to Commit objects, and
-// consolidated into a mapping of repositoryName -> []*Commit.
+// consolidated into a mapping of repository path -> []*Commit.
 
 package changelog
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -43,6 +42,8 @@ import (
 )
 
 type repo struct {
+	Repo string
+	Path string
 	// The Git on Borg instance to query from.
 	InstanceURL string
 	// A value that points to the last commit for a build on a given repo.
@@ -56,53 +57,85 @@ type repo struct {
 }
 
 type commitsResult struct {
-	RepoURL        string
 	Commits        []*Commit
+	Repo           string
+	Path           string
 	HasMoreCommits bool
-	Err            error
+	Err            utils.ChangelogError
 }
 
 type additionsResult struct {
 	Additions map[string]*RepoLog
-	Err       error
+	Err       utils.ChangelogError
 }
 
-func gerritClient(httpClient *http.Client, remoteURL string) (gitilesProto.GitilesClient, error) {
-	log.Debugf("Creating Gerrit client for remote url %s\n", remoteURL)
+// RepoLog contains a changelist for a particular repository
+type RepoLog struct {
+	Commits        []*Commit
+	Repo           string
+	SourceSHA      string
+	TargetSHA      string
+	HasMoreCommits bool
+}
+
+// Creates a unique identifier for a repo + branch pairing.
+// Path is used instead of dest-branch because some manifest files do not
+// indicate a dest-branch for a project.
+// Path itself is not sufficient to guarantee uniqueness, since some repos
+// share the same path.
+// ex. mirrors/cros/chromiumos/repohooks vs cos/repohooks
+func repoID(name, path string) string {
+	return name + path
+}
+
+// limitPageSize will restrict a request page size to min of pageSize (which grows exponentially)
+// or remaining request size
+func limitPageSize(pageSize, requestedSize int) int {
+	if requestedSize == -1 || pageSize <= requestedSize {
+		return pageSize
+	}
+	return requestedSize
+}
+
+func gitilesClient(httpClient *http.Client, remoteURL string) (gitilesProto.GitilesClient, utils.ChangelogError) {
+	log.Debugf("Creating Gitiles client for remote url %s\n", remoteURL)
 	cl, err := gitilesApi.NewRESTClient(httpClient, remoteURL, true)
 	if err != nil {
-		return nil, errors.New("changelog: Failed to establish client to remote url: " + remoteURL)
+		log.Errorf("gitilesClient: failed to create client for remote url %s", remoteURL)
+		return nil, utils.InternalError
 	}
 	return cl, nil
 }
 
-func createGerritClients(clients map[string]gitilesProto.GitilesClient, httpClient *http.Client, repoMap map[string]*repo) error {
+func createGitilesClients(clients map[string]gitilesProto.GitilesClient, httpClient *http.Client, repoMap map[string]*repo) utils.ChangelogError {
 	log.Debug("Creating additional Gerrit clients for manifest file if not already created")
 	for _, repoData := range repoMap {
 		remoteURL := repoData.InstanceURL
 		if _, ok := clients[remoteURL]; ok {
 			continue
 		}
-		client, err := gerritClient(httpClient, remoteURL)
+		client, err := gitilesClient(httpClient, remoteURL)
 		if err != nil {
-			return fmt.Errorf("createClients: error creating client mapping:\n%w", err)
+			return err
 		}
 		clients[remoteURL] = client
 	}
 	return nil
 }
 
-// repoMap generates a mapping of repo name to instance URL and committish.
+// repoMap generates a mapping of repository ID to instance URL and committish.
 // This eliminates the need to track remote names and allows lookup
 // of source committish when generating changelog.
 func repoMap(manifest string) (map[string]*repo, error) {
 	log.Debug("Mapping repository to instance URL and committish")
 	if manifest == "" {
-		return nil, fmt.Errorf("repoMap: manifest data is empty")
+		log.Error("repoMap: manifest file is empty")
+		return nil, errors.New("manifest file is empty")
 	}
 	doc := etree.NewDocument()
 	if err := doc.ReadFromString(manifest); err != nil {
-		return nil, fmt.Errorf("repoMap: error parsing manifest xml:\n%w", err)
+		log.Debug("repoMap: error parsing manifest xml:\n%w", err)
+		return nil, errors.New("could not parse XML for manifest file associated with build")
 	}
 	root := doc.SelectElement("manifest")
 
@@ -123,7 +156,10 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	}
 	repos := make(map[string]*repo)
 	for _, project := range root.SelectElements("project") {
-		repos[project.SelectAttr("name").Value] = &repo{
+		name, path := project.SelectAttr("name").Value, project.SelectAttr("path").Value
+		repos[repoID(name, path)] = &repo{
+			Repo:        name,
+			Path:        path,
 			InstanceURL: remoteMap[project.SelectAttrValue("remote", "")],
 			Committish:  project.SelectAttr("revision").Value,
 		}
@@ -132,35 +168,41 @@ func repoMap(manifest string) (map[string]*repo, error) {
 }
 
 // mappedManifest retrieves a Manifest file from GoB and unmarshals XML.
-func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum string) (map[string]*repo, error) {
+// Returns a mapping of repository ID to repository data.
+func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum string) (map[string]*repo, utils.ChangelogError) {
 	log.Debugf("Retrieving manifest file for build %s\n", buildNum)
 	response, err := utils.DownloadManifest(client, repo, buildNum)
 	if err != nil {
-		return nil, fmt.Errorf("mappedManifest: error downloading manifest file from repo %s:\n%w",
-			repo, err)
+		log.Errorf("mappedManifest: error downloading manifest file from repo %s for build %s:\n%v", repo, buildNum, err)
+		httpCode := utils.GitilesErrCode(err)
+		return nil, utils.FromChangelogError(httpCode, buildNum)
 	}
 	mappedManifest, err := repoMap(response.Contents)
 	if err != nil {
-		return nil, fmt.Errorf("mappedManifest: error parsing manifest contents from repo %s:\n%w",
-			repo, err)
+		log.Errorf("mappedManifest: error retrieving mapped manifest file from repo %s for build %s:\n%v", repo, buildNum, err)
+		httpCode := utils.GitilesErrCode(err)
+		return nil, utils.FromChangelogError(httpCode, buildNum)
 	}
 	return mappedManifest, nil
 }
 
-// commits retrieves a parsed list of commits between an ancestor and a committish
-func commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
+// commits get all commits that occur between committish and ancestor for a specific repo.
+func commits(client gitilesProto.GitilesClient, path string, repo string, committish string, ancestor string, querySize int, outputChan chan commitsResult) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
 	commits, hasMoreCommits, err := utils.Commits(client, repo, committish, ancestor, querySize)
 	if err != nil {
-		outputChan <- commitsResult{Err: err}
+		outputChan <- commitsResult{Err: utils.InternalError}
 	}
 	parsedCommits, err := ParseGitCommitLog(commits)
 	if err != nil {
-		outputChan <- commitsResult{Err: err}
+		log.Errorf("commits: Error parsing Gitiles commits response\n%v", err)
+		outputChan <- commitsResult{Err: utils.InternalError}
+		return
 	}
 	outputChan <- commitsResult{
-		RepoURL:        repo,
 		Commits:        parsedCommits,
+		Path:           path,
+		Repo:           repo,
 		HasMoreCommits: hasMoreCommits,
 	}
 }
@@ -171,15 +213,15 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 	log.Debug("Retrieving commit additions")
 	repoCommits := make(map[string]*RepoLog)
 	commitsChan := make(chan commitsResult, len(targetRepos))
-	for repoURL, targetRepoInfo := range targetRepos {
+	for repoID, targetRepoInfo := range targetRepos {
 		cl := clients[targetRepoInfo.InstanceURL]
 		// If the source Manifest file does not contain a target repo,
 		// count every commit since target repo creation as an addition
 		ancestorCommittish := ""
-		if sourceRepoInfo, ok := sourceRepos[repoURL]; ok {
+		if sourceRepoInfo, ok := sourceRepos[repoID]; ok {
 			ancestorCommittish = sourceRepoInfo.Committish
 		}
-		go commits(cl, repoURL, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
+		go commits(cl, targetRepoInfo.Path, targetRepoInfo.Repo, targetRepoInfo.Committish, ancestorCommittish, querySize, commitsChan)
 	}
 	for i := 0; i < len(targetRepos); i++ {
 		res := <-commitsChan
@@ -187,16 +229,17 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			outputChan <- additionsResult{Err: res.Err}
 			return
 		}
-		sourceSHA := ""
-		if sha, ok := sourceRepos[res.RepoURL]; ok {
-			sourceSHA = sha.Committish
+		var sourceSHA string
+		if sourceData, ok := sourceRepos[repoID(res.Repo, res.Path)]; ok {
+			sourceSHA = sourceData.Committish
 		}
 		if len(res.Commits) > 0 {
-			repoCommits[res.RepoURL] = &RepoLog{
+			repoCommits[res.Path] = &RepoLog{
 				Commits:        res.Commits,
 				HasMoreCommits: res.HasMoreCommits,
+				Repo:           res.Repo,
 				SourceSHA:      sourceSHA,
-				TargetSHA:      targetRepos[res.RepoURL].Committish,
+				TargetSHA:      targetRepos[repoID(res.Repo, res.Path)].Committish,
 			}
 		}
 	}
@@ -227,9 +270,10 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 //
 // The second changelog contains all commits that are present in the source build
 // but not present in the target build
-func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, error) {
+func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
 	if httpClient == nil {
-		return nil, nil, errors.New("Changelog: httpClient should not be nil")
+		log.Error("httpClient is nil")
+		return nil, nil, utils.InternalError
 	}
 
 	log.Infof("Retrieving changelog between %s and %s\n", sourceBuildNum, targetBuildNum)
@@ -237,29 +281,27 @@ func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum st
 
 	// Since the manifest file is always in the cos instance, add cos client
 	// so that client knows what URL to use
-	manifestClient, err := gerritClient(httpClient, host)
+	manifestClient, err := gitilesClient(httpClient, host)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Changelog: error creating client for GoB instance: %s:\n%w", host, err)
+		return nil, nil, err
 	}
 	sourceRepos, err := mappedManifest(manifestClient, repo, sourceBuildNum)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Changelog: error retrieving mapped manifest for source build number: %s using manifest repository: %s:\n%w",
-			sourceBuildNum, repo, err)
+		return nil, nil, err
 	}
 	targetRepos, err := mappedManifest(manifestClient, repo, targetBuildNum)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Changelog: error retrieving mapped manifest for target build number: %s using manifest repository: %s:\n%w",
-			targetBuildNum, repo, err)
+		return nil, nil, err
 	}
 
 	clients[host] = manifestClient
-	err = createGerritClients(clients, httpClient, sourceRepos)
+	err = createGitilesClients(clients, httpClient, sourceRepos)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Changelog: error creating source clients:\n%w", err)
+		return nil, nil, err
 	}
-	err = createGerritClients(clients, httpClient, targetRepos)
+	err = createGitilesClients(clients, httpClient, targetRepos)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Changelog: error creating target clients:\n%w", err)
+		return nil, nil, err
 	}
 
 	addChan := make(chan additionsResult, 1)
@@ -268,11 +310,11 @@ func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum st
 	go additions(clients, targetRepos, sourceRepos, querySize, missChan)
 	missRes := <-missChan
 	if missRes.Err != nil {
-		return nil, nil, fmt.Errorf("Changelog: failure when retrieving missed commits:\n%w", missRes.Err)
+		return nil, nil, err
 	}
 	addRes := <-addChan
 	if addRes.Err != nil {
-		return nil, nil, fmt.Errorf("Changelog: failure when retrieving commit additions:\n%w", addRes.Err)
+		return nil, nil, err
 	}
 
 	return addRes.Additions, missRes.Additions, nil
