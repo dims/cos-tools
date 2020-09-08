@@ -18,13 +18,13 @@
     <h1>Search Changelog</h1>
     <form class="changelog-form" action="/changelog">
       <div class="text">
-        <label for="source">From </label>
+        <label>From </label>
         {{if (ne .Source "")}}
           <input type="text" class="source" name="source" placeholder="COS build number" value={{.Source}} autocomplete="off">
         {{else}}
           <input type="text" class="source" name="source" placeholder="COS build number" autocomplete="off">
         {{end}}
-        <label for="target"> to </label>
+        <label> to </label>
         {{if (ne .Target "")}}
           <input type="text" class="target" name="target" placeholder="COS build number" value={{.Target}} autocomplete="off" required>
         {{else}}
@@ -35,15 +35,23 @@
       </div>
       <div class="radio">
         {{if .Internal}}
-          <input type="radio" class="internal" name="internal" value="true" checked>
-          <label for="internal"> Internal </label>
-          <input type="radio" class="external" name="internal" value="false">
-          <label for="external"> External </label>
+          <label>
+            <input type="radio" class="internal" name="internal" value="true" checked>
+            Internal
+          </label>
+          <label>
+            <input type="radio" class="external" name="internal" value="false">
+            External
+          </label>
         {{else}}
-          <input type="radio" class="internal" name="internal" value="true">
-          <label for="internal"> Internal </label>
-          <input type="radio" class="external" name="internal" value="false" checked>
-          <label for="external"> External </label>
+          <label>
+            <input type="radio" class="internal" name="internal" value="true">
+            Internal
+          </label>
+          <label>
+            <input type="radio" class="external" name="internal" value="false" checked>
+            External
+          </label>
         {{end}}
       </div>
     </form>
