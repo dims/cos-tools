@@ -11,13 +11,17 @@ td {
 }
 
 .changelog-form .text input {
-    height: 24px;
+    font-size: 14px;
+    height: 26px;
     margin-bottom: 8px;
     width: 135px;
 }
 
+.changelog-form .text input.cl-input {
+    width: 350px;
+}
+
 .changelog-form .text .submit {
-    height: 24px;
     width: 59px;
 }
 
@@ -107,4 +111,12 @@ th.commit-sha {
 .gob-link {
     font-size: 14;
     padding-left: 2px;
+}
+
+.locate-build-result {
+    margin: 20px 0px;
+}
+
+.build-info-link {
+    font-size: 15;
 }

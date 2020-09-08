@@ -16,6 +16,14 @@ h2 {
   font-size: 18;
 }
 
+h3 {
+  font-size: 16;
+}
+
+p {
+  margin: 8px 0px;
+}
+
 p,
 p a {
   font-size: 16;
@@ -54,7 +62,7 @@ label {
   padding-top: 30px;
   position: fixed;
   top: 0;
-  width: 120px;
+  width: 150px;
   z-index: 1;
 }
 
@@ -78,7 +86,7 @@ label {
 }
 
 .main {
-  margin: 30px 25px 0px 155px;
+  margin: 30px 25px 0px 160px;
 }
 
 .text-content {
