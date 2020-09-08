@@ -20,9 +20,9 @@
       <div class="text">
         <label>From </label>
         {{if (ne .Source "")}}
-          <input type="text" class="source" name="source" placeholder="COS build number" value={{.Source}} autocomplete="off">
+          <input type="text" class="source" name="source" placeholder="COS build number" value={{.Source}} autocomplete="off" required>
         {{else}}
-          <input type="text" class="source" name="source" placeholder="COS build number" autocomplete="off">
+          <input type="text" class="source" name="source" placeholder="COS build number" autocomplete="off" required>
         {{end}}
         <label> to </label>
         {{if (ne .Target "")}}
