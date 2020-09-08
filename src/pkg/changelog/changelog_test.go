@@ -314,7 +314,7 @@ func TestChangelog(t *testing.T) {
 	} else if removals == nil {
 		t.Errorf("Changelog failed, non-empty expected removals, got nil")
 	} else if _, ok := additions["src/third_party/kernel/v5.4"]; !ok {
-		t.Errorf("Changelog failed, expected repo: src/third_party/kernel/v4.19 in additions")
+		t.Errorf("Changelog failed, expected repo: src/third_party/kernel/v5.4 in additions")
 	}
 	for repoName, repoLog := range additions {
 		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
@@ -338,34 +338,9 @@ func TestChangelog(t *testing.T) {
 	} else if len(removals) != 0 {
 		t.Errorf("Changelog failed, expected empty removals, got %v", removals)
 	} else if _, ok := additions["src/platform/cobble"]; !ok {
-		t.Errorf("Changelog failed, expected repo: src/third_party/kernel/v4.19 in additions")
+		t.Errorf("Changelog failed, expected repo: src/platform/cobble in additions")
 	}
 	for repoName, repoLog := range additions {
-		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
-			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
-		} else if repoName == "src/platform/cobble" {
-			if repoLog.HasMoreCommits {
-				t.Errorf("Changelog failed, expected hasMoreCommits = false for repo: src/platform/cobble, got true")
-			} else if repoLog.SourceSHA != "" {
-				t.Errorf("Changelog failed, expected empty SourceSHA for src/platform/cobble, got %s", repoLog.SourceSHA)
-			} else if repoLog.TargetSHA != "4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d" {
-				t.Errorf("Changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for src/platform/cobble, got %s", repoLog.TargetSHA)
-			}
-		}
-	}
-
-	// Test changelog handles new repository addition
-	source = "12871.1179.0"
-	target = "12871.1177.0"
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
-	if err != nil {
-		t.Errorf("changelog failed, expected no error, got %v", err)
-	} else if len(additions) != 0 {
-		t.Errorf("Changelog failed, expected empty additions, got %v", additions)
-	} else if _, ok := removals["src/platform/cobble"]; !ok {
-		t.Errorf("Changelog failed, expected repo: src/third_party/kernel/v4.19 in additions")
-	}
-	for repoName, repoLog := range removals {
 		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
 			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
 		} else if repoName == "src/platform/cobble" {
@@ -403,5 +378,17 @@ func TestChangelog(t *testing.T) {
 		t.Errorf("changelog failed, expected error, got nil")
 	} else if err.HTTPCode() != "500" {
 		t.Errorf("changelog failed, expected error code 500, got error code %s", err.HTTPCode())
+	}
+
+	// Test image name
+	source = "cos-rc-85-13310-1034-0"
+	target = "cos-rc-85-13310-1030-0"
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	if err != nil {
+		t.Errorf("Changelog failed, expected no error, got %v", err)
+	} else if len(additions) != 0 {
+		t.Errorf("Changelog failed, expected empty additions, got %v", additions)
+	} else if len(removals) == 0 {
+		t.Errorf("Changelog failed, expected non-empty removals, got %v", removals)
 	}
 }

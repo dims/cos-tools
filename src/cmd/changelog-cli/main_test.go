@@ -172,6 +172,13 @@ func TestChangelog(t *testing.T) {
 			EmptyAdds: false,
 			EmptyRms:  true,
 		},
+		"image name": {
+			Source:    "cos-rc-85-13310-1034-0",
+			Target:    "cos-rc-85-13310-1030-0",
+			ShouldErr: false,
+			EmptyAdds: true,
+			EmptyRms:  false,
+		},
 		"invalid source": {
 			Source:    "999999.0.0",
 			Target:    "15056.0.0",

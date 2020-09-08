@@ -125,7 +125,7 @@ func BuildNotFound(buildNumber string) *UtilChangelogError {
 	return &UtilChangelogError{
 		httpCode: "404",
 		header:   "Build Not Found",
-		err:      fmt.Sprintf("Build number %s not found. Please input a valid build number (example: 13310.1035.0).", buildNumber),
+		err:      fmt.Sprintf("The build associated with input %s cannot be found. Please input a valid build number (example: 13310.1035.0) or a valid image name (example: cos-rc-85-13310-1034-0).", buildNumber),
 	}
 }
 

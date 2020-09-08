@@ -91,7 +91,7 @@ func TestBuildNotFound(t *testing.T) {
 	buildNumber := "15000.0.0"
 	expectedCode := "404"
 	expectedErrHeader := "Build Not Found"
-	expectedErrStr := fmt.Sprintf("Build number %s not found. Please input a valid build number (example: 13310.1035.0).", buildNumber)
+	expectedErrStr := fmt.Sprintf("The build associated with input %s cannot be found. Please input a valid build number (example: 13310.1035.0) or a valid image name (example: cos-rc-85-13310-1034-0).", buildNumber)
 	err := BuildNotFound(buildNumber)
 	if err.HTTPCode() != expectedCode {
 		t.Errorf("expected HTTP code %s, got %s", expectedCode, err.HTTPCode())

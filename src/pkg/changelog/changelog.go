@@ -32,6 +32,7 @@ package changelog
 import (
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"cos.googlesource.com/cos/tools/src/pkg/utils"
@@ -39,6 +40,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"
+)
+
+var (
+	imageBuildRe = regexp.MustCompile("^cos-(dev-|beta-|stable-|rc-)?\\d+-([\\d-]+)$")
 )
 
 type repo struct {
@@ -89,6 +94,18 @@ type RepoLog struct {
 	SourceSHA      string
 	TargetSHA      string
 	HasMoreCommits bool
+}
+
+// resolveImageName returns the build number associated with an image name.
+// If the string is not an image name, it returns the input string.
+func resolveImageName(imageName string) string {
+	build := imageBuildRe.FindStringSubmatch(imageName)
+	if len(build) < 2 {
+		return imageName
+	}
+	buildNum := strings.Replace(build[2], "-", ".", 3)
+	log.Debugf("resolveImageName: image name %s was resolved to build number %s", imageName, buildNum)
+	return strings.Replace(build[2], "-", ".", 3)
 }
 
 // Creates a unique identifier for a repo + branch pairing.
@@ -303,12 +320,12 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 //
 // The second changelog contains all commits that are present in the source build
 // but not present in the target build
-func Changelog(httpClient *http.Client, sourceBuildNum string, targetBuildNum string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
+func Changelog(httpClient *http.Client, source string, target string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
 	if httpClient == nil {
 		log.Error("httpClient is nil")
 		return nil, nil, utils.InternalServerError
 	}
-
+	sourceBuildNum, targetBuildNum := resolveImageName(source), resolveImageName(target)
 	log.Infof("Retrieving changelog between %s and %s\n", sourceBuildNum, targetBuildNum)
 	clients := make(map[string]gitilesProto.GitilesClient)
 
