@@ -58,22 +58,36 @@ var (
 	statusForbiddenTemplate *template.Template
 	basicTextTemplate       *template.Template
 
-	grpcCodeToHeader = map[string]string{
-		codes.Canceled.String():           "499 Client Closed Request",
-		codes.Unknown.String():            "500 Internal Server Error",
-		codes.InvalidArgument.String():    "400 Bad Request",
-		codes.DeadlineExceeded.String():   "504 Gateway Timeout",
-		codes.NotFound.String():           "404 Not Found",
-		codes.PermissionDenied.String():   "403 Forbidden",
-		codes.Unauthenticated.String():    "401 Unauthorized",
-		codes.ResourceExhausted.String():  "429 Too Many Requests",
-		codes.FailedPrecondition.String(): "400 Bad Request",
-		codes.Aborted.String():            "409 Conflict",
-		codes.OutOfRange.String():         "400 Bad Request",
-		codes.Unimplemented.String():      "501 Not Implemented",
-		codes.Internal.String():           "500 Internal Server Error",
-		codes.Unavailable.String():        "503 Service Unavailable",
-		codes.DataLoss.String():           "500 Internal Server Error",
+	grpcCodeToHTTP = map[string]string{
+		codes.Unknown.String():            "500",
+		codes.InvalidArgument.String():    "400",
+		codes.NotFound.String():           "404",
+		codes.PermissionDenied.String():   "403",
+		codes.Unauthenticated.String():    "401",
+		codes.ResourceExhausted.String():  "429",
+		codes.FailedPrecondition.String(): "400",
+		codes.OutOfRange.String():         "400",
+		codes.Internal.String():           "500",
+		codes.Unavailable.String():        "503",
+		codes.DataLoss.String():           "500",
+	}
+	httpCodeToHeader = map[string]string{
+		"400": "400 Bad Request",
+		"401": "401 Unauthorized",
+		"403": "403 Forbidden",
+		"404": "404 Not Found",
+		"429": "429 Too Many Requests",
+		"500": "500 Internal Server Error",
+		"503": "503 Service Unavailable",
+	}
+	httpCodeToDesc = map[string]string{
+		"400": "The request could not be understood.",
+		"401": "You are currently unauthenticated. Please login to access this resource.",
+		"403": "This account does not have access to internal repositories. Please retry with an authorized account, or select the external button to query from publically accessible builds.",
+		"404": "The requested resource was not found. Please verify that you are using a valid input.",
+		"429": "Our servers are currently experiencing heavy load. Please retry in a couple minutes.",
+		"500": "Something went wrong on our end. Please try again later.",
+		"503": "This service is temporarily offline. Please try again later.",
 	}
 	gitiles403Desc  = "unexpected HTTP 403 from Gitiles"
 	gerritErrCodeRe = regexp.MustCompile("status code\\s*(\\d+)")
@@ -294,35 +308,64 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 	return buildData, didFallback, err
 }
 
-// handleError creates the error page for a given error
-func handleError(w http.ResponseWriter, inputErr error, currPage string) {
-	var header, text string
-	innerErr := inputErr
-	for errors.Unwrap(innerErr) != nil {
-		innerErr = errors.Unwrap(innerErr)
-	}
-	rpcStatus, ok := status.FromError(innerErr)
-	// Error is not a status code, display generic header
+// parseGRPCError retrieves the header and description to display for a gRPC error
+func parseGRPCError(inputErr error) (string, string, error) {
+	rpcStatus, ok := status.FromError(inputErr)
 	if !ok {
-		basicTextTemplate.Execute(w, &basicTextPage{
-			Header:     "An error occurred while fulfilling your request",
-			Body:       innerErr.Error(),
-			ActivePage: currPage,
-		})
-		return
+		return "", "", fmt.Errorf("parseGRPCError: Error %v is not a gRPC error", inputErr)
 	}
 	code, text := rpcStatus.Code(), rpcStatus.Message()
-	// RPC status code misclassifies 403 error as internal for Gitiles requests
+	// RPC status code misclassifies 403 error as 500 error for Gitiles requests
 	if text == gitiles403Desc {
 		code = codes.PermissionDenied
 	}
-	if _, ok := grpcCodeToHeader[code.String()]; !ok {
-		header = "An error occurred while fulfilling your request"
+	if httpCode, ok := grpcCodeToHTTP[code.String()]; ok {
+		if _, ok := httpCodeToHeader[httpCode]; !ok {
+			log.Errorf("parseGRPCError: No error header mapping found for HTTP code %s", httpCode)
+			return "", "", fmt.Errorf("parseGRPCError: No error header mapping found for HTTP code %s", httpCode)
+		}
+		if _, ok := httpCodeToDesc[httpCode]; !ok {
+			log.Errorf("parseGRPCError: No error description mapping found for HTTP code %s", httpCode)
+			return "", "", fmt.Errorf("parseGRPCError: No error description mapping found for HTTP code %s", httpCode)
+		}
+		return httpCodeToHeader[httpCode], httpCodeToDesc[httpCode], nil
 	}
-	header = grpcCodeToHeader[code.String()]
+	return "", "", fmt.Errorf("parseGRPCError: gRPC error code %s not supported", code.String())
+}
+
+// parseGitilesError retrieves the header and description to display for a Gerrit error
+func parseGerritError(inputErr error) (string, string, error) {
+	matches := gerritErrCodeRe.FindStringSubmatch(inputErr.Error())
+	if len(matches) != 2 {
+		return "", "", fmt.Errorf("parseGerritError: error %v is not a Gerrit error", inputErr)
+	}
+	httpCode := matches[1]
+	if _, ok := httpCodeToHeader[httpCode]; !ok {
+		log.Errorf("parseGerritError: No error header mapping found for HTTP code %s", httpCode)
+		return "", "", fmt.Errorf("parseGerritError: No error header mapping found for HTTP code %s", httpCode)
+	}
+	if _, ok := httpCodeToDesc[httpCode]; !ok {
+		log.Errorf("parseGerritError: No error description mapping found for HTTP code %s", httpCode)
+		return "", "", fmt.Errorf("parseGerritError: No error description mapping found for HTTP code %s", httpCode)
+	}
+	return httpCodeToHeader[httpCode], httpCodeToDesc[httpCode], nil
+}
+
+// handleError creates the error page for a given error
+func handleError(w http.ResponseWriter, inputErr error, currPage string) {
+	innerErr := unwrappedError(inputErr)
+	header := "An error occurred while handling this request"
+	body := innerErr.Error()
+	if tmpHeader, tmpBody, err := parseGRPCError(innerErr); err == nil {
+		header = tmpHeader
+		body = tmpBody
+	} else if tmpHeader, tmpBody, err := parseGerritError(innerErr); err == nil {
+		header = tmpHeader
+		body = tmpBody
+	}
 	basicTextTemplate.Execute(w, &basicTextPage{
 		Header:     header,
-		Body:       text,
+		Body:       body,
 		ActivePage: currPage,
 	})
 }
@@ -372,7 +415,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Errorf("HandleChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
 			source, target, externalGoBInstance, externalManifestRepo, err)
-		handleError(w, err, "changelog")
+		handleError(w, err, "/changelog/")
 		return
 	}
 	page := createChangelogPage(changelogData{
@@ -423,8 +466,8 @@ func HandleLocateBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	buildData, didFallback, err := findBuildWithFallback(httpClient, gerrit, fallbackGerrit, gob, repo, cl, internal)
 	if err != nil {
-		log.Errorf("HandleLocateBuild: error retrieving build for CL %s with internal set to %t\n%v", cl, internal, err)
-		handleError(w, err, "locatebuild")
+		log.Errorf("Handlelocatebuild: error retrieving build for CL %s with internal set to %t\n%v", cl, internal, err)
+		handleError(w, err, "/locatebuild/")
 		return
 	}
 	var gerritLink string
