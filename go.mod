@@ -3,6 +3,7 @@ module cos.googlesource.com/cos/tools
 go 1.14
 
 require (
+	cloud.google.com/go v0.57.0
 	cloud.google.com/go/storage v1.10.0
 	github.com/beevik/etree v1.1.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -19,5 +20,6 @@ require (
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.28.0
 	google.golang.org/grpc v1.29.1
+	google.golang.org/genproto v0.0.0-20200618031413-b414f8b61790
 	google.golang.org/protobuf v1.25.0
 )
