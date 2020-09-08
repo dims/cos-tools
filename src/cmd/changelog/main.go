@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"cos.googlesource.com/cos/tools/src/pkg/changelog"
+	"cos.googlesource.com/cos/tools/src/pkg/findbuild"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
@@ -42,14 +43,24 @@ import (
 	"go.chromium.org/luci/common/api/gerrit"
 )
 
-// Default Manifest location
 const (
-	cosInstanceURL      string = "cos.googlesource.com"
-	defaultManifestRepo string = "cos/manifest-snapshots"
+	externalGerritURL    = "https://cos-review.googlesource.com"
+	fallbackGerritURL    = "https://chromium-review.googlesource.com"
+	externalGoBURL       = "cos.googlesource.com"
+	externalManifestRepo = "cos/manifest-snapshots"
+	fallbackRepoPrefix   = "mirrors/cros/"
 )
 
+func unwrappedError(err error) error {
+	innerErr := err
+	for errors.Unwrap(innerErr) != nil {
+		innerErr = errors.Unwrap(innerErr)
+	}
+	return innerErr
+}
+
 func getHTTPClient() (*http.Client, error) {
-	log.Info("Creating HTTP client")
+	log.Debug("Creating HTTP client")
 	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
 	if err != nil || len(creds.JSON) == 0 {
 		return nil, fmt.Errorf("no application default credentials found - run `gcloud auth application-default login` and try again")
@@ -93,26 +104,85 @@ func generateChangelog(source, target, instance, manifestRepo string) error {
 	return nil
 }
 
+func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL string) error {
+	httpClient, err := getHTTPClient()
+	if err != nil {
+		return fmt.Errorf("Error creating http client: %v", err)
+	}
+	req := &findbuild.BuildRequest{
+		HTTPClient:   httpClient,
+		GerritHost:   gerrit,
+		GitilesHost:  gob,
+		ManifestRepo: manifestRepo,
+		RepoPrefix:   "",
+		CL:           targetCL,
+	}
+	buildData, err := findbuild.FindBuild(req)
+	if unwrappedError(err) == findbuild.ErrorCLNotFound {
+		log.Debugf("Query failed on Gerrit url %s and Gitiles url %s, retrying with fallback urls", externalGerritURL, externalGoBURL)
+		fallbackReq := &findbuild.BuildRequest{
+			HTTPClient:   httpClient,
+			GerritHost:   fallback,
+			GitilesHost:  gob,
+			ManifestRepo: manifestRepo,
+			RepoPrefix:   fallbackPrefix,
+			CL:           targetCL,
+		}
+		buildData, err = findbuild.FindBuild(fallbackReq)
+	}
+	if err != nil {
+		return err
+	}
+	log.Infof("Build: %s", buildData.BuildNum)
+	return nil
+}
+
 func main() {
-	var instance, manifestRepo string
+	var mode, gobURL, gerritURL, fallbackURL, manifestRepo, fallbackPrefix string
 	var debug bool
 	app := &cli.App{
 		Name:  "changelog",
-		Usage: "get commits between builds",
+		Usage: "get commits between builds or first build containing CL",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "instance",
-				Value:       cosInstanceURL,
-				Aliases:     []string{"i"},
-				Usage:       "GoB `INSTANCE` to use as client",
-				Destination: &instance,
+				Name:        "mode",
+				Value:       "",
+				Aliases:     []string{"m"},
+				Usage:       "Specify query mode. Acceptable values: changelog | findbuild",
+				Destination: &mode,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "gerrit",
+				Value:       externalGerritURL,
+				Usage:       "Gerrit `URL` to query from",
+				Destination: &gerritURL,
+			},
+			&cli.StringFlag{
+				Name:        "fallback",
+				Value:       fallbackGerritURL,
+				Usage:       "Fallback Gerrit `URL` to query from",
+				Destination: &fallbackURL,
+			},
+			&cli.StringFlag{
+				Name:        "gob",
+				Value:       externalGoBURL,
+				Usage:       "Git on Borg `URL` to query from",
+				Destination: &gobURL,
 			},
 			&cli.StringFlag{
 				Name:        "repo",
-				Value:       defaultManifestRepo,
+				Value:       externalManifestRepo,
 				Aliases:     []string{"r"},
 				Usage:       "`REPO` containing Manifest file",
 				Destination: &manifestRepo,
+			},
+			&cli.StringFlag{
+				Name:        "prefix",
+				Value:       fallbackRepoPrefix,
+				Aliases:     []string{"p"},
+				Usage:       "`PREFIX` prepended to repo when querying GoB using fallback Gerrit results",
+				Destination: &fallbackPrefix,
 			},
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -123,15 +193,26 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			if c.NArg() < 2 {
-				return errors.New("Must specify source and target build number")
-			}
 			if debug {
 				log.SetLevel(log.DebugLevel)
 			}
-			source := c.Args().Get(0)
-			target := c.Args().Get(1)
-			return generateChangelog(source, target, instance, manifestRepo)
+			switch mode {
+			case "findbuild":
+				if c.NArg() != 1 {
+					return errors.New("Must specify CL number or change ID")
+				}
+				targetCL := c.Args().Get(0)
+				return getBuildForCL(gerritURL, fallbackURL, gobURL, manifestRepo, fallbackPrefix, targetCL)
+			case "changelog":
+				if c.NArg() != 2 {
+					return errors.New("Must specify source and target build number")
+				}
+				source := c.Args().Get(0)
+				target := c.Args().Get(1)
+				return generateChangelog(source, target, gobURL, manifestRepo)
+			default:
+				return fmt.Errorf("Please specify either \"findbuild\" or \"changelog\" mode")
+			}
 		},
 	}
 	err := app.Run(os.Args)

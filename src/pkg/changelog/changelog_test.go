@@ -66,61 +66,61 @@ func TestChangelog(t *testing.T) {
 	// Test invalid source
 	additions, removals, err := Changelog(httpClient, "15", "15043.0.0", cosInstance, defaultManifestRepo, -1)
 	if additions != nil {
-		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
-		t.Errorf("Changelog failed, expected nil removals, got %v", removals)
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
-		t.Errorf("Changelog failed, expected error, got nil")
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 
 	// Test invalid target
 	additions, removals, err = Changelog(httpClient, "15043.0.0", "abx", cosInstance, defaultManifestRepo, -1)
 	if additions != nil {
-		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
-		t.Errorf("Changelog failed, expected nil removals, got %v", removals)
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
-		t.Errorf("Changelog failed, expected error, got nil")
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 
 	// Test invalid instance
 	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", "com", defaultManifestRepo, -1)
 	if additions != nil {
-		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
-		t.Errorf("Changelog failed, expected nil removals, got %v", removals)
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
-		t.Errorf("Changelog failed, expected error, got nil")
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 
 	// Test invalid manifest repo
 	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", cosInstance, "cos/not-a-repo", -1)
 	if additions != nil {
-		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
-		t.Errorf("Changelog failed, expected nil removals, got %v", removals)
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
-		t.Errorf("Changelog failed, expected error, got nil")
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 
 	// Test build number higher than latest release
 	additions, removals, err = Changelog(httpClient, "15036.0.0", "99999.0.0", cosInstance, defaultManifestRepo, -1)
 	if additions != nil {
-		t.Errorf("Changelog failed, expected nil additions, got %v", additions)
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
-		t.Errorf("Changelog failed, expected nil removals, got %v", removals)
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
 	} else if err == nil {
-		t.Errorf("Changelog failed, expected error, got nil")
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 
 	// Test manifest with remote urls specified and no default URL
 	additions, removals, err = Changelog(httpClient, "1.0.0", "2.0.0", cosInstance, defaultManifestRepo, -1)
 	if additions == nil {
-		t.Errorf("Changelog failed, expected additions, got nil")
+		t.Errorf("changelog failed, expected additions, got nil")
 	} else if removals == nil {
-		t.Errorf("Changelog failed, expected removals, got nil")
+		t.Errorf("changelog failed, expected removals, got nil")
 	} else if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	}
 
 	// Test 1 build number difference with only 1 repo change between them
@@ -240,23 +240,23 @@ func TestChangelog(t *testing.T) {
 	}
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, -1)
 	if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if len(removals) != 0 {
-		t.Errorf("Changelog failed, expected empty removals list, got %v", removals)
+		t.Errorf("changelog failed, expected empty removals list, got %v", removals)
 	} else if len(additions) != 1 {
-		t.Errorf("Changelog failed, expected only 1 repo in additions, got %v", additions)
+		t.Errorf("changelog failed, expected only 1 repo in additions, got %v", additions)
 	}
 	boardOverlayLog := additions["cos/overlays/board-overlays"]
 	if boardOverlayLog == nil {
-		t.Errorf("Changelog failed, expected cos/overlays/board-overlays in changelog, got nil")
+		t.Errorf("changelog failed, expected cos/overlays/board-overlays in changelog, got nil")
 	} else if changes := boardOverlayLog.Commits; len(changes) != 108 {
-		t.Errorf("Changelog failed, expected 108 changes for \"cos/overlays/board-overlays\", got %d", len(changes))
+		t.Errorf("changelog failed, expected 108 changes for \"cos/overlays/board-overlays\", got %d", len(changes))
 	} else if !commitsMatch(boardOverlayLog.Commits, expectedCommits) {
-		t.Errorf("Changelog failed, Changelog output does not match expected commits or is not sorted")
+		t.Errorf("changelog failed, Changelog output does not match expected commits or is not sorted")
 	} else if boardOverlayLog.SourceSHA != "612ca5ef5455534127d008e08c65aa29a2fd97a5" {
-		t.Errorf("Changelog failed, expected SourceSHA \"612ca5ef5455534127d008e08c65aa29a2fd97a5\", got %s", boardOverlayLog.SourceSHA)
+		t.Errorf("changelog failed, expected SourceSHA \"612ca5ef5455534127d008e08c65aa29a2fd97a5\", got %s", boardOverlayLog.SourceSHA)
 	} else if boardOverlayLog.TargetSHA != "6201c49afe667c8fa7796608a4d7162bb3f7f4f4" {
-		t.Errorf("Changelog failed, expected SourceSHA \"6201c49afe667c8fa7796608a4d7162bb3f7f4f4\", got %s", boardOverlayLog.TargetSHA)
+		t.Errorf("changelog failed, expected SourceSHA \"6201c49afe667c8fa7796608a4d7162bb3f7f4f4\", got %s", boardOverlayLog.TargetSHA)
 	}
 
 	// Test build numbers further apart from each other with multiple repo differences
@@ -285,13 +285,13 @@ func TestChangelog(t *testing.T) {
 	}
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, -1)
 	if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	}
 	kernelLog := additions["third_party/kernel"]
 	if len(removals) != 1 || kernelLog == nil {
-		t.Errorf("Changelog failed, expected miss list containing only \"third_party/kernel\", got %v", removals)
+		t.Errorf("changelog failed, expected miss list containing only \"third_party/kernel\", got %v", removals)
 	} else if !repoListInLog(additions, additionRepos) {
-		t.Errorf("Changelog failed, additions repo output does not match expected repos %v", additionRepos)
+		t.Errorf("changelog failed, additions repo output does not match expected repos %v", additionRepos)
 	}
 
 	// Test changelog returns correct output when given a querySize instead of -1
@@ -300,24 +300,24 @@ func TestChangelog(t *testing.T) {
 	querySize := 50
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
 	if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if additions == nil {
-		t.Errorf("Changelog failed, non-empty expected additions, got nil")
+		t.Errorf("changelog failed, non-empty expected additions, got nil")
 	} else if removals == nil {
-		t.Errorf("Changelog failed, non-empty expected removals, got nil")
+		t.Errorf("changelog failed, non-empty expected removals, got nil")
 	} else if _, ok := additions["third_party/kernel"]; !ok {
-		t.Errorf("Changelog failed, expected repo: third_party/kernel in additions")
+		t.Errorf("changelog failed, expected repo: third_party/kernel in additions")
 	}
 	for repoName, repoLog := range additions {
 		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
-			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
+			t.Errorf("changelog failed, expected non-empty additions commits, got nil or empty commits")
 		}
 		if len(repoLog.Commits) > querySize {
-			t.Errorf("Changelog failed, expected %d commits for repo: %s, got: %d", querySize, repoName, len(repoLog.Commits))
+			t.Errorf("changelog failed, expected %d commits for repo: %s, got: %d", querySize, repoName, len(repoLog.Commits))
 		} else if repoName == "third_party/kernel" && !repoLog.HasMoreCommits {
-			t.Errorf("Changelog failed, expected HasMoreCommits = True for repo: third_party/kernel, got False")
+			t.Errorf("changelog failed, expected HasMoreCommits = True for repo: third_party/kernel, got False")
 		} else if repoLog.HasMoreCommits && len(repoLog.Commits) < querySize {
-			t.Errorf("Changelog failed, expected HasMoreCommits = False for repo: %s with %d commits, got True", repoName, len(repoLog.Commits))
+			t.Errorf("changelog failed, expected HasMoreCommits = False for repo: %s with %d commits, got True", repoName, len(repoLog.Commits))
 		}
 	}
 
@@ -326,46 +326,58 @@ func TestChangelog(t *testing.T) {
 	target = "12871.1179.0"
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
 	if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if len(removals) != 0 {
-		t.Errorf("Changelog failed, expected empty removals, got %v", removals)
+		t.Errorf("changelog failed, expected empty removals, got %v", removals)
 	} else if _, ok := additions["cos/cobble"]; !ok {
-		t.Errorf("Changelog failed, expected repo: third_party/kernel in additions")
+		t.Errorf("changelog failed, expected repo: third_party/kernel in additions")
 	}
 	for repoName, repoLog := range additions {
 		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
-			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
+			t.Errorf("changelog failed, expected non-empty additions commits, got nil or empty commits")
 		} else if repoName == "cos/cobble" {
 			if repoLog.HasMoreCommits {
-				t.Errorf("Changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
+				t.Errorf("changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
 			} else if repoLog.SourceSHA != "" {
-				t.Errorf("Changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
+				t.Errorf("changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
 			} else if repoLog.TargetSHA != "4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d" {
-				t.Errorf("Changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
+				t.Errorf("changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
 			}
 		}
 	}
+	// Test repository added between builds
 	source = "12871.1179.0"
 	target = "12871.1177.0"
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
 	if err != nil {
-		t.Errorf("Changelog failed, expected no error, got %v", err)
+		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if len(additions) != 0 {
-		t.Errorf("Changelog failed, expected empty additions, got %v", additions)
+		t.Errorf("changelog failed, expected empty additions, got %v", additions)
 	} else if _, ok := removals["cos/cobble"]; !ok {
-		t.Errorf("Changelog failed, expected repo: third_party/kernel in additions")
+		t.Errorf("changelog failed, expected repo: third_party/kernel in additions")
 	}
 	for repoName, repoLog := range removals {
 		if repoLog.Commits == nil || len(repoLog.Commits) == 0 {
-			t.Errorf("Changelog failed, expected non-empty additions commits, got nil or empty commits")
+			t.Errorf("changelog failed, expected non-empty additions commits, got nil or empty commits")
 		} else if repoName == "cos/cobble" {
 			if repoLog.HasMoreCommits {
-				t.Errorf("Changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
+				t.Errorf("changelog failed, expected hasMoreCommits = false for repo: cos/cobble, got true")
 			} else if repoLog.SourceSHA != "" {
-				t.Errorf("Changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
+				t.Errorf("changelog failed, expected empty SourceSHA for cos/cobble, got %s", repoLog.SourceSHA)
 			} else if repoLog.TargetSHA != "4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d" {
-				t.Errorf("Changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
+				t.Errorf("changelog failed, expected TargetSHA: \"4ab43f1f86b7099b8ad75cf9615ea1fa155bbd7d\" for cos/cobble, got %s", repoLog.TargetSHA)
 			}
 		}
+	}
+	// Test empty repository
+	source = "0.0.0"
+	target = "2.0.0"
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	if additions != nil {
+		t.Errorf("changelog failed, expected nil additions, got %v", additions)
+	} else if removals != nil {
+		t.Errorf("changelog failed, expected nil removals, got %v", removals)
+	} else if err == nil {
+		t.Errorf("changelog failed, expected error, got nil")
 	}
 }
