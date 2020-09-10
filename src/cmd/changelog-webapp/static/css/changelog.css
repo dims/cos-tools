@@ -7,10 +7,11 @@ th {
 th,
 td {
     margin-bottom: 5px;
-    padding: 2px;
+    padding: 4px;
 }
 
-.feature-info {
+.feature-info,
+.feature-info a {
     font-size: 14;
     margin: 6px 0px;
     width: 650px;
@@ -47,18 +48,19 @@ td {
     margin: 3px 0px 3px 4px;
 }
 
-.sha-legend .circle {
+.circle {
     border-radius: 50%;
+    display: inline-block;
     height: 14px;
     margin-right: 8px;
     width: 14px;
 }
 
-.sha-legend .circle.addition {
+.circle.addition {
     background-color: #adef97;
 }
 
-.sha-legend .circle.removal {
+.circle.removal {
     background-color: #ffc0c0;
 }
 
@@ -99,11 +101,11 @@ th.commit-sha {
 }
 
 .commit-author {
-    width: 150px;
+    width: 155px;
 }
 
 .commit-committer {
-    width: 150px;
+    width: 155px;
 }
 
 .commit-time {

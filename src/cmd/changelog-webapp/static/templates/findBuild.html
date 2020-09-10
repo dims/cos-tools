@@ -1,7 +1,7 @@
 <html>
 <head>
   <title>Find Build</title>
-  <meta name="description" content="Google COS build changelog">
+  <meta name="description" content="Find the first build containing a changelist">
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/changelog.css">
 </head>
@@ -14,11 +14,25 @@
     <a href="/">Home</a>
     <a href="/changelog/">Changelog</a>
     <a class="active" href="/findbuild/">Find Build</a>
+    <a href="/readme/">Readme</a>
   </div>
   <div class="main">
     <h1>Find Build with CL</h1>
-    <p class="feature-info">Find the first build containing a requested CL.</p>
-    <p class="feature-info">Note: It is possible that a COS build was not created using the build number returned. However, any COS build with build number greater than the returned build number should have the desired change present.</p>
+    <p class="feature-info">
+      Find the first Container-Optimized OS build containing a desired
+      changelist.<br>
+      Example input: <b>3280</b> or <b>18d4ce4</b>
+    </p>
+    <p class="feature-info">
+      <b>Note:</b> It is possible that a COS build was not created using the
+      build number returned. However, any COS build with build number greater
+      than the returned build number should have the desired change present.
+    </p>
+    <p class="feature-info">
+      <b>Note:</b> Commits must be submitted through Gerrit to be tracked by
+      this tool. Commits directly submitted to a Git repository are not
+      supported.
+    </p>
     <form class="changelog-form" action="/findbuild">
       <div class="text">
         {{if (ne .CL "")}}
@@ -52,7 +66,10 @@
     </form>
     <div class="locate-build-result">
       {{if (ne .BuildNum "")}}
-        <p><a href={{.GerritLink}} target="_blank">CL {{.CLNum}}</a> landed in build <b>{{.BuildNum}}</b>.</p>
+        <p>
+          <a href={{.GerritLink}} target="_blank"> CL {{.CLNum}}</a>
+          landed in build <b>{{.BuildNum}}</b>.
+        </p>
       {{end}}
     </div>
   </div>

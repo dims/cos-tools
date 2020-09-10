@@ -1,7 +1,7 @@
 <html>
 <head>
   <title>Changelog</title>
-  <meta name="description" content="Google COS build changelog">
+  <meta name="description" content="Get the changelog between two COS builds">
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/changelog.css">
 </head>
@@ -14,11 +14,20 @@
     <a href="/">Home</a>
     <a class="active" href="/changelog/">Changelog</a>
     <a href="/findbuild/">Find Build</a>
+    <a href="/readme/">Readme</a>
   </div>
   <div class="main">
     <h1>Changelog</h1>
-    <p class="feature-info">Retrieve a list of commits between two Container Optimized OS build numbers.</p>
-    <p class="feature-info">Note: Build numbers generated using ChromiumOS infrastructure are not supported.</p>
+    <p class="feature-info">Retrieve a list of commits between two 
+      Container-Optimized OS builds.<br>
+      Example Input: <b>cos-rc-85-13310-1034-0</b> or <b>13310.1034.0</b>
+    </p>
+    <p class="feature-info"><b>Note:</b>
+      <a href="https://crosland.corp.google.com/" target="_blank">
+        go/crosland
+      </a>
+      should be used for pre-cusky builds
+    </p>
     <form class="changelog-form" action="/changelog">
       <div class="text">
         <label>From </label>
@@ -62,11 +71,15 @@
       <div class="sha-legend">
         <div class="legend-row">
           <div class="circle addition"></div>
-          <span>Commits introduced to {{.Target}} since {{.Source}}</span><br>
+          <span>
+            Commits present in <b>{{.Target}}</b> but not in <b>{{.Source}}</b>
+          </span><br>
         </div>
         <div class="legend-row">
           <div class="circle removal"></div>
-          <span>Commits introduced to {{.Source}} since {{.Target}}</span>
+          <span>
+            Commits present in <b>{{.Source}}</b> but not in <b>{{.Target}}</b>
+          </span>
         </div>
       </div>
     {{end}}
@@ -79,7 +92,7 @@
         <th class="commit-bugs">Bugs</th>
         <th class="commit-author">Author</th>
         <th class="commit-committer">Committer</th>
-        <th class="commit-time">Date</th>
+        <th class="commit-time">Committer Date</th>
         <th class="commit-release-notes">Release Notes</th>
       </tr>
     </table>
@@ -103,13 +116,15 @@
       {{end}}
     </table>
     {{if (ne $table.AdditionsLink "")}}
-      <a class="gob-link" href={{$table.AdditionsLink}}  target="_blank">Show more commits</a>
+      <a class="gob-link" href={{$table.AdditionsLink}} target="_blank">
+        Show more commits
+      </a>
     {{end}}
     <table class="repo-table">
       {{range $commit := $table.Removals}}
       <tr>
         <td class="commit-sha removal">
-          <a href={{$commit.SHA.URL}}  target="_blank">{{$commit.SHA.Name}}</a>
+          <a href={{$commit.SHA.URL}} target="_blank">{{$commit.SHA.Name}}</a>
         </td>
         <td class="commit-subject">{{$commit.Subject}}</td>
         <td class="commit-bugs">
@@ -125,7 +140,9 @@
       {{end}}
     </table>
     {{if (ne $table.RemovalsLink "")}}
-      <a class="gob-link" href={{$table.RemovalsLink}} target="_blank">Show more commits</a>
+      <a class="gob-link" href={{$table.RemovalsLink}} target="_blank">
+        Show more commits
+      </a>
     {{end}}
     {{end}}
   </div>

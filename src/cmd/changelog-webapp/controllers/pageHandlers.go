@@ -49,6 +49,7 @@ var (
 
 	staticBasePath          string
 	indexTemplate           *template.Template
+	readme                  *template.Template
 	changelogTemplate       *template.Template
 	promptLoginTemplate     *template.Template
 	findBuildTemplate       *template.Template
@@ -86,6 +87,7 @@ func init() {
 	envQuerySize = getIntVerifiedEnv("CHANGELOG_QUERY_SIZE")
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
+	readme = template.Must(template.ParseFiles(staticBasePath + "templates/readme.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
 	findBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/findBuild.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
@@ -285,6 +287,15 @@ func handleError(w http.ResponseWriter, r *http.Request, displayErr utils.Change
 // HandleIndex serves the home page
 func HandleIndex(w http.ResponseWriter, r *http.Request) {
 	err := indexTemplate.Execute(w, &statusPage{SignedIn: SignedIn(r)})
+	if err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleReadme serves the about page
+func HandleReadme(w http.ResponseWriter, r *http.Request) {
+	err := readme.Execute(w, &statusPage{SignedIn: SignedIn(r)})
 	if err != nil {
 		log.Error(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

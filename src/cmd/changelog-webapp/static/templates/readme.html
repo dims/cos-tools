@@ -1,0 +1,87 @@
+<html>
+<head>
+  <title>Readme</title>
+  <meta name="description" content="Readme this website">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/changelog.css">
+</head>
+<body>
+  <div class="navbar">
+    <p class="navbar-title">Container Optimized OS</p>
+    {{if .SignedIn}}
+      <a class="signout" href="/signout/?redirect=/readme/">Sign Out</a>
+    {{else}}
+      <a class="login" href="/login/?redirect=/readme/">Login</a>
+    {{end}}
+  </div>
+  <div class="sidenav">
+    <a href="/">Home</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="/findbuild/">Find Build</a>
+    <a class="active" href="/readme/?redirect=/readme/">Readme</a>
+  </div>
+  <div class="main">
+    <div class="text-content">
+      <h1>Readme</h1>
+      <p>Information about this website's features, and how to use them.</p>
+      <h2>Changelog</h2>
+      <p>
+        This feature displays a list of commits that were submitted between two
+        COS builds
+      </p>
+      <p>
+        It accepts either a COS image name or a COS build number. For example,
+        <b>cos-rc-85-13310-1034-0</b> or <b>13310.1034.0</b> are both
+        acceptable inputs for a desired build. Image names must match the
+        regex pattern <i>^cos-(dev-|beta-|stable-|rc-)?([\d-]+)$</i> to be
+        recognized.
+      </p>
+      <p>
+        As an output, the page provides a list of commits that are not common
+        in both builds. 
+      </p>
+      <p>
+        <div class="circle removal"></div> A commit highlighted in pink
+        indicates that the commit is present in the first build (the "From"
+        text box), but not present in the second build (the "To" text box).<br>
+      </p>
+      <p>
+        <div class="circle addition"></div> A commit highlighted in green
+        indicates that the commit is present in the second build (the "To" text
+        box) but not the first build (the "From" text box).
+      </p>
+      <p>
+        For example, for a query that reads "From 15000.0.0 to 15020.0.0",
+        green commits would indicate commits present in 15020.0.0 but not
+        15000.0.0, while pink commits indicate the reverse.
+      </p>
+      <p>
+        <b>Note:</b> Pre-Cusky releases are not supported by this application.
+        For retrieving changelogs from pre-cusky builds, please use
+        <a href="https://crosland.corp.google.com/" target="_blank">
+          go/crosland
+        </a>.
+      </p>
+      <h2>Find Build</h2>
+      <p>
+        This feature allows you to locate the first build containing a desired
+        CL.
+      </p>
+      <p>
+        It accepts either a CL-number or a commit-SHA as input. Using
+        <a href="https://cos-review.googlesource.com/c/cos/overlays/board-overlays/+/3280" target="_blank">
+          CL 3280
+        </a>
+        as an example, an acceptable input would be either <b>3280</b> or
+        <b>18d4ce4</b>.
+      </p>
+      <p>
+        As an output, the page provides the build number for the first build
+        containing a CL. In some cases, the output may not map to a released
+        COS build. However, any build number that sequentially follows it is
+        guaranteed to contain the desired change.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

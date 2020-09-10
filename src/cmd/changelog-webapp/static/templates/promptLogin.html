@@ -1,7 +1,7 @@
 <html>
 <head>
   <title>Login Required</title>
-  <meta name="description" content="Google COS build information">
+  <meta name="description" content="Login required to continue">
   <link rel="stylesheet" href="/static/css/base.css">
 </head>
 <body>
@@ -21,12 +21,14 @@
     {{else}}
       <a href="/findbuild/">Find Build</a>
     {{end}}
+    <a href="/readme/">Readme</a>
   </div>
   <div class="main">
     <div class="text-content">
       <h1>Please sign in to use this feature</h1>
-      <p>This application requires OAuth authentication to communicate with Google Git repositories. Your account data
-        will not be used for any other purposes. To continue, please sign in by clicking 
+      <p>This application requires OAuth authentication to communicate with
+        Google Git repositories. Your account data will not be used for any
+        other purposes. To continue, please sign in by clicking
         <a href="/login/?redirect={{.ActivePage}}">here</a>.
       </p>
     </div>
