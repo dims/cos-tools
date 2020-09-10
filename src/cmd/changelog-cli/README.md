@@ -5,21 +5,27 @@ An application that generates build changelogs and locates the first build conta
 ## Usage
 
 ### Retrieve Changelog
-Run with `./changelog --mode changelog [options] source_build_number target_build_number`
+Retrieve the commit changelog between two builds.
 
-Example: `./changelog --gob cos.googlesource.com --repo cos/manifest-snapshots 15037.0.0 15045.0.0`
+Run with `./changelog --mode changelog [options] [build-number || image-name] [build-number || image-name]`
+
+Example: `./changelog --gob cos.googlesource.com --repo cos/manifest-snapshots cos-rc-85-13310-1034-0 15045.0.0`
 
 ### Find First Build Containing CL
-Run with `./changelog --mode findbuild [options] CL-number or commit SHA`
+Retrieve the first build containing a CL.
 
-Example: `./changelog --mode findbuild 2781`
+Run with `./changelog --mode findbuild [options] [CL-number || commit-SHA]`
+
+Example using CL-Number: `./changelog --mode findbuild 3280`
+
+Example using Commit-SHA: `./changelog --mode findbuild 18d4ce48c1dc2f530120f85973fec348367f78a0`
 
 ## Commands
 `./changelog --help` to see a list of commands or get help for one command
 
 ## Global Options
 
-`--mode | -m`: Specifies the query mode. Acceptable values: changelog | findbuild
+`--mode | -m`: Specifies the query mode. Acceptable values: [changelog || findbuild]
 
 `--gerrit URL`: (optional) Specifies the Gerrit instance to query from, with the `https://` prefix. It will use `https://cos-review.googlesource.com` by default.
 
@@ -48,4 +54,5 @@ All commits that were present in the source build number but not present in the 
 Prints the first build number that includes the input CL.
 
 ## Notes
-* Changelog only supports querying from build numbers from [COS GoB](cos.googlesource.com). It does not support build numbers generated using [ChromiumOS GoB](https://chromium.googlesource.com/).
+* Changelog only supports Cusky builds. For retrieving changelogs from Pre-Cusky builds, please use go/crosland.
+* Changelog only supports image names satisfying the regex `^cos-(dev-|beta-|stable-|rc-)?\d+-([\d-]+)$`

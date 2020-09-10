@@ -133,8 +133,12 @@ func main() {
 	var mode, gobURL, gerritURL, fallbackURL, manifestRepo, fallbackPrefix string
 	var debug bool
 	app := &cli.App{
-		Name:  "changelog",
+		Name:  "changelog-cli",
 		Usage: "get commits between builds or first build containing CL",
+		Description: fmt.Sprintf("%s\n   %s",
+			"changelog usage: ./changelog-cli -m changelog [build-number || image-name] [build-number || image-name]",
+			"findbuild usage: ./changelog-cli -m findbuild [CL-number || commit-SHA]",
+		),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "mode",
@@ -191,13 +195,13 @@ func main() {
 			switch mode {
 			case "findbuild":
 				if c.NArg() != 1 {
-					return errors.New("Must specify CL number or change ID")
+					return errors.New("must specify CL number (ex. 3280) or commit SHA (ex. 18d4ce48c1dc2f530120f85973fec348367f78a0)")
 				}
 				targetCL := c.Args().Get(0)
 				return getBuildForCL(gerritURL, fallbackURL, gobURL, manifestRepo, fallbackPrefix, targetCL)
 			case "changelog":
 				if c.NArg() != 2 {
-					return errors.New("Must specify source and target build number")
+					return errors.New("must specify two build numbers (ex. 13310.1034.0) or image names (ex. cos-rc-85-13310-1034-0) to retrieve changelog")
 				}
 				source := c.Args().Get(0)
 				target := c.Args().Get(1)
