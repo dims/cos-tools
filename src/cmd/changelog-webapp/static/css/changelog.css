@@ -48,6 +48,11 @@ td {
     margin: 3px 0px 3px 4px;
 }
 
+.sha-legend a {
+    font-size: 14px;
+    margin: 4px;
+}
+
 .circle {
     border-radius: 50%;
     display: inline-block;
