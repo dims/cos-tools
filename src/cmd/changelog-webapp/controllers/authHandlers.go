@@ -134,12 +134,6 @@ func RequireToken(w http.ResponseWriter, r *http.Request, activePage string) boo
 		}
 		return true
 	}
-	// If token is expired, auto refresh instead of prompting sign in
-	if tokenExpired(r) {
-		loginURL := GetLoginURL(activePage, true)
-		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
-		return true
-	}
 	return false
 }
 
