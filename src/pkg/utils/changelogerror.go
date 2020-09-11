@@ -43,14 +43,6 @@ var (
 		codes.DataLoss.String():           "500",
 	}
 
-	// ChangeIDUnsupported returns a ChangelogError object for findbuild indicating an
-	// invalid CL identifier was provided for findbuild
-	ChangeIDUnsupported = &UtilChangelogError{
-		httpCode: "400",
-		header:   "Change-ID Not Supported",
-		err:      "Change-ID is not a supported input format. Please enter either a CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) for a submitted CL.",
-	}
-
 	// ForbiddenError is a ChangelogError object indicating the user does not have
 	// permission to access a resource
 	ForbiddenError = &UtilChangelogError{
@@ -76,14 +68,16 @@ type ChangelogError interface {
 	HTTPCode() string
 	Header() string
 	HTMLError() string
+	Retryable() bool
 }
 
 // UtilChangelogError implements the ChangelogError interface
 type UtilChangelogError struct {
-	httpCode string
-	header   string
-	err      string
-	htmlErr  string
+	httpCode  string
+	header    string
+	err       string
+	htmlErr   string
+	retryable bool
 }
 
 // HTTPCode retrieves the HTTP error code associated with the error
@@ -109,6 +103,12 @@ func (e *UtilChangelogError) HTMLError() string {
 		return e.htmlErr
 	}
 	return e.Error()
+}
+
+// Retryable indicates whether increasing the search range
+// could resolve this error
+func (e *UtilChangelogError) Retryable() bool {
+	return e.retryable
 }
 
 func unwrapError(err error) error {
@@ -139,7 +139,7 @@ func CLNotFound(clID string) *UtilChangelogError {
 	return &UtilChangelogError{
 		httpCode: "404",
 		header:   "CL Not Found",
-		err:      fmt.Sprintf("CL/Commit-SHA %s not found. Please enter either the CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.", clID),
+		err:      fmt.Sprintf("No CL was found matching the identifier: %s. Please enter either the CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.", clID),
 	}
 }
 
@@ -149,10 +149,11 @@ func CLLandingNotFound(clID, instanceURL string) *UtilChangelogError {
 	errStrFmt := "No build was found containing %s."
 	link := clLink(clID, instanceURL)
 	return &UtilChangelogError{
-		httpCode: "404",
-		header:   "No Build Found",
-		err:      fmt.Sprintf(errStrFmt, "CL "+clID),
-		htmlErr:  fmt.Sprintf(errStrFmt, link),
+		httpCode:  "404",
+		header:    "No Build Found",
+		err:       fmt.Sprintf(errStrFmt, "CL "+clID),
+		htmlErr:   fmt.Sprintf(errStrFmt, link),
+		retryable: true,
 	}
 }
 
@@ -160,7 +161,7 @@ func CLLandingNotFound(clID, instanceURL string) *UtilChangelogError {
 // that the repository and branch associated with a CL was not found in any
 // manifest files
 func CLNotUsed(clID, repo, branch, instanceURL string) *UtilChangelogError {
-	errStrFmt := "%s modifies the %s repository on the %s branch, which was not used by builds near its submission time."
+	errStrFmt := "%s modifies the %s repository on the %s branch, which has not been used in COS builds since the CL's submission."
 	link := clLink(clID, instanceURL)
 	return &UtilChangelogError{
 		httpCode: "406",

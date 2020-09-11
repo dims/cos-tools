@@ -101,6 +101,8 @@ func TestBuildNotFound(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedErrStr, err.HTMLError())
+	} else if err.Retryable() {
+		t.Errorf("expected retryable = false, got true")
 	}
 }
 
@@ -108,7 +110,7 @@ func TestCLNotFound(t *testing.T) {
 	clID := "1540"
 	expectedCode := "404"
 	expectedErrHeader := "CL Not Found"
-	expectedErrStr := fmt.Sprintf("CL/Commit-SHA %s not found. Please enter either the CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.", clID)
+	expectedErrStr := fmt.Sprintf("No CL was found matching the identifier: %s. Please enter either the CL-number (example: 3206) or a Commit-SHA (example: I7e549d7753cc7acec2b44bb5a305347a97719ab9) of a submitted CL.", clID)
 	err := CLNotFound(clID)
 	if err.HTTPCode() != expectedCode {
 		t.Errorf("expected HTTP code %s, got %s", expectedCode, err.HTTPCode())
@@ -118,6 +120,8 @@ func TestCLNotFound(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedErrStr, err.HTMLError())
+	} else if err.Retryable() {
+		t.Errorf("expected retryable = false, got true")
 	}
 }
 
@@ -137,6 +141,8 @@ func TestCLLandingNotFound(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedHTMLErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedHTMLErrStr, err.HTMLError())
+	} else if !err.Retryable() {
+		t.Errorf("expected retryable = true, got false")
 	}
 }
 
@@ -146,9 +152,9 @@ func TestCLNotUsed(t *testing.T) {
 	branch := "master"
 	expectedCode := "406"
 	expectedErrHeader := "CL Not Used"
-	expectedErrStr := fmt.Sprintf("CL %s modifies the %s repository on the %s branch, which was not used by builds near its submission time.", clID, repo, branch)
+	expectedErrStr := fmt.Sprintf("CL %s modifies the %s repository on the %s branch, which has not been used in COS builds since the CL's submission.", clID, repo, branch)
 	link := testCLLink(clID, testInstanceURL)
-	expectedHTMLErrStr := fmt.Sprintf("%s modifies the %s repository on the %s branch, which was not used by builds near its submission time.", link, repo, branch)
+	expectedHTMLErrStr := fmt.Sprintf("%s modifies the %s repository on the %s branch, which has not been used in COS builds since the CL's submission.", link, repo, branch)
 	err := CLNotUsed(clID, repo, branch, testInstanceURL)
 	if err.HTTPCode() != expectedCode {
 		t.Errorf("expected HTTP code %s, got %s", expectedCode, err.HTTPCode())
@@ -158,6 +164,8 @@ func TestCLNotUsed(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedHTMLErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedHTMLErrStr, err.HTMLError())
+	} else if err.Retryable() {
+		t.Errorf("expected retryable = false, got true")
 	}
 }
 
@@ -177,6 +185,8 @@ func TestCLTooRecent(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedHTMLErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedHTMLErrStr, err.HTMLError())
+	} else if err.Retryable() {
+		t.Errorf("expected retryable = false, got true")
 	}
 }
 
@@ -216,5 +226,7 @@ func TestCLInvalidRelease(t *testing.T) {
 		t.Errorf("expected error string %s, got %s", expectedErrStr, err.Error())
 	} else if err.HTMLError() != expectedHTMLErrStr {
 		t.Errorf("expected html error string %s, got %s", expectedHTMLErrStr, err.HTMLError())
+	} else if err.Retryable() {
+		t.Errorf("expected retryable = false, got true")
 	}
 }

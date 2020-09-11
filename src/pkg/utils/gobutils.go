@@ -86,7 +86,7 @@ func nextCommits(client gitilesProto.GitilesClient, repo string, committish stri
 // for a given repository. Returns a list of commits and a bool that is set to true
 // if there are more than querySize commits between the two provided committishs.
 func Commits(client gitilesProto.GitilesClient, repo string, committish string, ancestor string, querySize int) ([]*git.Commit, bool, error) {
-	log.Debugf("Fetching changelog for repo: %s on committish %s\n", repo, committish)
+	log.Debugf("Fetching changelog for repo: %s from: %s to: %s\n", repo, ancestor, committish)
 	if querySize < -1 {
 		return nil, false, fmt.Errorf("commits: %d is not a valid querySize. Please specify a positive querySize, or -1 for all commits", querySize)
 	}

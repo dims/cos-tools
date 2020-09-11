@@ -186,7 +186,7 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	}
 	repos := make(map[string]*repo)
 	for _, project := range root.SelectElements("project") {
-		name, path := project.SelectAttr("name").Value, project.SelectAttr("path").Value
+		name, path := project.SelectAttr("name").Value, project.SelectAttrValue("path", "")
 		repos[repoID(name, path)] = &repo{
 			Repo:        name,
 			Path:        path,

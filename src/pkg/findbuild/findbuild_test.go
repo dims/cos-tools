@@ -110,14 +110,6 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 			ExpectedError:  "406",
 		},
-		"under review CL": {
-			Change:         "1540",
-			GerritHost:     externalGerritURL,
-			GitilesHost:    externalGitilesURL,
-			ManifestRepo:   externalManifestRepo,
-			ShouldFallback: false,
-			ExpectedError:  "406",
-		},
 		"chromium CL": {
 			Change:             "2288114",
 			GerritHost:         externalGerritURL,
@@ -137,14 +129,6 @@ func TestFindCL(t *testing.T) {
 			OutputBuildNum:     "12871.1183.0",
 			ShouldFallback:     false,
 		},
-		"reject change-id": {
-			Change:         "I6cc721e6e61b3863e549045e68c1a2bd363efa0a",
-			GerritHost:     externalGerritURL,
-			GitilesHost:    externalGitilesURL,
-			ManifestRepo:   externalManifestRepo,
-			ShouldFallback: false,
-			ExpectedError:  "400",
-		},
 		"third_party/kernel special branch case": {
 			Change:         "3302",
 			GerritHost:     externalGerritURL,
@@ -161,18 +145,28 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 			ExpectedError:  "406",
 		},
-		"cl fallback earlier than earliest COS build": {
-			Change:             "3740",
+		"invalid release branch": {
+			Change:             "150",
 			GerritHost:         externalGerritURL,
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
 			FallbackPrefix:     fallbackRepoPrefix,
 			ShouldFallback:     true,
-			ExpectedError:      "404",
+			ExpectedError:      "406",
 		},
-		"invalid release branch": {
-			Change:             "150",
+		"exponential search range required": {
+			Change:             "1740206",
+			GerritHost:         externalGerritURL,
+			GitilesHost:        externalGitilesURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			ManifestRepo:       externalManifestRepo,
+			FallbackPrefix:     fallbackRepoPrefix,
+			OutputBuildNum:     "12371.1001.0",
+			ShouldFallback:     true,
+		},
+		"repo not used": {
+			Change:             "2040271",
 			GerritHost:         externalGerritURL,
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
