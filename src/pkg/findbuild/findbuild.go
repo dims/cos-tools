@@ -60,6 +60,8 @@ const (
 	searchRangeMultiplier = 5
 	// Maximum time to wait for a response from a Gerrit or Gitiles request
 	requestMaxAge = 30 * time.Second
+	// Max size of changelog if no changelog source is specified
+	noSourceChangelogSize = 10000
 
 	shortSHALength = 7
 	fullSHALength  = 40
@@ -80,7 +82,17 @@ var (
 			releaseRe:      regexp.MustCompile("(.*)-cos-.*"),
 			defaultRelease: "master",
 		},
+		"chromiumos/third_party/kernel": {
+			releaseRe:      regexp.MustCompile("(.*)-chromeos-.*"),
+			defaultRelease: "master",
+		},
+		"chromiumos/third_party/lakitu-kernel": {
+			releaseRe:      regexp.MustCompile("(.*)-lakitu-.*"),
+			defaultRelease: "master",
+		},
 	}
+	// crosRepoRe is used to strip chromium prefixes from the repo name.
+	crosRepoRe = regexp.MustCompile("^(?:chromeos|chrome|chromiumos|chromium)?/(.*)")
 )
 
 // BuildRequest is the input struct for the FindBuild function
@@ -97,14 +109,6 @@ type BuildRequest struct {
 	// ManifestRepo is the repository the manifest.xml files are located in.
 	// ex. "cos/manifest-snapshots"
 	ManifestRepo string
-	// RepoPrefix is the prefix that will be added to the repository name
-	// when querying GoB using the repository listed in a Gerrit CL.
-	// For example, if a CL in Gerrit is for a change in the
-	// "chromiumos/overlays/chromiumos-overlay" repository, specifying a prefix
-	// of "mirrors/cros" will instruct this package to search in the repository
-	// "mirrors/cros/chromiumos/overlays/chromiumos-overlay". This is useful if
-	// your GerritHost and GitilesHost are not a part of the same instance.
-	RepoPrefix string
 	// CL can be either the CL number or commit SHA of your target CL
 	// ex. 3741 or If9f774179322c413fa0fd5ebb3dd615c5b22cd6c
 	CL string
@@ -128,7 +132,6 @@ type BuildResponse struct {
 type clData struct {
 	CLNum            string
 	InstanceURL      string
-	ProjectPrefix    string
 	Project          string
 	Release          string
 	Branch           string
@@ -141,10 +144,12 @@ type repoData struct {
 	Candidates map[string]string
 	SourceSHA  string
 	TargetSHA  string
+	RemoteURL  string
 }
 
 type manifestResponse struct {
 	BuildNum  string
+	Repo      string
 	SHA       string
 	RemoteURL string
 	Err       error
@@ -191,7 +196,7 @@ func queryCL(client *gerrit.Client, clID, instanceURL string) (*gerrit.Change, u
 	return change, nil
 }
 
-func getCLData(client *gerrit.Client, clID, instanceURL, repoPrefix string) (*clData, utils.ChangelogError) {
+func getCLData(client *gerrit.Client, clID, instanceURL string) (*clData, utils.ChangelogError) {
 	log.Debugf("Retrieving CL data from Gerrit for changeID: %s", clID)
 	change, err := queryCL(client, clID, instanceURL)
 	if err != nil {
@@ -207,17 +212,21 @@ func getCLData(client *gerrit.Client, clID, instanceURL, repoPrefix string) (*cl
 	// repository branch name to a release branch name
 	release := change.Branch
 	if rule, ok := clReleaseMapping[change.Project]; ok {
-		release = rule.defaultRelease
-		matches := rule.releaseRe.FindStringSubmatch(release)
-		if len(matches) == 2 {
+		if matches := rule.releaseRe.FindStringSubmatch(release); matches != nil {
 			release = matches[1]
+		} else {
+			release = rule.defaultRelease
 		}
+	}
+	// Strip chromium prefixes
+	project := change.Project
+	if matches := crosRepoRe.FindStringSubmatch(project); matches != nil {
+		project = matches[1]
 	}
 	return &clData{
 		CLNum:            strconv.Itoa(change.ChangeNumber),
 		InstanceURL:      instanceURL,
-		ProjectPrefix:    repoPrefix,
-		Project:          change.Project,
+		Project:          project,
 		Release:          release,
 		Branch:           change.Branch,
 		Revision:         change.CurrentRevision,
@@ -357,13 +366,18 @@ func manifestData(client gitilesProto.GitilesClient, manifestRepo string, buildN
 	output := manifestResponse{BuildNum: buildNum}
 	for _, project := range root.SelectElements("project") {
 		repo := project.SelectAttr("name").Value
-		branch := project.SelectAttrValue("dest-branch", "")
+		branch := project.SelectAttrValue("upstream", "")
+		if branch == "" {
+			branch = project.SelectAttrValue("dest-branch", "")
+		}
 		// Remove refs/heads/ prefix for branch if specified
 		if len(branch) > 0 {
 			branch = branch[11:]
 		}
-		if strings.Contains(clData.ProjectPrefix+clData.Project, repo) && (branch == "" || branch == clData.Branch) {
+		if strings.Contains(repo, clData.Project) && (branch == "" || branch == clData.Branch) {
+			clData.Project = repo
 			output.SHA = project.SelectAttr("revision").Value
+			output.Repo = repo
 			output.RemoteURL = remoteMap[project.SelectAttrValue("remote", "")]
 		}
 	}
@@ -404,6 +418,10 @@ func getRepoData(client gitilesProto.GitilesClient, manifestRepo string, clData 
 		// CL, need to select the earliest/latest builds that do
 		if buildOrder[curr.BuildNum] > targetOrder {
 			output.TargetSHA = curr.SHA
+			output.RemoteURL = curr.RemoteURL
+			if curr.Repo != "" {
+				clData.Project = curr.Repo
+			}
 			targetOrder = buildOrder[curr.BuildNum]
 		}
 		if buildOrder[curr.BuildNum] < sourceOrder {
@@ -416,7 +434,7 @@ func getRepoData(client gitilesProto.GitilesClient, manifestRepo string, clData 
 	}
 	if len(output.Candidates) == 0 {
 		log.Debugf("getRepoData: No builds found for CL %s", clData.CLNum)
-		return nil, utils.CLNotUsed(clData.CLNum, clData.Project, clData.Branch, clData.InstanceURL)
+		return nil, utils.CLNotUsed(clData.CLNum, clData.Project, clData.Release, clData.InstanceURL)
 	}
 	return &output, nil
 }
@@ -466,10 +484,24 @@ func findBuildInRange(request *BuildRequest, cache *iterCache, clData *clData) (
 	if repoData.TargetSHA == "" {
 		return "", canExpand, utils.CLLandingNotFound(clData.CLNum, request.GerritHost)
 	}
-	changelog, _, err := utils.Commits(cache.GitilesClient, clData.ProjectPrefix+clData.Project, repoData.TargetSHA, repoData.SourceSHA, -1)
+	changelogClient := cache.GitilesClient
+	if repoData.RemoteURL != request.GitilesHost {
+		log.Debugf("Different remote URL used in build, setting remote URL to %s", repoData.RemoteURL)
+		changelogClient, err = gitilesApi.NewRESTClient(request.HTTPClient, repoData.RemoteURL, true)
+		if err != nil {
+			log.Errorf("failed to establish Gitiles client for remote URL %s", repoData.RemoteURL)
+			return "", false, utils.InternalServerError
+		}
+	}
+	querySize := -1
+	if repoData.SourceSHA == "" {
+		querySize = noSourceChangelogSize
+	}
+	changelog, _, err := utils.Commits(changelogClient, clData.Project, repoData.TargetSHA, repoData.SourceSHA, querySize)
 	if err != nil {
+		log.Errorf("failed to retrieve changelog: %v", err)
 		if utils.GitilesErrCode(err) == "404" {
-			return "", canExpand, utils.CLNotUsed(clData.CLNum, clData.Project, clData.Branch, clData.InstanceURL)
+			return "", canExpand, utils.CLNotUsed(clData.CLNum, clData.Project, clData.Release, clData.InstanceURL)
 		}
 		return "", canExpand, utils.InternalServerError
 	}
@@ -542,7 +574,7 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 		log.Errorf("failed to establish Gitiles client for host %s:\n%v", request.GitilesHost, err)
 		return nil, utils.InternalServerError
 	}
-	clData, clErr := getCLData(gerritClient, request.CL, request.GerritHost, request.RepoPrefix)
+	clData, clErr := getCLData(gerritClient, request.CL, request.GerritHost)
 	if clErr != nil {
 		return nil, clErr
 	}

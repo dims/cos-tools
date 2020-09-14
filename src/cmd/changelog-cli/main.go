@@ -48,7 +48,6 @@ const (
 	fallbackGerritURL    = "https://chromium-review.googlesource.com"
 	externalGoBURL       = "cos.googlesource.com"
 	externalManifestRepo = "cos/manifest-snapshots"
-	fallbackRepoPrefix   = "mirrors/cros/"
 )
 
 func getHTTPClient() (*http.Client, error) {
@@ -96,7 +95,7 @@ func generateChangelog(source, target, instance, manifestRepo string) error {
 	return nil
 }
 
-func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL string) error {
+func getBuildForCL(gerrit, fallback, gob, manifestRepo, targetCL string) error {
 	httpClient, err := getHTTPClient()
 	if err != nil {
 		return fmt.Errorf("error creating http client: %v", err)
@@ -106,7 +105,6 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 		GerritHost:   gerrit,
 		GitilesHost:  gob,
 		ManifestRepo: manifestRepo,
-		RepoPrefix:   "",
 		CL:           targetCL,
 	}
 	buildData, clErr := findbuild.FindBuild(req)
@@ -117,7 +115,6 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 			GerritHost:   fallback,
 			GitilesHost:  gob,
 			ManifestRepo: manifestRepo,
-			RepoPrefix:   fallbackPrefix,
 			CL:           targetCL,
 		}
 		buildData, clErr = findbuild.FindBuild(fallbackReq)
@@ -130,7 +127,7 @@ func getBuildForCL(gerrit, fallback, gob, manifestRepo, fallbackPrefix, targetCL
 }
 
 func main() {
-	var mode, gobURL, gerritURL, fallbackURL, manifestRepo, fallbackPrefix string
+	var mode, gobURL, gerritURL, fallbackURL, manifestRepo string
 	var debug bool
 	app := &cli.App{
 		Name:  "changelog-cli",
@@ -173,13 +170,6 @@ func main() {
 				Usage:       "`REPO` containing Manifest file",
 				Destination: &manifestRepo,
 			},
-			&cli.StringFlag{
-				Name:        "prefix",
-				Value:       fallbackRepoPrefix,
-				Aliases:     []string{"p"},
-				Usage:       "`PREFIX` prepended to repo when querying GoB using fallback Gerrit results",
-				Destination: &fallbackPrefix,
-			},
 			&cli.BoolFlag{
 				Name:        "debug",
 				Value:       false,
@@ -198,7 +188,7 @@ func main() {
 					return errors.New("must specify CL number (ex. 3280) or commit SHA (ex. 18d4ce48c1dc2f530120f85973fec348367f78a0)")
 				}
 				targetCL := c.Args().Get(0)
-				return getBuildForCL(gerritURL, fallbackURL, gobURL, manifestRepo, fallbackPrefix, targetCL)
+				return getBuildForCL(gerritURL, fallbackURL, gobURL, manifestRepo, targetCL)
 			case "changelog":
 				if c.NArg() != 2 {
 					return errors.New("must specify two build numbers (ex. 13310.1034.0) or image names (ex. cos-rc-85-13310-1034-0) to retrieve changelog")

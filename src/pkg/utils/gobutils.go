@@ -113,6 +113,7 @@ func Commits(client gitilesProto.GitilesClient, repo string, committish string, 
 			pageSize *= pageSizeGrowthMultiplier
 		}
 		pageSize = limitPageSize(pageSize, querySize, noLimit)
+		log.Debugf("More commits remaining, expanding page size to %d commits", pageSize)
 		querySize -= pageSize
 		response, err = nextCommits(client, repo, committish, ancestor, response.NextPageToken, pageSize)
 		if err != nil {

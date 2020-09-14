@@ -35,8 +35,6 @@ Example using Commit-SHA: `./changelog --mode findbuild 18d4ce48c1dc2f530120f859
 
 `--repo`: (optional) Specifies the repository for manifest-snapshot files within the Git on Borg instance. It will use `cos/manifest-snapshots` by default.
 
-`--prefix`: (optional) Specifies a repository prefix for CLs retrieved from the fallback Gerrit instance. For example, a prefix of `mirrors/cros/` for a CL in repository `chromiumos/overlays/chromiumos-overlay` will instruct the program to search the repository `mirrors/cros/chromiumos/overlays/chromiumos-overlay` in Git on Borg. It will use `mirrors/cros/` by default.
-
 `--debug | -d`: (optional) Enables debug messages.
 
 ## Output

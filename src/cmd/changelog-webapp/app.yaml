@@ -11,7 +11,6 @@ env_variables:
   # Webpage configuration
   STATIC_BASE_PATH: "src/cmd/changelog-webapp/static/"
   CHANGELOG_QUERY_SIZE: "50"
-  COS_FALLBACK_REPO_PREFIX: "mirrors/cros/"
 
   # External sources
   COS_EXTERNAL_GERRIT_INSTANCE: "https://cos-review.googlesource.com"

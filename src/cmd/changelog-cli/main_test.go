@@ -25,11 +25,10 @@ import (
 )
 
 const (
-	gerritURL      = "https://cos-review.googlesource.com"
-	fallbackURLs   = "https://chromium-review.googlesource.com"
-	gitilesURL     = "cos.googlesource.com"
-	manifestRepo   = "cos/manifest-snapshots"
-	fallbackPrefix = "mirrors/cros/"
+	gerritURL    = "https://cos-review.googlesource.com"
+	fallbackURLs = "https://chromium-review.googlesource.com"
+	gitilesURL   = "cos.googlesource.com"
+	manifestRepo = "cos/manifest-snapshots"
 )
 
 var (
@@ -279,7 +278,7 @@ func TestFindBuild(t *testing.T) {
 		},
 		"test fallback string flags": {
 			CL:     "2288114",
-			Args:   []string{"-gerrit", gerritURL, "-fallback", fallbackURLs, "-gob", gitilesURL, "-repo", manifestRepo, "-prefix", fallbackPrefix},
+			Args:   []string{"-gerrit", gerritURL, "-fallback", fallbackURLs, "-gob", gitilesURL, "-repo", manifestRepo},
 			Output: "Build: 15049.0.0\n",
 		},
 		"invalid gob": {
@@ -295,11 +294,6 @@ func TestFindBuild(t *testing.T) {
 		"invalid fallback": {
 			CL:        "2288114",
 			Args:      []string{"-gerrit", gerritURL, "-fallback", "https://zop-review.googlesource.com", "-gob", gitilesURL, "-repo", manifestRepo},
-			ShouldErr: true,
-		},
-		"invalid prefix": {
-			CL:        "2288114",
-			Args:      []string{"-gerrit", gerritURL, "-fallback", fallbackURLs, "-gob", gitilesURL, "-repo", manifestRepo, "-prefix", "mirrors/zop"},
 			ShouldErr: true,
 		},
 		"non-existant cl": {

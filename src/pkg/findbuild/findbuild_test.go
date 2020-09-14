@@ -30,7 +30,6 @@ const (
 	externalGitilesURL        string = "cos.googlesource.com"
 	externalFallbackGerritURL string = "https://chromium-review.googlesource.com"
 	externalManifestRepo      string = "cos/manifest-snapshots"
-	fallbackRepoPrefix        string = "mirrors/cros/"
 )
 
 func getHTTPClient() (*http.Client, error) {
@@ -47,7 +46,6 @@ func TestFindCL(t *testing.T) {
 		GerritHost         string
 		GitilesHost        string
 		FallbackGerritHost string
-		FallbackPrefix     string
 		ManifestRepo       string
 		OutputBuildNum     string
 		ShouldFallback     bool
@@ -116,7 +114,6 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
-			FallbackPrefix:     fallbackRepoPrefix,
 			OutputBuildNum:     "15049.0.0",
 			ShouldFallback:     true,
 		},
@@ -137,6 +134,14 @@ func TestFindCL(t *testing.T) {
 			OutputBuildNum: "15088.0.0",
 			ShouldFallback: false,
 		},
+		"third_party/kernel release branch": {
+			Change:         "4983",
+			GerritHost:     externalGerritURL,
+			GitilesHost:    externalGitilesURL,
+			ManifestRepo:   externalManifestRepo,
+			OutputBuildNum: "12871.1192.0",
+			ShouldFallback: false,
+		},
 		"branch not in manifest": {
 			Change:         "1592",
 			GerritHost:     externalGerritURL,
@@ -151,7 +156,6 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
-			FallbackPrefix:     fallbackRepoPrefix,
 			ShouldFallback:     true,
 			ExpectedError:      "406",
 		},
@@ -161,19 +165,17 @@ func TestFindCL(t *testing.T) {
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
-			FallbackPrefix:     fallbackRepoPrefix,
 			OutputBuildNum:     "12371.1001.0",
 			ShouldFallback:     true,
 		},
-		"repo not used": {
-			Change:             "2040271",
+		"chromeos branch": {
+			Change:             "2036225",
 			GerritHost:         externalGerritURL,
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
 			ManifestRepo:       externalManifestRepo,
-			FallbackPrefix:     fallbackRepoPrefix,
+			OutputBuildNum:     "12371.1001.0",
 			ShouldFallback:     true,
-			ExpectedError:      "406",
 		},
 	}
 
@@ -185,7 +187,6 @@ func TestFindCL(t *testing.T) {
 				GerritHost:   test.GerritHost,
 				GitilesHost:  test.GitilesHost,
 				ManifestRepo: test.ManifestRepo,
-				RepoPrefix:   "",
 				CL:           test.Change,
 			}
 			res, err := FindBuild(req)
@@ -198,7 +199,6 @@ func TestFindCL(t *testing.T) {
 					GerritHost:   test.FallbackGerritHost,
 					GitilesHost:  test.GitilesHost,
 					ManifestRepo: test.ManifestRepo,
-					RepoPrefix:   test.FallbackPrefix,
 					CL:           test.Change,
 				}
 				res, err = FindBuild(fallbackReq)

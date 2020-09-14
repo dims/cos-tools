@@ -44,7 +44,6 @@ var (
 	externalFallbackGerritInstance string
 	externalGoBInstance            string
 	externalManifestRepo           string
-	fallbackRepoPrefix             string
 	envQuerySize                   string
 
 	staticBasePath          string
@@ -83,7 +82,6 @@ func init() {
 	externalFallbackGerritInstance = os.Getenv("COS_EXTERNAL_FALLBACK_GERRIT_INSTANCE")
 	externalGoBInstance = os.Getenv("COS_EXTERNAL_GOB_INSTANCE")
 	externalManifestRepo = os.Getenv("COS_EXTERNAL_MANIFEST_REPO")
-	fallbackRepoPrefix = os.Getenv("COS_FALLBACK_REPO_PREFIX")
 	envQuerySize = getIntVerifiedEnv("CHANGELOG_QUERY_SIZE")
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
@@ -250,7 +248,6 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 		GerritHost:   gerrit,
 		GitilesHost:  gob,
 		ManifestRepo: repo,
-		RepoPrefix:   "",
 		CL:           cl,
 	}
 	buildData, err := findbuild.FindBuild(request)
@@ -261,7 +258,6 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 			GerritHost:   fallbackGerrit,
 			GitilesHost:  gob,
 			ManifestRepo: repo,
-			RepoPrefix:   fallbackRepoPrefix,
 			CL:           cl,
 		}
 		buildData, err = findbuild.FindBuild(fallbackRequest)
