@@ -400,9 +400,9 @@ func HandleFindBuild(w http.ResponseWriter, r *http.Request) {
 	}
 	var gerritLink string
 	if didFallback {
-		gerritLink = fallbackGerrit + "/q/" + buildData.CLNum
+		gerritLink = fallbackGerrit + "/c/" + buildData.CLNum
 	} else {
-		gerritLink = gerrit + "/q/" + buildData.CLNum
+		gerritLink = gerrit + "/c/" + buildData.CLNum
 	}
 	page := &findBuildPage{
 		CL:         cl,

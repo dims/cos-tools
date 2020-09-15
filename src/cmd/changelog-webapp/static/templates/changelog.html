@@ -32,15 +32,15 @@
       <div class="text">
         <label>From </label>
         {{if (ne .Source "")}}
-          <input type="text" class="source" name="source" placeholder="Image Name or Build Number" value={{.Source}} autocomplete="off" required>
+          <input type="text" class="source" name="source" placeholder="Image Name or Build Number" value={{.Source}} required>
         {{else}}
-          <input type="text" class="source" name="source" placeholder="Image Name or Build Number" autocomplete="off" required>
+          <input type="text" class="source" name="source" placeholder="Image Name or Build Number" required>
         {{end}}
         <label> to </label>
         {{if (ne .Target "")}}
-          <input type="text" class="target" name="target" placeholder="Image Name or Build Number" value={{.Target}} autocomplete="off" required>
+          <input type="text" class="target" name="target" placeholder="Image Name or Build Number" value={{.Target}} required>
         {{else}}
-          <input type="text" class="target" name="target" placeholder="Image Name or Build Number" autocomplete="off" required>
+          <input type="text" class="target" name="target" placeholder="Image Name or Build Number" required>
         {{end}}
         <input type="hidden" name="n" value={{.QuerySize}}>
         <input class="submit" type="submit" value="Submit"><br>

@@ -130,7 +130,7 @@ func BuildNotFound(buildNumber string) *UtilChangelogError {
 }
 
 func clLink(clID, instanceURL string) string {
-	return fmt.Sprintf("<a href=\"%s/q/%s\" target=\"_blank\">CL %s</a>", instanceURL, clID, clID)
+	return fmt.Sprintf("<a href=\"%s/c/%s\" target=\"_blank\">CL %s</a>", instanceURL, clID, clID)
 }
 
 // CLNotFound returns a ChangelogError object for findbuild indicating the provided

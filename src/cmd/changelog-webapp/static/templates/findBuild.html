@@ -37,9 +37,9 @@
     <form class="changelog-form" action="/findbuild">
       <div class="text">
         {{if (ne .CL "")}}
-          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" value={{.CL}} autocomplete="off" required>
+          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" value={{.CL}} required>
         {{else}}
-          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" autocomplete="off" required>
+          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" required>
         {{end}}
         <input class="submit" type="submit" value="Submit"><br>
       </div>
