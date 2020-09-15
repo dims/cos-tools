@@ -360,8 +360,8 @@ func TestChangelog(t *testing.T) {
 	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if err != nil {
 		t.Errorf("Changelog failed, expected no error, got %v", err)
-	} else if len(additions) == 0 {
-		t.Errorf("Changelog failed, expected non-empty additions, got %v", additions)
+	} else if len(additions) != 0 {
+		t.Errorf("Changelog failed, expected empty additions, got %v", additions)
 	} else if len(removals) == 0 {
 		t.Errorf("Changelog failed, expected non-empty removals, got %v", removals)
 	}

@@ -108,16 +108,6 @@ func resolveImageName(imageName string) string {
 	return buildNum
 }
 
-// Creates a unique identifier for a repo + branch pairing.
-// Path is used instead of dest-branch because some manifest files do not
-// indicate a dest-branch for a project.
-// Path itself is not sufficient to guarantee uniqueness, since some repos
-// share the same path.
-// ex. mirrors/cros/chromiumos/repohooks vs cos/repohooks
-func repoID(name, path string) string {
-	return name + path
-}
-
 // limitPageSize will restrict a request page size to min of pageSize (which grows exponentially)
 // or remaining request size
 func limitPageSize(pageSize, requestedSize int) int {
@@ -187,7 +177,7 @@ func repoMap(manifest string) (map[string]*repo, error) {
 	repos := make(map[string]*repo)
 	for _, project := range root.SelectElements("project") {
 		name, path := project.SelectAttr("name").Value, project.SelectAttrValue("path", "")
-		repos[repoID(name, path)] = &repo{
+		repos[path] = &repo{
 			Repo:        name,
 			Path:        path,
 			InstanceURL: remoteMap[project.SelectAttrValue("remote", "")],
@@ -229,11 +219,24 @@ func commits(req commitsRequest) {
 	log.Debugf("Fetching changelog for repo: %s on committish %s\n", req.Repo, req.Committish)
 	commits, hasMoreCommits, err := utils.Commits(req.Client, req.Repo, req.Committish, req.Ancestor, req.QuerySize)
 	if err != nil {
-		req.OutputChan <- commitsResult{Err: utils.InternalServerError}
+		if utils.GitilesErrCode(err) == "404" {
+			req.OutputChan <- commitsResult{
+				InstanceURL: req.InstanceURL,
+				Path:        req.Path,
+				Repo:        req.Repo,
+			}
+		} else {
+			log.Errorf("commits: error retrieving commit changelog on repo %s from commit %s to commit %s:\n%v", req.Repo, req.Committish, req.Ancestor, err)
+			req.OutputChan <- commitsResult{Err: utils.InternalServerError}
+		}
+		return
+	}
+	if commits == nil {
+		log.Info(req.Repo, req.Committish, req.Ancestor)
 	}
 	parsedCommits, err := ParseGitCommitLog(commits)
 	if err != nil {
-		log.Errorf("commits: Error parsing Gitiles commits response\n%v", err)
+		log.Errorf("commits: error parsing Gitiles commits response\n%v", err)
 		req.OutputChan <- commitsResult{Err: utils.InternalServerError}
 		return
 	}
@@ -279,7 +282,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 			return
 		}
 		var sourceSHA string
-		if sourceData, ok := sourceRepos[repoID(res.Repo, res.Path)]; ok {
+		if sourceData, ok := sourceRepos[res.Path]; ok {
 			sourceSHA = sourceData.Committish
 		}
 		if len(res.Commits) > 0 {
@@ -289,7 +292,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 				InstanceURL:    res.InstanceURL,
 				Repo:           res.Repo,
 				SourceSHA:      sourceSHA,
-				TargetSHA:      targetRepos[repoID(res.Repo, res.Path)].Committish,
+				TargetSHA:      targetRepos[res.Path].Committish,
 			}
 		}
 	}
@@ -361,11 +364,11 @@ func Changelog(httpClient *http.Client, source, target, host, repo, croslandURL 
 	go additions(clients, targetRepos, sourceRepos, querySize, missChan)
 	missRes := <-missChan
 	if missRes.Err != nil {
-		return nil, nil, err
+		return nil, nil, missRes.Err
 	}
 	addRes := <-addChan
 	if addRes.Err != nil {
-		return nil, nil, err
+		return nil, nil, addRes.Err
 	}
 
 	return addRes.Additions, missRes.Additions, nil
