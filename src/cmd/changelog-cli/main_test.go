@@ -304,10 +304,6 @@ func TestFindBuild(t *testing.T) {
 			CL:        "1540",
 			ShouldErr: true,
 		},
-		"invalid cl identifier": {
-			CL:        "I6cc721e6e61b3863e549045e68c1a2bd363efa0a",
-			ShouldErr: true,
-		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

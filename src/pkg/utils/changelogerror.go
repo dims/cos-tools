@@ -149,7 +149,7 @@ func CLLandingNotFound(clID, instanceURL string) *UtilChangelogError {
 	errStrFmt := "No build was found containing %s."
 	link := clLink(clID, instanceURL)
 	return &UtilChangelogError{
-		httpCode:  "404",
+		httpCode:  "406",
 		header:    "No Build Found",
 		err:       fmt.Sprintf(errStrFmt, "CL "+clID),
 		htmlErr:   fmt.Sprintf(errStrFmt, link),

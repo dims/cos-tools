@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"go.chromium.org/luci/common/api/gerrit"
 	"golang.org/x/oauth2"
@@ -51,6 +52,15 @@ func TestFindCL(t *testing.T) {
 		ShouldFallback     bool
 		ExpectedError      string
 	}{
+		"exponential search range required": {
+			Change:             "1740206",
+			GerritHost:         externalGerritURL,
+			GitilesHost:        externalGitilesURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			ManifestRepo:       externalManifestRepo,
+			OutputBuildNum:     "12371.1001.0",
+			ShouldFallback:     true,
+		},
 		"invalid host": {
 			Change:         "3781",
 			GerritHost:     "https://zop-review.googlesource.com",
@@ -143,12 +153,12 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 		},
 		"branch not in manifest": {
-			Change:         "1592",
-			GerritHost:     externalGerritURL,
-			GitilesHost:    externalGitilesURL,
-			ManifestRepo:   externalManifestRepo,
-			ShouldFallback: false,
-			ExpectedError:  "406",
+			Change:             "1592",
+			GerritHost:         externalGerritURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			GitilesHost:        externalGitilesURL,
+			ManifestRepo:       externalManifestRepo,
+			ExpectedError:      "406",
 		},
 		"invalid release branch": {
 			Change:             "150",
@@ -158,15 +168,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:       externalManifestRepo,
 			ShouldFallback:     true,
 			ExpectedError:      "406",
-		},
-		"exponential search range required": {
-			Change:             "1740206",
-			GerritHost:         externalGerritURL,
-			GitilesHost:        externalGitilesURL,
-			FallbackGerritHost: externalFallbackGerritURL,
-			ManifestRepo:       externalManifestRepo,
-			OutputBuildNum:     "12371.1001.0",
-			ShouldFallback:     true,
 		},
 		"chromeos branch": {
 			Change:             "2036225",
@@ -181,38 +182,37 @@ func TestFindCL(t *testing.T) {
 
 	httpClient, _ := getHTTPClient()
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			req := &BuildRequest{
+		req := &BuildRequest{
+			HTTPClient:   httpClient,
+			GerritHost:   test.GerritHost,
+			GitilesHost:  test.GitilesHost,
+			ManifestRepo: test.ManifestRepo,
+			CL:           test.Change,
+		}
+		res, err := FindBuild(req)
+		if err != nil && err.HTTPCode() != "404" && test.ShouldFallback {
+			t.Fatalf("test \"%s\" failed:\nexpected not found error, got %v", name, err)
+		}
+		if err != nil && err.HTTPCode() == "404" {
+			fallbackReq := &BuildRequest{
 				HTTPClient:   httpClient,
-				GerritHost:   test.GerritHost,
+				GerritHost:   test.FallbackGerritHost,
 				GitilesHost:  test.GitilesHost,
 				ManifestRepo: test.ManifestRepo,
 				CL:           test.Change,
 			}
-			res, err := FindBuild(req)
-			if err != nil && err.HTTPCode() != "404" && test.ShouldFallback {
-				t.Fatalf("expected not found error, got %v", err)
-			}
-			if err != nil && err.HTTPCode() == "404" {
-				fallbackReq := &BuildRequest{
-					HTTPClient:   httpClient,
-					GerritHost:   test.FallbackGerritHost,
-					GitilesHost:  test.GitilesHost,
-					ManifestRepo: test.ManifestRepo,
-					CL:           test.Change,
-				}
-				res, err = FindBuild(fallbackReq)
-			}
-			switch {
-			case test.ExpectedError == "" && err != nil:
-				t.Fatalf("expected no error, got %v", err)
-			case test.ExpectedError != "" && err == nil:
-				t.Fatalf("expected error code %s, got nil err", test.ExpectedError)
-			case test.ExpectedError != "" && err != nil && test.ExpectedError != err.HTTPCode():
-				t.Fatalf("expected error code %s, got error code %s", test.ExpectedError, err.HTTPCode())
-			case test.ExpectedError == "" && res.BuildNum != test.OutputBuildNum:
-				t.Fatalf("expected output %s, got %s", test.OutputBuildNum, res)
-			}
-		})
+			res, err = FindBuild(fallbackReq)
+		}
+		switch {
+		case test.ExpectedError == "" && err != nil:
+			t.Fatalf("test \"%s\" failed:\nexpected no error, got %v", name, err)
+		case test.ExpectedError != "" && err == nil:
+			t.Fatalf("test \"%s\" failed:\nexpected error code %s, got nil err", name, test.ExpectedError)
+		case test.ExpectedError != "" && err != nil && test.ExpectedError != err.HTTPCode():
+			t.Fatalf("test \"%s\" failed:\nexpected error code %s, got error code %s", name, test.ExpectedError, err.HTTPCode())
+		case test.ExpectedError == "" && res.BuildNum != test.OutputBuildNum:
+			t.Fatalf("test \"%s\" failed:\nexpected output %s, got %s", name, test.OutputBuildNum, res)
+		}
+		time.Sleep(time.Second * 5)
 	}
 }
