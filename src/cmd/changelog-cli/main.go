@@ -78,7 +78,7 @@ func generateChangelog(source, target, instance, manifestRepo string) error {
 	if err != nil {
 		return fmt.Errorf("generateChangelog: failed to create http client: \n%v", err)
 	}
-	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo, -1)
+	sourceToTargetChanges, targetToSourceChanges, err := changelog.Changelog(httpClient, source, target, instance, manifestRepo, "", -1)
 	if err != nil {
 		return fmt.Errorf("generateChangelog: error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v",
 			source, target, instance, manifestRepo, err)

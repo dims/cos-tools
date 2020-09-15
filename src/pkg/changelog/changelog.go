@@ -105,7 +105,7 @@ func resolveImageName(imageName string) string {
 	}
 	buildNum := strings.Replace(build[2], "-", ".", 3)
 	log.Debugf("resolveImageName: image name %s was resolved to build number %s", imageName, buildNum)
-	return strings.Replace(build[2], "-", ".", 3)
+	return buildNum
 }
 
 // Creates a unique identifier for a repo + branch pairing.
@@ -320,7 +320,7 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 //
 // The second changelog contains all commits that are present in the source build
 // but not present in the target build
-func Changelog(httpClient *http.Client, source string, target string, host string, repo string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
+func Changelog(httpClient *http.Client, source, target, host, repo, croslandURL string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
 	if httpClient == nil {
 		log.Error("httpClient is nil")
 		return nil, nil, utils.InternalServerError
@@ -335,13 +335,14 @@ func Changelog(httpClient *http.Client, source string, target string, host strin
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRepos, err := mappedManifest(manifestClient, repo, sourceBuildNum)
-	if err != nil {
-		return nil, nil, err
-	}
-	targetRepos, err := mappedManifest(manifestClient, repo, targetBuildNum)
-	if err != nil {
-		return nil, nil, err
+	sourceRepos, sourceErr := mappedManifest(manifestClient, repo, sourceBuildNum)
+	targetRepos, targetErr := mappedManifest(manifestClient, repo, targetBuildNum)
+	if sourceErr != nil && sourceErr.HTTPCode() == "404" && targetErr != nil && targetErr.HTTPCode() == "404" {
+		return nil, nil, utils.BothBuildsNotFound(croslandURL, source, target)
+	} else if sourceErr != nil {
+		return nil, nil, sourceErr
+	} else if targetErr != nil {
+		return nil, nil, targetErr
 	}
 
 	clients[host] = manifestClient

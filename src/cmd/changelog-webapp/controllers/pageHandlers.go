@@ -40,6 +40,7 @@ var (
 	internalFallbackGerritInstance string
 	internalGoBInstance            string
 	internalManifestRepo           string
+	croslandURL                    string
 	externalGerritInstance         string
 	externalFallbackGerritInstance string
 	externalGoBInstance            string
@@ -77,6 +78,10 @@ func init() {
 	internalManifestRepo, err = getSecret(client, os.Getenv("COS_INTERNAL_MANIFEST_REPO_NAME"))
 	if err != nil {
 		log.Fatalf("Failed to retrieve secret for COS_INTERNAL_MANIFEST_REPO_NAME with key name %s\n%v", os.Getenv("COS_INTERNAL_MANIFEST_REPO_NAME"), err)
+	}
+	croslandURL, err = getSecret(client, os.Getenv("CROSLAND_NAME"))
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret for CROSLAND_NAME with key name %s\n%v", os.Getenv("CROSLAND_NAME"), err)
 	}
 	externalGerritInstance = os.Getenv("COS_EXTERNAL_GERRIT_INSTANCE")
 	externalFallbackGerritInstance = os.Getenv("COS_EXTERNAL_FALLBACK_GERRIT_INSTANCE")
@@ -337,7 +342,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
 		return
 	}
-	added, removed, utilErr := changelog.Changelog(httpClient, source, target, instance, manifestRepo, querySize)
+	added, removed, utilErr := changelog.Changelog(httpClient, source, target, instance, manifestRepo, croslandURL, querySize)
 	if utilErr != nil {
 		log.Errorf("error retrieving changelog between builds %s and %s on GoB instance: %s with manifest repository: %s\n%v\n",
 			source, target, externalGoBInstance, externalManifestRepo, utilErr)

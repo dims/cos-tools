@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -119,13 +120,63 @@ func unwrapError(err error) error {
 	return innerErr
 }
 
+func croslandLink(croslandURL, source, target string) string {
+	return fmt.Sprintf("%s/log/%s..%s", croslandURL, source, target)
+}
+
+// BothBuildsNotFound indicates that neither build was not found
+func BothBuildsNotFound(croslandURL, source, target string) *UtilChangelogError {
+	return &UtilChangelogError{
+		httpCode: "404",
+		header:   "Build Not Found",
+		err: strings.Join([]string{
+			"The builds associated with input",
+			source,
+			"and",
+			target,
+			"cannot be found. It may be possible that the inputs are either invalid or both belong",
+			"to pre-Cusky builds. If both of the inputs belong to pre-Cusky builds, note that this tool only supports changelogs",
+			"between Cusky builds. Otherwise, please input valid build numbers (example: 13310.1035.0) or valid image names",
+			"(example: cos-rc-85-13310-1034-0).",
+		}, " "),
+		htmlErr: fmt.Sprintf("%s %s and %s %s<br><br>%s %s <a href=%s target=\"_blank\">%s</a>. %s %s",
+			"The builds associated with input",
+			source,
+			target,
+			"could not be found.",
+			"It may be possible that the inputs are either invalid or both belong to pre-Cusky builds.",
+			"If both of the inputs belong to pre-Cusky builds, please check",
+			croslandLink(croslandURL, source, target),
+			croslandLink(croslandURL, source, target),
+			"Otherwise, please input valid build numbers",
+			"(example: 13310.1035.0) or valid image names (example: cos-rc-85-13310-1034-0).",
+		),
+	}
+}
+
 // BuildNotFound returns a ChangelogError object for changelog indicating
 // the desired build could not be found
 func BuildNotFound(buildNumber string) *UtilChangelogError {
 	return &UtilChangelogError{
 		httpCode: "404",
 		header:   "Build Not Found",
-		err:      fmt.Sprintf("The build associated with input %s cannot be found. Please input a valid build number (example: 13310.1035.0) or a valid image name (example: cos-rc-85-13310-1034-0).", buildNumber),
+		err: strings.Join([]string{
+			"The build associated with input",
+			buildNumber,
+			"cannot be found. It may be possible that the input is either invalid or belongs to a",
+			"pre-Cusky build. If you entered a pre-Cusky build number or image name, note that changelog between",
+			"pre-Cusky and Cusky builds are not supported. Otherwise, please input a valid build number",
+			"(example: 13310.1035.0) or a valid image name (example: cos-rc-85-13310-1034-0).",
+		}, " "),
+		htmlErr: fmt.Sprintf("%s %s %s<br><br>%s %s %s %s",
+			"The build associated with input",
+			buildNumber,
+			"cannot be found.",
+			"It may be possible that either the input is either invalid or belongs to a",
+			"pre-Cusky build. If you entered a pre-Cusky build number or image name, note that changelog between",
+			"pre-Cusky and Cusky builds are not supported. Otherwise, please input a valid build number",
+			"(example: 13310.1035.0) or a valid image name (example: cos-rc-85-13310-1034-0).",
+		),
 	}
 }
 

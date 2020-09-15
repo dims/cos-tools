@@ -64,7 +64,7 @@ func TestChangelog(t *testing.T) {
 	httpClient, _ := getHTTPClient()
 
 	// Test invalid source
-	additions, removals, err := Changelog(httpClient, "15", "15043.0.0", cosInstance, defaultManifestRepo, -1)
+	additions, removals, err := Changelog(httpClient, "15", "15043.0.0", cosInstance, defaultManifestRepo, "", -1)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -76,7 +76,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid target
-	additions, removals, err = Changelog(httpClient, "15043.0.0", "abx", cosInstance, defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, "15043.0.0", "abx", cosInstance, defaultManifestRepo, "", -1)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -88,7 +88,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid instance
-	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", "com", defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", "com", defaultManifestRepo, "", -1)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -100,7 +100,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test invalid manifest repo
-	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", cosInstance, "cos/not-a-repo", -1)
+	additions, removals, err = Changelog(httpClient, "15036.0.0", "15041.0.0", cosInstance, "cos/not-a-repo", "", -1)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -112,7 +112,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test build number higher than latest release
-	additions, removals, err = Changelog(httpClient, "15036.0.0", "99999.0.0", cosInstance, defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, "15036.0.0", "99999.0.0", cosInstance, defaultManifestRepo, "", -1)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -124,7 +124,7 @@ func TestChangelog(t *testing.T) {
 	}
 
 	// Test manifest with remote urls specified and no default URL
-	additions, removals, err = Changelog(httpClient, "1.0.0", "2.0.0", cosInstance, defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, "1.0.0", "2.0.0", cosInstance, defaultManifestRepo, "", -1)
 	if additions == nil {
 		t.Errorf("changelog failed, expected additions, got nil")
 	} else if removals == nil {
@@ -248,7 +248,7 @@ func TestChangelog(t *testing.T) {
 		"9bc12bb411f357188d008864f80dfba43210b9d8",
 		"bf0dd3757826b9bc9d7082f5f749ff7615d4bcb3",
 	}
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", -1)
 	if err != nil {
 		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if len(removals) != 0 {
@@ -292,7 +292,7 @@ func TestChangelog(t *testing.T) {
 		"src/platform2",
 		"src/third_party/chromiumos-overlay",
 	}
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, -1)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", -1)
 	if err != nil {
 		t.Errorf("changelog failed, expected no error, got %v", err)
 	}
@@ -306,7 +306,7 @@ func TestChangelog(t *testing.T) {
 	source = "15030.0.0"
 	target = "15050.0.0"
 	querySize := 50
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if err != nil {
 		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if additions == nil {
@@ -332,7 +332,7 @@ func TestChangelog(t *testing.T) {
 	// Test changelog handles manifest with non-matching repositories
 	source = "12871.1177.0"
 	target = "12871.1179.0"
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if err != nil {
 		t.Errorf("changelog failed, expected no error, got %v", err)
 	} else if len(removals) != 0 {
@@ -357,7 +357,7 @@ func TestChangelog(t *testing.T) {
 	// Test with different release branches
 	source = "13310.1035.0"
 	target = "15000.0.0"
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if err != nil {
 		t.Errorf("Changelog failed, expected no error, got %v", err)
 	} else if len(additions) == 0 {
@@ -369,7 +369,7 @@ func TestChangelog(t *testing.T) {
 	// Test empty repository
 	source = "0.0.0"
 	target = "2.0.0"
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if additions != nil {
 		t.Errorf("changelog failed, expected nil additions, got %v", additions)
 	} else if removals != nil {
@@ -383,7 +383,7 @@ func TestChangelog(t *testing.T) {
 	// Test image name
 	source = "cos-rc-85-13310-1034-0"
 	target = "cos-rc-85-13310-1030-0"
-	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, querySize)
+	additions, removals, err = Changelog(httpClient, source, target, cosInstance, defaultManifestRepo, "", querySize)
 	if err != nil {
 		t.Errorf("Changelog failed, expected no error, got %v", err)
 	} else if len(additions) != 0 {

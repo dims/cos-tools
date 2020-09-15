@@ -23,3 +23,4 @@ env_variables:
   COS_INTERNAL_FALLBACK_GERRIT_INSTANCE_NAME: "cos-internal-fallback-gerrit-instance"
   COS_INTERNAL_GOB_INSTANCE_NAME: "cos-internal-gob-instance"
   COS_INTERNAL_MANIFEST_REPO_NAME: "cos-internal-manifest-repo"
+  CROSLAND_NAME: "crosland-url"
