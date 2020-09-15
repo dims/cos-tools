@@ -382,7 +382,7 @@ func manifestData(client gitilesProto.GitilesClient, manifestRepo string, buildN
 		}
 	}
 	if output.SHA == "" || output.RemoteURL == "" {
-		out <- manifestResponse{Err: fmt.Errorf("repository associated with CL could not be found in manifest %s", buildNum)}
+		out <- manifestResponse{BuildNum: buildNum, SHA: ""}
 		return
 	}
 	out <- output
