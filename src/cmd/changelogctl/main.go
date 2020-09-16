@@ -130,11 +130,11 @@ func main() {
 	var mode, gobURL, gerritURL, fallbackURL, manifestRepo string
 	var debug bool
 	app := &cli.App{
-		Name:  "changelog-cli",
+		Name:  "changelogctl",
 		Usage: "get commits between builds or first build containing CL",
 		Description: fmt.Sprintf("%s\n   %s",
-			"changelog usage: ./changelog-cli -m changelog [build-number || image-name] [build-number || image-name]",
-			"findbuild usage: ./changelog-cli -m findbuild [CL-number || commit-SHA]",
+			"changelog usage: ./changelogctl -m changelog [build-number || image-name] [build-number || image-name]",
+			"findbuild usage: ./changelogctl -m findbuild [CL-number || commit-SHA]",
 		),
 		Flags: []cli.Flag{
 			&cli.StringFlag{

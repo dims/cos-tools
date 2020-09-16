@@ -7,21 +7,21 @@ An application that generates build changelogs and locates the first build conta
 ### Retrieve Changelog
 Retrieve the commit changelog between two builds.
 
-Run with `./changelog --mode changelog [options] [build-number || image-name] [build-number || image-name]`
+Run with `./changelogctl --mode changelog [options] [build-number || image-name] [build-number || image-name]`
 
-Example: `./changelog --gob cos.googlesource.com --repo cos/manifest-snapshots cos-rc-85-13310-1034-0 15045.0.0`
+Example: `./changelogctl --gob cos.googlesource.com --repo cos/manifest-snapshots cos-rc-85-13310-1034-0 15045.0.0`
 
 ### Find First Build Containing CL
 Retrieve the first build containing a CL.
 
-Run with `./changelog --mode findbuild [options] [CL-number || commit-SHA]`
+Run with `./changelogctl --mode findbuild [options] [CL-number || commit-SHA]`
 
-Example using CL-Number: `./changelog --mode findbuild 3280`
+Example using CL-Number: `./changelogctl --mode findbuild 3280`
 
-Example using Commit-SHA: `./changelog --mode findbuild 18d4ce48c1dc2f530120f85973fec348367f78a0`
+Example using Commit-SHA: `./changelogctl --mode findbuild 18d4ce48c1dc2f530120f85973fec348367f78a0`
 
 ## Commands
-`./changelog --help` to see a list of commands or get help for one command
+`./changelogctl --help` to see a list of commands or get help for one command
 
 ## Global Options
 

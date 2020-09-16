@@ -47,7 +47,7 @@ type Commit struct {
 }
 
 func setup() error {
-	cmd := exec.Command("go", "build", "-o", "changelog-cli", "main.go")
+	cmd := exec.Command("go", "build", "-o", "changelogctl", "main.go")
 	return cmd.Run()
 }
 
@@ -213,7 +213,7 @@ func TestChangelog(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			args := append([]string{"-mode", "changelog"}, test.Args...)
 			args = append(args, []string{test.Source, test.Target}...)
-			cmd := exec.Command("./changelog-cli", args...)
+			cmd := exec.Command("./changelogctl", args...)
 			err := cmd.Run()
 			if test.ShouldErr {
 				switch {
@@ -310,7 +310,7 @@ func TestFindBuild(t *testing.T) {
 			var out bytes.Buffer
 			args := append([]string{"-mode", "findbuild"}, test.Args...)
 			args = append(args, test.CL)
-			cmd := exec.Command("./changelog-cli", args...)
+			cmd := exec.Command("./changelogctl", args...)
 			cmd.Stdout = &out
 			err := cmd.Run()
 			if test.ShouldErr && err == nil {
