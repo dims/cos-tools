@@ -89,8 +89,8 @@ func TestGitilesErrCode(t *testing.T) {
 }
 
 func TestBothBuildsNotFound(t *testing.T) {
-	source := "1a"
-	target := "ddddddd"
+	source := "cos-stable-81-12871-103-0"
+	target := "cos-stable-81-12871-117-0"
 	croslandURL := "https://www.google.com"
 	expectedCode := "404"
 	expectedErrHeader := "Build Not Found"
@@ -116,7 +116,7 @@ func TestBothBuildsNotFound(t *testing.T) {
 		"Otherwise, please input valid build numbers",
 		"(example: 13310.1035.0) or valid image names (example: cos-rc-85-13310-1034-0).",
 	)
-	err := BothBuildsNotFound(croslandURL, source, target)
+	err := BothBuildsNotFound(croslandURL, source, target, source, target)
 	if err.HTTPCode() != expectedCode {
 		t.Errorf("expected HTTP code %s, got %s", expectedCode, err.HTTPCode())
 	} else if err.Header() != expectedErrHeader {
@@ -131,7 +131,7 @@ func TestBothBuildsNotFound(t *testing.T) {
 }
 
 func TestBuildNotFound(t *testing.T) {
-	buildNumber := "15000.0.0"
+	buildNumber := "cos-stable-81-12871-117-0"
 	expectedCode := "404"
 	expectedErrHeader := "Build Not Found"
 	expectedErrStr := strings.Join([]string{

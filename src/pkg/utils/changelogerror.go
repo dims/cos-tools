@@ -125,7 +125,7 @@ func croslandLink(croslandURL, source, target string) string {
 }
 
 // BothBuildsNotFound indicates that neither build was not found
-func BothBuildsNotFound(croslandURL, source, target string) *UtilChangelogError {
+func BothBuildsNotFound(croslandURL, source, target, sourceBuildNum, targetBuildNum string) *UtilChangelogError {
 	return &UtilChangelogError{
 		httpCode: "404",
 		header:   "Build Not Found",
@@ -146,8 +146,8 @@ func BothBuildsNotFound(croslandURL, source, target string) *UtilChangelogError 
 			"could not be found.",
 			"It may be possible that the inputs are either invalid or both belong to pre-Cusky builds.",
 			"If both of the inputs belong to pre-Cusky builds, please check",
-			croslandLink(croslandURL, source, target),
-			croslandLink(croslandURL, source, target),
+			croslandLink(croslandURL, sourceBuildNum, targetBuildNum),
+			croslandLink(croslandURL, sourceBuildNum, targetBuildNum),
 			"Otherwise, please input valid build numbers",
 			"(example: 13310.1035.0) or valid image names (example: cos-rc-85-13310-1034-0).",
 		),

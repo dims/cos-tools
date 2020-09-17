@@ -189,7 +189,7 @@ func repoMap(manifest string) (map[string]*repo, error) {
 
 // mappedManifest retrieves a Manifest file from GoB and unmarshals XML.
 // Returns a mapping of repository ID to repository data.
-func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum string) (map[string]*repo, utils.ChangelogError) {
+func mappedManifest(client gitilesProto.GitilesClient, repo string, buildInput, buildNum string) (map[string]*repo, utils.ChangelogError) {
 	log.Debugf("Retrieving manifest file for build %s\n", buildNum)
 	response, err := utils.DownloadManifest(client, repo, buildNum)
 	if err != nil {
@@ -198,7 +198,7 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 		if httpCode == "403" {
 			return nil, utils.ForbiddenError
 		} else if httpCode == "404" {
-			return nil, utils.BuildNotFound(buildNum)
+			return nil, utils.BuildNotFound(buildInput)
 		}
 		return nil, utils.InternalServerError
 	}
@@ -207,7 +207,7 @@ func mappedManifest(client gitilesProto.GitilesClient, repo string, buildNum str
 		log.Errorf("mappedManifest: error retrieving mapped manifest file from repo %s for build %s:\n%v", repo, buildNum, err)
 		httpCode := utils.GitilesErrCode(err)
 		if httpCode == "404" {
-			return nil, utils.BuildNotFound(buildNum)
+			return nil, utils.BuildNotFound(buildInput)
 		}
 		return nil, utils.InternalServerError
 	}
@@ -338,10 +338,10 @@ func Changelog(httpClient *http.Client, source, target, host, repo, croslandURL 
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRepos, sourceErr := mappedManifest(manifestClient, repo, sourceBuildNum)
-	targetRepos, targetErr := mappedManifest(manifestClient, repo, targetBuildNum)
+	sourceRepos, sourceErr := mappedManifest(manifestClient, repo, source, sourceBuildNum)
+	targetRepos, targetErr := mappedManifest(manifestClient, repo, target, targetBuildNum)
 	if sourceErr != nil && sourceErr.HTTPCode() == "404" && targetErr != nil && targetErr.HTTPCode() == "404" {
-		return nil, nil, utils.BothBuildsNotFound(croslandURL, source, target)
+		return nil, nil, utils.BothBuildsNotFound(croslandURL, source, target, sourceBuildNum, targetBuildNum)
 	} else if sourceErr != nil {
 		return nil, nil, sourceErr
 	} else if targetErr != nil {
