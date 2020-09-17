@@ -3,7 +3,7 @@ instance_class: F2
 
 env_variables:
   # Authentication variables
-  COS_CHANGELOG_PROJECT_ID: "cos-oss-interns-playground"  # Used to access project secrets from secret manager
+  COS_CHANGELOG_PROJECT_ID: "google.com:cos-changelog"  # Used to access project secrets from secret manager
   COS_CHANGELOG_OAUTH_CLIENT_ID_NAME: "cos-changelog-oauth-client-id"
   COS_CHANGELOG_CLIENT_SECRET_NAME: "cos-changelog-client-secret"
   COS_CHANGELOG_SESSION_SECRET_NAME: "cos-changelog-session-secret"
