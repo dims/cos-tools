@@ -41,16 +41,18 @@ const (
 )
 
 var config = &oauth2.Config{
-	ClientID:     os.Getenv("OAUTH_CLIENT_ID"),
+	ClientID:     "",
 	ClientSecret: "",
 	Endpoint:     google.Endpoint,
-	RedirectURL:  "https://cos-oss-interns-playground.uc.r.appspot.com/oauth2callback/",
+	RedirectURL:  "",
 	Scopes:       []string{"https://www.googleapis.com/auth/gerritcodereview"},
 }
 var store *sessions.CookieStore
 var projectID = os.Getenv("COS_CHANGELOG_PROJECT_ID")
+var clientIDName = os.Getenv("COS_CHANGELOG_OAUTH_CLIENT_ID_NAME")
 var clientSecretName = os.Getenv("COS_CHANGELOG_CLIENT_SECRET_NAME")
 var sessionSecretName = os.Getenv("COS_CHANGELOG_SESSION_SECRET_NAME")
+var redirectURL = os.Getenv("COS_CHANGELOG_OAUTH_CALLBACK_NAME")
 
 func init() {
 	var err error
@@ -58,6 +60,12 @@ func init() {
 	if err != nil {
 		log.Fatalf("failed to setup client: %v", err)
 	}
+
+	config.ClientID, err = getSecret(client, clientIDName)
+	if err != nil {
+		log.Fatalf("failed to retrieve client id: %s\n%v", clientIDName, err)
+	}
+
 	config.ClientSecret, err = getSecret(client, clientSecretName)
 	if err != nil {
 		log.Fatalf("failed to retrieve secret: %s\n%v", clientSecretName, err)
@@ -68,6 +76,11 @@ func init() {
 		log.Fatalf("failed to retrieve secret :%s\n%v", sessionSecretName, err)
 	}
 	store = sessions.NewCookieStore([]byte(sessionSecret))
+
+	config.RedirectURL, err = getSecret(client, redirectURL)
+	if err != nil {
+		log.Fatalf("failed to retrieve secret :%s\n%v", redirectURL, err)
+	}
 }
 
 // Retrieve secrets stored in Gcloud Secret Manager

@@ -4,9 +4,10 @@ instance_class: F2
 env_variables:
   # Authentication variables
   COS_CHANGELOG_PROJECT_ID: "cos-oss-interns-playground"  # Used to access project secrets from secret manager
-  OAUTH_CLIENT_ID: "1080882898042-86cke9tvtqd9vrfnd8dj8ub6m0stjv2u.apps.googleusercontent.com"
+  COS_CHANGELOG_OAUTH_CLIENT_ID_NAME: "cos-changelog-oauth-client-id"
   COS_CHANGELOG_CLIENT_SECRET_NAME: "cos-changelog-client-secret"
   COS_CHANGELOG_SESSION_SECRET_NAME: "cos-changelog-session-secret"
+  COS_CHANGELOG_OAUTH_CALLBACK_NAME: "cos-changelog-oauth-callback"
 
   # Webpage configuration
   STATIC_BASE_PATH: "src/cmd/changelog-webapp/static/"
