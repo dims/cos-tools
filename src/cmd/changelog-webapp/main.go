@@ -18,7 +18,7 @@ import (
 	"net/http"
 	"os"
 
-	"cos.googlesource.com/cos/tools/src/cmd/changelog-webapp/controllers"
+	"cos.googlesource.com/cos/tools.git/src/cmd/changelog-webapp/controllers"
 
 	log "github.com/sirupsen/logrus"
 )

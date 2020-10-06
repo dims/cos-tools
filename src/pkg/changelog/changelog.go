@@ -35,7 +35,7 @@ import (
 	"regexp"
 	"strings"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
 	log "github.com/sirupsen/logrus"
 	gitilesApi "go.chromium.org/luci/common/api/gitiles"

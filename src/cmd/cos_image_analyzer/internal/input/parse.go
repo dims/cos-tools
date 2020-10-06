@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // BinaryDiffTypes is a list of all valid binary differnce types

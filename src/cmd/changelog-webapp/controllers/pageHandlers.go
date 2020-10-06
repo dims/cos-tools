@@ -24,9 +24,9 @@ import (
 	"text/template"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
-	"cos.googlesource.com/cos/tools/src/pkg/changelog"
-	"cos.googlesource.com/cos/tools/src/pkg/findbuild"
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/changelog"
+	"cos.googlesource.com/cos/tools.git/src/pkg/findbuild"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	log "github.com/sirupsen/logrus"
 )

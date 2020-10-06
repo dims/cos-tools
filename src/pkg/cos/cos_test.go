@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	log "github.com/golang/glog"
 )

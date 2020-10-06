@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/input"
 )
 
 const pathToPackageList = "/etc/package_list"

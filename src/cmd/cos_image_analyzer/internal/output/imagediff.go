@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/binary"
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/packagediff"
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/binary"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/input"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/packagediff"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // ImageDiff stores all of the differences between the two images

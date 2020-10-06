@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	"github.com/pkg/errors"
 )

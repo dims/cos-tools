@@ -7,8 +7,8 @@ import (
 
 	"flag"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_gpu_installer/internal/installer"
-	"cos.googlesource.com/cos/tools/src/pkg/cos"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_installer/internal/installer"
+	"cos.googlesource.com/cos/tools.git/src/pkg/cos"
 
 	log "github.com/golang/glog"
 	"github.com/google/subcommands"

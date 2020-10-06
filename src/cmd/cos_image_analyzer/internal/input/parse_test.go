@@ -3,7 +3,7 @@ package input
 import (
 	"testing"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // test FlagErrorChecking function

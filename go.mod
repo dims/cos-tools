@@ -1,4 +1,4 @@
-module cos.googlesource.com/cos/tools
+module cos.googlesource.com/cos/tools.git
 
 go 1.14
 

@@ -7,7 +7,7 @@ import (
 
 	log "github.com/golang/glog"
 
-	"cos.googlesource.com/cos/tools/src/pkg/modules"
+	"cos.googlesource.com/cos/tools.git/src/pkg/modules"
 )
 
 var (

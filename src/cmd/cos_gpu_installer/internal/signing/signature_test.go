@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 func TestDownloadDriverSignatures(t *testing.T) {

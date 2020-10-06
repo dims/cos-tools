@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"

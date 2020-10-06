@@ -33,8 +33,8 @@ import (
 	"os"
 	"time"
 
-	"cos.googlesource.com/cos/tools/src/pkg/changelog"
-	"cos.googlesource.com/cos/tools/src/pkg/findbuild"
+	"cos.googlesource.com/cos/tools.git/src/pkg/changelog"
+	"cos.googlesource.com/cos/tools.git/src/pkg/findbuild"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 

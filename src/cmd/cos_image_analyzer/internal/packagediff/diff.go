@@ -3,7 +3,7 @@ package packagediff
 import (
 	"fmt"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/input"
 )
 
 // PkgDiff is used to hold package difference between the two images

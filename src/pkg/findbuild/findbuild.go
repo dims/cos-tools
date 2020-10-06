@@ -44,7 +44,7 @@ import (
 	"sync"
 	"time"
 
-	"cos.googlesource.com/cos/tools/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
 	log "github.com/sirupsen/logrus"
 	"go.chromium.org/luci/common/api/gerrit"

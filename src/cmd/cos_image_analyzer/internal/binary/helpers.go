@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/input"
-	"cos.googlesource.com/cos/tools/src/cmd/cos_image_analyzer/internal/utilities"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/input"
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_image_analyzer/internal/utilities"
 )
 
 // findOSConfigs creates a map of all /etc entries in both images
