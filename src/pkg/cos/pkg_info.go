@@ -33,6 +33,12 @@ type packageInfoJSON struct {
 	InstalledPackages []packageJSON `json:"installedPackages"`
 }
 
+// PackageInfoExists returns whether COS package information exists.
+func PackageInfoExists() bool {
+	info, err := os.Stat(packageInfoDefaultJSONFile)
+	return !os.IsNotExist(err) && !info.IsDir()
+}
+
 // GetPackageInfo loads the package information from this COS system and returns
 // it.
 func GetPackageInfo() (PackageInfo, error) {
