@@ -29,11 +29,12 @@ const (
 
 // InstallCommand is the subcommand to install GPU drivers.
 type InstallCommand struct {
-	driverVersion    string
-	hostInstallDir   string
-	unsignedDriver   bool
-	internalDownload bool
-	debug            bool
+	driverVersion     string
+	hostInstallDir    string
+	unsignedDriver    bool
+	gcsDownloadBucket string
+	gcsDownloadPrefix string
+	debug             bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -51,14 +52,17 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"The GPU driver verion to install. It will install the default GPU driver if the flag is not set explicitly.")
 	f.StringVar(&c.hostInstallDir, "host-dir", "",
 		"Host directory that GPU drivers should be installed to. "+
-		"It tries to read from the env NVIDIA_INSTALL_DIR_HOST if the flag is not set explicitly.")
+			"It tries to read from the env NVIDIA_INSTALL_DIR_HOST if the flag is not set explicitly.")
 	f.BoolVar(&c.unsignedDriver, "allow-unsigned-driver", false,
 		"Whether to allow load unsigned GPU drivers. "+
 			"If this flag is set to true, module signing security features must be disabled on the host for driver installation to succeed. "+
 			"This flag is only for debugging.")
-	// TODO(mikewu): change this flag to a bucket prefix string.
-	f.BoolVar(&c.internalDownload, "internal-download", false,
-		"Whether to try to download files from Google internal server. This is only useful for internal developing.")
+	f.StringVar(&c.gcsDownloadBucket, "gcs-download-bucket", "cos-tools",
+		"The GCS bucket to download COS artifacts from. "+
+			"For example, the default value is 'cos-tools' which is the public COS artifacts bucket.")
+	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
+		"The GCS path prefix when downloading COS artifacts."+
+			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 }
@@ -73,7 +77,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
 
-	downloader := cos.NewGCSDownloader(envReader, c.internalDownload)
+	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
 	if c.driverVersion == "" {
 		defaultVersion, err := installer.GetDefaultGPUDriverVersion(downloader)
 		if err != nil {

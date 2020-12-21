@@ -17,8 +17,9 @@ import (
 
 // ListCommand is the subcommand to list supported GPU drivers.
 type ListCommand struct {
-	internalDownload bool
-	debug            bool
+	gcsDownloadBucket string
+	gcsDownloadPrefix string
+	debug             bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -32,9 +33,12 @@ func (*ListCommand) Usage() string { return "list\n" }
 
 // SetFlags implements subcommands.Command.SetFlags.
 func (c *ListCommand) SetFlags(f *flag.FlagSet) {
-	// TODO(mikewu): change this flag to a bucket prefix string.
-	f.BoolVar(&c.internalDownload, "internal-download", false,
-		"Whether to try to download files from Google internal server. This is only useful for internal developing.")
+	f.StringVar(&c.gcsDownloadBucket, "gcs-download-bucket", "cos-tools",
+		"The GCS bucket to download COS artifacts from. "+
+			"For example, the default value is 'cos-tools' which is the public COS artifacts bucket.")
+	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
+		"The GCS path prefix when downloading COS artifacts."+
+			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 }
@@ -47,8 +51,8 @@ func (c *ListCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfa
 		return subcommands.ExitFailure
 	}
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
-	downloader := cos.NewGCSDownloader(envReader, c.internalDownload)
-	artifacts, err := downloader.ListExtensionArtifacts("gpu")
+	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
+	artifacts, err := downloader.ListGPUExtensionArtifacts()
 	if err != nil {
 		c.logError(errors.Wrap(err, "failed to list gpu extension artifacts"))
 		return subcommands.ExitFailure

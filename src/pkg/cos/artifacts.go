@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	log "github.com/golang/glog"
@@ -13,9 +14,7 @@ import (
 )
 
 const (
-	// TODO(mikewu): consider making GCS buckets as flags.
 	cosToolsGCS      = "cos-tools"
-	internalGCS      = "container-vm-image-staging"
 	chromiumOSSDKGCS = "chromiumos-sdk"
 	kernelInfo       = "kernel_info"
 	kernelSrcArchive = "kernel-src.tar.gz"
@@ -38,13 +37,22 @@ type ArtifactsDownloader interface {
 
 // GCSDownloader is the struct downloading COS artifacts from GCS bucket.
 type GCSDownloader struct {
-	envReader *EnvReader
-	Internal  bool
+	envReader         *EnvReader
+	gcsDownloadBucket string
+	gcsDownloadPrefix string
 }
 
 // NewGCSDownloader creates a GCSDownloader instance.
-func NewGCSDownloader(e *EnvReader, i bool) *GCSDownloader {
-	return &GCSDownloader{e, i}
+func NewGCSDownloader(e *EnvReader, bucket, prefix string) *GCSDownloader {
+	// Use cos-tools as the default GCS bucket.
+	if bucket == "" {
+		bucket = cosToolsGCS
+	}
+	// Use build number as the default GCS download prefix.
+	if prefix == "" {
+		prefix = e.BuildNumber()
+	}
+	return &GCSDownloader{e, bucket, prefix}
 }
 
 // DownloadKernelSrc downloads COS kernel sources to destination directory.
@@ -95,32 +103,13 @@ func (d *GCSDownloader) GetArtifact(artifactPath string) ([]byte, error) {
 	return content, nil
 }
 
-// DownloadArtifact downloads an artifact from GCS buckets, including public bucket and internal bucket.
-// TODO(mikewu): consider allow users to pass in GCS directories in arguments.
+// DownloadArtifact downloads an artifact from the GCS prefix configured in GCSDownloader.
 func (d *GCSDownloader) DownloadArtifact(destDir, artifactPath string) error {
-	var err error
-
-	if err = utils.DownloadFromGCS(destDir, cosToolsGCS, d.artifactPublicPath(artifactPath)); err == nil {
-		return nil
+	gcsPath := path.Join(d.gcsDownloadPrefix, artifactPath)
+	if err := utils.DownloadFromGCS(destDir, d.gcsDownloadBucket, gcsPath); err != nil {
+		return errors.Errorf("failed to download %s from gs://%s/%s", artifactPath, d.gcsDownloadBucket, gcsPath)
 	}
-	log.Errorf("Failed to download %s from public GCS: %v", artifactPath, err)
-
-	if d.Internal {
-		if err = utils.DownloadFromGCS(destDir, internalGCS, d.artifactInternalPath(artifactPath)); err == nil {
-			return nil
-		}
-		log.Errorf("Failed to download %s from internal GCS: %v", artifactPath, err)
-	}
-
-	return errors.Errorf("failed to download %s", artifactPath)
-}
-
-func (d *GCSDownloader) artifactPublicPath(artifactPath string) string {
-	return fmt.Sprintf("%s/%s", d.envReader.BuildNumber(), artifactPath)
-}
-
-func (d *GCSDownloader) artifactInternalPath(artifactPath string) string {
-	return fmt.Sprintf("lakitu-release/R%s-%s/%s", d.envReader.Milestone(), d.envReader.BuildNumber(), artifactPath)
+	return nil
 }
 
 func (d *GCSDownloader) getToolchainURL() (string, error) {
