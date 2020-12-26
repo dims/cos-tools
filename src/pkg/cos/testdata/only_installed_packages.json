@@ -1,0 +1,21 @@
+{
+	"installedPackages": [
+		{
+			"category": "app-arch",
+			"name": "gzip",
+			"version": "1.9"
+		},
+		{
+			"category": "dev-libs",
+			"name": "popt",
+			"version": "1.16",
+			"revision": "2"
+		},
+		{
+			"category": "app-emulation",
+			"name": "docker-credential-helpers",
+			"version": "0.6.3",
+			"revision": "1"
+		}
+	]
+}

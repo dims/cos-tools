@@ -1,129 +1,126 @@
 package cos
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 )
 
 func TestPackageInfo(t *testing.T) {
-	testDataJSON := `{
-    "installedPackages": [
-	{
-	    "category": "app-arch",
-	    "name": "gzip",
-	    "version": "1.9"
-	},
-	{
-	    "category": "dev-libs",
-	    "name": "popt",
-	    "version": "1.16",
-	    "revision": "2"
-	},
-	{
-	    "category": "app-emulation",
-	    "name": "docker-credential-helpers",
-	    "version": "0.6.3",
-	    "revision": "1"
-	},
-	{
-	    "category": "_not.real-category1+",
-	    "name": "_not-real_package1",
-	    "version": "12.34.56.78"
-	},
-	{
-	    "category": "_not.real-category1+",
-	    "name": "_not-real_package2",
-	    "version": "12.34.56.78",
-	    "revision": "26"
-	},
-	{
-	    "category": "_not.real-category1+",
-	    "name": "_not-real_package3",
-	    "version": "12.34.56.78_rc3"
-	},
-	{
-	    "category": "_not.real-category1+",
-	    "name": "_not-real_package4",
-	    "version": "12.34.56.78_rc3",
-	    "revision": "26"
-	},
-	{
-	    "category": "_not.real-category1+",
-	    "name": "_not-real_package5",
-	    "version": "12.34.56.78_pre2_rc3",
-	    "revision": "26"
-	},
-	{
-	    "category": "_not.real-category2+",
-	    "name": "_not-real_package1",
-	    "version": "12.34.56.78q"
-	},
-	{
-	    "category": "_not.real-category2+",
-	    "name": "_not-real_package2",
-	    "version": "12.34.56.78q",
-	    "revision": "26"
-	},
-	{
-	    "category": "_not.real-category2+",
-	    "name": "_not-real_package3",
-	    "version": "12.34.56.78q_rc3"
-	},
-	{
-	    "category": "_not.real-category2+",
-	    "name": "_not-real_package4",
-	    "version": "12.34.56.78q_rc3",
-	    "revision": "26"
-	},
-	{
-	    "category": "_not.real-category2+",
-	    "name": "_not-real_package5",
-	    "version": "12.34.56.78q_pre2_rc3",
-	    "revision": "26"
+	tests := []struct {
+		name              string
+		inputFile         string
+		wantInstalledPkgs []Package
+		wantBuildTimePkgs []Package
+	}{
+		{
+			name:      "OnlyInstalledPackages",
+			inputFile: "testdata/only_installed_packages.json",
+			wantInstalledPkgs: []Package{
+				Package{
+					Category: "app-arch",
+					Name:     "gzip",
+					Version:  "1.9",
+					Revision: 0,
+				},
+				Package{
+					Category: "dev-libs",
+					Name:     "popt",
+					Version:  "1.16",
+					Revision: 2,
+				},
+				Package{
+					Category: "app-emulation",
+					Name:     "docker-credential-helpers",
+					Version:  "0.6.3",
+					Revision: 1,
+				},
+			},
+		},
+		{
+			name:      "OnlyBuildTimePackages",
+			inputFile: "testdata/only_build_time_packages.json",
+			wantBuildTimePkgs: []Package{
+				Package{
+					Category: "virtual",
+					Name:     "pkgconfig",
+					Version:  "0",
+					Revision: 1,
+				},
+				Package{
+					Category: "dev-go",
+					Name:     "protobuf",
+					Version:  "1.3.2",
+					Revision: 0,
+				},
+			},
+		},
+		{
+			name:      "AllPackages",
+			inputFile: "testdata/packages.json",
+			wantInstalledPkgs: []Package{
+				Package{
+					Category: "app-arch",
+					Name:     "gzip",
+					Version:  "1.9",
+					Revision: 0,
+				},
+				Package{
+					Category: "dev-libs",
+					Name:     "popt",
+					Version:  "1.16",
+					Revision: 2,
+				},
+				Package{
+					Category: "app-emulation",
+					Name:     "docker-credential-helpers",
+					Version:  "0.6.3",
+					Revision: 1,
+				},
+			},
+			wantBuildTimePkgs: []Package{
+				Package{
+					Category: "virtual",
+					Name:     "pkgconfig",
+					Version:  "0",
+					Revision: 1,
+				},
+				Package{
+					Category: "dev-go",
+					Name:     "protobuf",
+					Version:  "1.3.2",
+					Revision: 0,
+				},
+			},
+		},
 	}
-    ]
-}`
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	testFile, err := ioutil.TempFile("", "pkg_info_test")
-	if err != nil {
-		t.Fatalf("Failed to create tempfile: %v", err)
-	}
-	defer os.Remove(testFile.Name())
-	_, err = testFile.WriteString(testDataJSON)
-	if err != nil {
-		t.Fatalf("Failed to write test data: %v", err)
-	}
-	err = testFile.Close()
-	if err != nil {
-		t.Fatalf("Failed to close test file: %v", err)
-	}
+			packageInfo, err := GetPackageInfoFromFile(test.inputFile)
+			if err != nil {
+				t.Fatalf("Failed to read package information: %v", err)
+			}
 
-	packageInfo, err := GetPackageInfoFromFile(testFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to read package information: %v", err)
+			installedPackages := packageInfo.InstalledPackages
+			if len(installedPackages) != len(test.wantInstalledPkgs) {
+				t.Errorf("Installed packages length is wrong. want: %d, got: %d", len(test.wantInstalledPkgs), len(installedPackages))
+			}
+
+			for index, pkg := range test.wantInstalledPkgs {
+				checkPackage(t, installedPackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.Revision)
+			}
+
+			buildTimePackages := packageInfo.BuildTimePackages
+			if len(buildTimePackages) != len(test.wantBuildTimePkgs) {
+				t.Errorf("Build Time packages length is wrong. want: %d, got: %d", len(test.wantBuildTimePkgs), len(buildTimePackages))
+			}
+
+			for index, pkg := range test.wantBuildTimePkgs {
+				checkPackage(t, buildTimePackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.Revision)
+			}
+		})
 	}
-
-	installedPackages := packageInfo.InstalledPackages
-	if len(installedPackages) != 13 {
-		t.Errorf("Installed packages length is wrong. want: 13, got: %d",
-			len(installedPackages))
-
-	}
-
-	checkPackage(t, installedPackages[0], "app-arch", "gzip", "1.9", 0)
-	checkPackage(t, installedPackages[1], "dev-libs", "popt", "1.16", 2)
-	checkPackage(t, installedPackages[2], "app-emulation", "docker-credential-helpers", "0.6.3", 1)
-	checkPackage(t, installedPackages[3], "_not.real-category1+", "_not-real_package1", "12.34.56.78", 0)
-	checkPackage(t, installedPackages[4], "_not.real-category1+", "_not-real_package2", "12.34.56.78", 26)
-	checkPackage(t, installedPackages[5], "_not.real-category1+", "_not-real_package3", "12.34.56.78_rc3", 0)
-	checkPackage(t, installedPackages[6], "_not.real-category1+", "_not-real_package4", "12.34.56.78_rc3", 26)
-	checkPackage(t, installedPackages[7], "_not.real-category1+", "_not-real_package5", "12.34.56.78_pre2_rc3", 26)
-	checkPackage(t, installedPackages[8], "_not.real-category2+", "_not-real_package1", "12.34.56.78q", 0)
-	checkPackage(t, installedPackages[9], "_not.real-category2+", "_not-real_package2", "12.34.56.78q", 26)
-	checkPackage(t, installedPackages[10], "_not.real-category2+", "_not-real_package3", "12.34.56.78q_rc3", 0)
-	checkPackage(t, installedPackages[11], "_not.real-category2+", "_not-real_package4", "12.34.56.78q_rc3", 26)
-	checkPackage(t, installedPackages[12], "_not.real-category2+", "_not-real_package5", "12.34.56.78q_pre2_rc3", 26)
 }
 
 func checkPackage(t *testing.T, p Package, category string, name string, version string, revision int) {

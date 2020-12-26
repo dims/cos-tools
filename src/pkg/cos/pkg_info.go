@@ -20,6 +20,7 @@ type Package struct {
 // PackageInfo contains information about the packages of a COS instance.
 type PackageInfo struct {
 	InstalledPackages []Package
+	BuildTimePackages []Package
 }
 
 type packageJSON struct {
@@ -31,6 +32,7 @@ type packageJSON struct {
 
 type packageInfoJSON struct {
 	InstalledPackages []packageJSON `json:"installedPackages"`
+	BuildTimePackages []packageJSON `json:"buildTimePackages"`
 }
 
 // PackageInfoExists returns whether COS package information exists.
@@ -45,7 +47,7 @@ func GetPackageInfo() (PackageInfo, error) {
 	return GetPackageInfoFromFile(packageInfoDefaultJSONFile)
 }
 
-// GetPackageInfoFromFile loads the pacakge information from the specified file
+// GetPackageInfoFromFile loads the package information from the specified file
 // and returns it.
 func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 	var packageInfo PackageInfo
@@ -70,6 +72,22 @@ func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 	for i := range piJSON.InstalledPackages {
 		pJSON := &piJSON.InstalledPackages[i]
 		p := &packageInfo.InstalledPackages[i]
+
+		p.Category = pJSON.Category
+		p.Name = pJSON.Name
+		p.Version = pJSON.Version
+		if pJSON.Revision != "" {
+			p.Revision, err = strconv.Atoi(pJSON.Revision)
+			if err != nil {
+				return packageInfo, err
+			}
+		}
+	}
+
+	packageInfo.BuildTimePackages = make([]Package, len(piJSON.BuildTimePackages))
+	for i := range piJSON.BuildTimePackages {
+		pJSON := &piJSON.BuildTimePackages[i]
+		p := &packageInfo.BuildTimePackages[i]
 
 		p.Category = pJSON.Category
 		p.Name = pJSON.Name
