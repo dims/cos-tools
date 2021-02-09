@@ -53,8 +53,8 @@ func UpdateHostLdCache(hostRootDir, moduleLibDir string) error {
 	}
 	defer f.Close()
 
-	if _, err := f.WriteString(moduleLibDir); err != nil {
-		return errors.Wrapf(err, "failed to write \"%s\" to %s", moduleLibDir, ldPath)
+	if _, err := f.WriteString(moduleLibDir + "\n"); err != nil {
+		return errors.Wrapf(err, `failed to write "%s" to %s`, moduleLibDir, ldPath)
 	}
 
 	if err := execCommand("ldconfig", "-r", hostRootDir).Run(); err != nil {
