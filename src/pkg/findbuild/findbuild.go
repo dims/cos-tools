@@ -34,8 +34,6 @@
 package findbuild
 
 import (
-	"context"
-
 	"fmt"
 	"net/http"
 	"regexp"
@@ -46,11 +44,12 @@ import (
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
-	log "github.com/sirupsen/logrus"
-	"go.chromium.org/luci/common/api/gerrit"
-	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	"go.chromium.org/luci/common/proto/git"
 	"go.chromium.org/luci/common/proto/gitiles"
+
+	gerrit "github.com/andygrunwald/go-gerrit"
+	log "github.com/sirupsen/logrus"
+	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"
 )
 
@@ -163,51 +162,50 @@ func queryString(clID string) string {
 }
 
 // queryCL retrieves the list of CLs matching a query from Gerrit
-func queryCL(client *gerrit.Client, clID, instanceURL string) (*gerrit.Change, utils.ChangelogError) {
-	log.Debug("Retrieving CL List from Gerrit")
+func queryCL(client *gerrit.Client, clID, instanceURL string) (gerrit.ChangeInfo, utils.ChangelogError) {
+	log.Debugf("Retrieving CL List from Gerrit for clID: %q", clID)
 	query := queryString(clID)
-	queryOptions := gerrit.ChangeQueryParams{
-		Query:   query,
-		N:       1,
-		Options: []string{"CURRENT_REVISION"},
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), requestMaxAge)
-	defer cancel()
-	clList, _, err := client.ChangeQuery(ctx, queryOptions)
+	queryOptions := &gerrit.QueryChangeOptions{}
+	queryOptions.Query = []string{query}
+	queryOptions.AdditionalFields = []string{"CURRENT_REVISION"}
+	queryOptions.Limit = 1
+
+	clList, _, err := client.Changes.QueryChanges(queryOptions)
 	if err != nil {
 		log.Errorf("queryCL: Error retrieving change for input %s:\n%v", clID, err)
 		httpCode := utils.GerritErrCode(err)
 		if httpCode == "403" {
-			return nil, utils.ForbiddenError
+			return gerrit.ChangeInfo{}, utils.ForbiddenError
 		} else if httpCode == "400" || httpCode == "404" {
-			return nil, utils.CLNotFound(clID)
+			return gerrit.ChangeInfo{}, utils.CLNotFound(clID)
 		}
-		return nil, utils.InternalServerError
+		return gerrit.ChangeInfo{}, utils.InternalServerError
 	}
-	if len(clList) == 0 {
+	if len(*clList) == 0 {
 		log.Errorf("queryCL: CL with identifier %s not found", clID)
-		return nil, utils.CLNotFound(clID)
+		return gerrit.ChangeInfo{}, utils.CLNotFound(clID)
 	}
-	change := clList[0]
-	if change.Submitted == "" {
+	change := (*clList)[0]
+	log.Debugf("Found CL: %+v", change)
+	if change.Submitted == nil {
 		log.Debugf("Provided CL identifier %s maps to an unsubmitted CL", clID)
-		return nil, utils.CLNotSubmitted(strconv.Itoa(change.ChangeNumber), instanceURL)
+		return gerrit.ChangeInfo{}, utils.CLNotSubmitted(strconv.Itoa(change.Number), instanceURL)
 	}
 	return change, nil
 }
 
-func getCLData(client *gerrit.Client, clID, instanceURL string) (*clData, utils.ChangelogError) {
+func getCLData(clID, instanceURL string, httpClient *http.Client) (*clData, utils.ChangelogError) {
 	log.Debugf("Retrieving CL data from Gerrit for changeID: %s", clID)
-	change, err := queryCL(client, clID, instanceURL)
+	gerritClient, clientErr := gerrit.NewClient(instanceURL, httpClient)
+	if clientErr != nil {
+		log.Errorf("failed to establish Gerrit client for host %s:\n%v", instanceURL, clientErr)
+		return nil, utils.InternalServerError
+	}
+	change, err := queryCL(gerritClient, clID, instanceURL)
 	if err != nil {
 		return nil, err
 	}
 	log.Debugf("Target CL found with SHA %s on repo %s, branch %s", change.CurrentRevision, change.Project, change.Branch)
-	parsedTime, parseErr := time.Parse("2006-01-02 15:04:05.000000000", change.Submitted)
-	if parseErr != nil {
-		log.Errorf("getTargetData: Error parsing submission time %s for CL %d:\n%v", change.Submitted, change.ChangeNumber, err)
-		return nil, utils.InternalServerError
-	}
 	// If a repository has non-conventional branch names, need to convert the
 	// repository branch name to a release branch name
 	release := change.Branch
@@ -218,20 +216,26 @@ func getCLData(client *gerrit.Client, clID, instanceURL string) (*clData, utils.
 			release = rule.defaultRelease
 		}
 	}
+	// In case the branch associated with the change is "main", branch
+	// on the manifest-snapshot will be master.
+	if change.Branch == "main" {
+		release = "master"
+	}
 	// Strip chromium prefixes
 	project := change.Project
 	if matches := crosRepoRe.FindStringSubmatch(project); matches != nil {
 		project = matches[1]
 	}
+	submittedTime := *change.Submitted
 	return &clData{
-		CLNum:            strconv.Itoa(change.ChangeNumber),
+		CLNum:            strconv.Itoa(change.Number),
 		InstanceURL:      instanceURL,
 		Project:          project,
 		Release:          release,
 		Branch:           change.Branch,
 		Revision:         change.CurrentRevision,
-		SearchStartRange: parsedTime,
-		SearchEndRange:   parsedTime.AddDate(0, 0, defaultSearchRange),
+		SearchStartRange: submittedTime.Time,
+		SearchEndRange:   submittedTime.Time.AddDate(0, 0, defaultSearchRange),
 	}, nil
 }
 
@@ -284,20 +288,23 @@ func candidateManifestCommits(manifestCommits []*git.Commit, clData *clData) ([]
 }
 
 // repoTags retrieves all tags belonging to a repository
-func repoTags(client gitilesProto.GitilesClient, repo string) (*gitilesProto.RefsResponse, error) {
+func repoTags(client *gerrit.Client, repo string) (map[string]string, error) {
 	log.Debugf("Retrieving tags for repository %s", repo)
-	request := &gitilesProto.RefsRequest{
-		Project:  repo,
-		RefsPath: "refs/tags",
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), requestMaxAge)
-	defer cancel()
-	res, err := client.Refs(ctx, request)
+	tagInfos, _, err := client.Projects.ListTags(repo, &gerrit.ProjectBaseOptions{})
 	if err != nil {
 		log.Errorf("error retrieving tags:\n%v", err)
 		return nil, err
 	}
-	return res, nil
+	tags := make(map[string]string)
+	for _, tagInfo := range *tagInfos {
+		log.Debugf("Tag found: %+v", tagInfo)
+		commitSHA := tagInfo.Revision
+		if tagInfo.Object != "" {
+			commitSHA = tagInfo.Object
+		}
+		tags[tagInfo.Ref] = commitSHA
+	}
+	return tags, nil
 }
 
 // candidateBuildNums returns a list of build numbers from a list of possible
@@ -534,14 +541,27 @@ func findBuildExponential(gitilesClient gitiles.GitilesClient, request *BuildReq
 		clData.SearchEndRange = clData.SearchStartRange.AddDate(0, 0, defaultSearchRange)
 		log.Debugf("CL submitted earlier than first build, set search range to starting time from %v to %v", clData.SearchStartRange, clData.SearchEndRange)
 	}
-	tagResp, err := repoTags(gitilesClient, request.ManifestRepo)
+	// Creating a Gerrit client based on manifest-snapshot repository.
+	// The client will be used for finding information associated with
+	// an annotated git tag.
+	instanceURL, err := utils.CreateGerritURL(request.GitilesHost)
+	if err != nil {
+		log.Errorf("failed to create Gerrit URL from Gitiles Host %q: %v", request.GitilesHost, err)
+		return "", utils.InternalServerError
+	}
+	gerritClient, err := gerrit.NewClient(instanceURL, request.HTTPClient)
+	if err != nil {
+		log.Errorf("failed to establish Gerrit client for host %s:\n%v", instanceURL, err)
+		return "", utils.InternalServerError
+	}
+	tagResp, err := repoTags(gerritClient, request.ManifestRepo)
 	if err != nil {
 		log.Errorf("failed to retrieve tags for project %s:\n%v", request.ManifestRepo, err)
 		return "", utils.InternalServerError
 	}
 	cache := &iterCache{
 		GitilesClient:   gitilesClient,
-		Tags:            tagResp.Revisions,
+		Tags:            tagResp,
 		ManifestCommits: manifestCommits,
 	}
 
@@ -564,17 +584,12 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 		log.Error("expected non-nil request")
 		return nil, utils.InternalServerError
 	}
-	gerritClient, err := gerrit.NewClient(request.HTTPClient, request.GerritHost)
-	if err != nil {
-		log.Errorf("failed to establish Gerrit client for host %s:\n%v", request.GerritHost, err)
-		return nil, utils.InternalServerError
-	}
 	gitilesClient, err := gitilesApi.NewRESTClient(request.HTTPClient, request.GitilesHost, true)
 	if err != nil {
 		log.Errorf("failed to establish Gitiles client for host %s:\n%v", request.GitilesHost, err)
 		return nil, utils.InternalServerError
 	}
-	clData, clErr := getCLData(gerritClient, request.CL, request.GerritHost)
+	clData, clErr := getCLData(request.CL, request.GerritHost, request.HTTPClient)
 	if clErr != nil {
 		return nil, clErr
 	}

@@ -16,8 +16,9 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/golang/glog"
 	"github.com/pkg/errors"
+
+	log "github.com/golang/glog"
 )
 
 var (

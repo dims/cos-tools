@@ -38,9 +38,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"go.chromium.org/luci/common/api/gerrit"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (

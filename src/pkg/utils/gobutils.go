@@ -22,10 +22,12 @@ package utils
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"go.chromium.org/luci/common/proto/git"
+
+	log "github.com/sirupsen/logrus"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"
 )
 
@@ -123,4 +125,18 @@ func Commits(client gitilesProto.GitilesClient, repo string, committish string, 
 	}
 	log.Debugf("Retrieved %d commits from %s in %s\n", len(allCommits), repo, time.Since(start))
 	return allCommits, response.NextPageToken != "", nil
+}
+
+// CreateGerritURL creates a Gerrit URL from a given
+// Gitiles Host URL. For example: If the given Gitiles
+// Host URL is: https://cos.googlesource.com, then it will
+// return https://cos-review.googlesource.com. In case the
+// Gitiles Host URL is in incorrect format, error is returned.
+func CreateGerritURL(gitilesHostURL string) (string, error) {
+	re := regexp.MustCompile("(.+://)?(.+?).googlesource.com")
+	ss := re.FindStringSubmatch(gitilesHostURL)
+	if len(ss) > 0 {
+		return fmt.Sprintf("https://%s-review.googlesource.com", ss[len(ss)-1]), nil
+	}
+	return "", fmt.Errorf("failed to created Gerrit Host URL from invalid Gitiles Host URL: %q", gitilesHostURL)
 }

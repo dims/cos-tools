@@ -37,6 +37,7 @@ import (
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
+
 	log "github.com/sirupsen/logrus"
 	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"

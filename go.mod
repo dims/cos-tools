@@ -5,6 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go v0.57.0
 	cloud.google.com/go/storage v1.10.0
+	github.com/andygrunwald/go-gerrit v0.0.0-20201231163137-46815e48bfe0
 	github.com/beevik/etree v1.1.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/google/go-cmp v0.5.1

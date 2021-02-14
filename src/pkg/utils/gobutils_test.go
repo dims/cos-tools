@@ -211,3 +211,35 @@ func TestCommits(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateGerritURL(t *testing.T) {
+	tests := map[string]struct {
+		input   string
+		output  string
+		wantErr bool
+	}{
+		"SuccessHTTP": {
+			input:  "https://cos.googlesource.com",
+			output: "https://cos-review.googlesource.com",
+		},
+		"SuccessWithoutHTTP": {
+			input:  "cos.googlesource.com",
+			output: "https://cos-review.googlesource.com",
+		},
+		"Failure": {
+			input:   "https://cos.googleSource.com",
+			wantErr: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotOutput, err := CreateGerritURL(test.input)
+			if gotErr := err != nil; gotErr != test.wantErr {
+				t.Fatalf("CreateGerritURL(%s) = %v", test.input, err)
+			}
+			if !test.wantErr && gotOutput != test.output {
+				t.Fatalf("CreateGerritURL(%s), got %s, want %s", test.input, gotOutput, test.output)
+			}
+		})
+	}
+}

@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"go.chromium.org/luci/common/api/gerrit"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -34,7 +33,7 @@ const (
 )
 
 func getHTTPClient() (*http.Client, error) {
-	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
+	creds, err := google.FindDefaultCredentials(context.Background(), "https://www.googleapis.com/auth/gerritcodereview")
 	if err != nil || len(creds.JSON) == 0 {
 		return nil, fmt.Errorf("no application default credentials found - run `gcloud auth application-default login` and try again")
 	}
@@ -102,7 +101,7 @@ func TestFindCL(t *testing.T) {
 			ShouldFallback: false,
 		},
 		"non-existant CL": {
-			Change:             "9999999999",
+			Change:             "9",
 			GerritHost:         externalGerritURL,
 			GitilesHost:        externalGitilesURL,
 			FallbackGerritHost: externalFallbackGerritURL,
@@ -177,6 +176,14 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:       externalManifestRepo,
 			OutputBuildNum:     "12371.1001.0",
 			ShouldFallback:     true,
+		},
+		"main branch": {
+			Change:             "808c2270202fbd79367c4c46b6223e6dfc2d1d01",
+			GerritHost:         externalGerritURL,
+			GitilesHost:        externalGitilesURL,
+			FallbackGerritHost: externalFallbackGerritURL,
+			ManifestRepo:       externalManifestRepo,
+			OutputBuildNum:     "16101.0.0",
 		},
 	}
 
