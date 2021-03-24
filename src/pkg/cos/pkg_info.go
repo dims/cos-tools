@@ -4,17 +4,16 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	"strconv"
 )
 
 const packageInfoDefaultJSONFile = "/etc/cos-package-info.json"
 
 // Package represents a COS package.
 type Package struct {
-	Category string
-	Name     string
-	Version  string
-	Revision int
+	Category      string
+	Name          string
+	Version       string
+	EbuildVersion string
 }
 
 // PackageInfo contains information about the packages of a COS instance.
@@ -24,10 +23,10 @@ type PackageInfo struct {
 }
 
 type packageJSON struct {
-	Category string `json:"category"`
-	Name     string `json:"name"`
-	Version  string `json:"version"`
-	Revision string `json:"revision"`
+	Category      string `json:"category"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	EbuildVersion string `json:"ebuild_version"`
 }
 
 type packageInfoJSON struct {
@@ -76,12 +75,7 @@ func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 		p.Category = pJSON.Category
 		p.Name = pJSON.Name
 		p.Version = pJSON.Version
-		if pJSON.Revision != "" {
-			p.Revision, err = strconv.Atoi(pJSON.Revision)
-			if err != nil {
-				return packageInfo, err
-			}
-		}
+		p.EbuildVersion = pJSON.EbuildVersion
 	}
 
 	packageInfo.BuildTimePackages = make([]Package, len(piJSON.BuildTimePackages))
@@ -92,12 +86,7 @@ func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 		p.Category = pJSON.Category
 		p.Name = pJSON.Name
 		p.Version = pJSON.Version
-		if pJSON.Revision != "" {
-			p.Revision, err = strconv.Atoi(pJSON.Revision)
-			if err != nil {
-				return packageInfo, err
-			}
-		}
+		p.EbuildVersion = pJSON.EbuildVersion
 	}
 
 	return packageInfo, nil

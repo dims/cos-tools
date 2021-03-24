@@ -16,22 +16,22 @@ func TestPackageInfo(t *testing.T) {
 			inputFile: "testdata/only_installed_packages.json",
 			wantInstalledPkgs: []Package{
 				Package{
-					Category: "app-arch",
-					Name:     "gzip",
-					Version:  "1.9",
-					Revision: 0,
+					Category:      "app-arch",
+					Name:          "gzip",
+					Version:       "123",
+					EbuildVersion: "1.9",
 				},
 				Package{
-					Category: "dev-libs",
-					Name:     "popt",
-					Version:  "1.16",
-					Revision: 2,
+					Category:      "dev-libs",
+					Name:          "popt",
+					Version:       "123",
+					EbuildVersion: "1.16-r2",
 				},
 				Package{
-					Category: "app-emulation",
-					Name:     "docker-credential-helpers",
-					Version:  "0.6.3",
-					Revision: 1,
+					Category:      "app-emulation",
+					Name:          "docker-credential-helpers",
+					Version:       "123",
+					EbuildVersion: "0.6.3-r1",
 				},
 			},
 		},
@@ -40,16 +40,16 @@ func TestPackageInfo(t *testing.T) {
 			inputFile: "testdata/only_build_time_packages.json",
 			wantBuildTimePkgs: []Package{
 				Package{
-					Category: "virtual",
-					Name:     "pkgconfig",
-					Version:  "0",
-					Revision: 1,
+					Category:      "virtual",
+					Name:          "pkgconfig",
+					Version:       "123",
+					EbuildVersion: "0-r1",
 				},
 				Package{
-					Category: "dev-go",
-					Name:     "protobuf",
-					Version:  "1.3.2",
-					Revision: 0,
+					Category:      "dev-go",
+					Name:          "protobuf",
+					Version:       "123",
+					EbuildVersion: "1.3.2",
 				},
 			},
 		},
@@ -58,36 +58,36 @@ func TestPackageInfo(t *testing.T) {
 			inputFile: "testdata/packages.json",
 			wantInstalledPkgs: []Package{
 				Package{
-					Category: "app-arch",
-					Name:     "gzip",
-					Version:  "1.9",
-					Revision: 0,
+					Category:      "app-arch",
+					Name:          "gzip",
+					Version:       "123",
+					EbuildVersion: "1.9",
 				},
 				Package{
-					Category: "dev-libs",
-					Name:     "popt",
-					Version:  "1.16",
-					Revision: 2,
+					Category:      "dev-libs",
+					Name:          "popt",
+					Version:       "123",
+					EbuildVersion: "1.16-r2",
 				},
 				Package{
-					Category: "app-emulation",
-					Name:     "docker-credential-helpers",
-					Version:  "0.6.3",
-					Revision: 1,
+					Category:      "app-emulation",
+					Name:          "docker-credential-helpers",
+					Version:       "123",
+					EbuildVersion: "0.6.3-r1",
 				},
 			},
 			wantBuildTimePkgs: []Package{
 				Package{
-					Category: "virtual",
-					Name:     "pkgconfig",
-					Version:  "0",
-					Revision: 1,
+					Category:      "virtual",
+					Name:          "pkgconfig",
+					Version:       "123",
+					EbuildVersion: "0-r1",
 				},
 				Package{
-					Category: "dev-go",
-					Name:     "protobuf",
-					Version:  "1.3.2",
-					Revision: 0,
+					Category:      "dev-go",
+					Name:          "protobuf",
+					Version:       "123",
+					EbuildVersion: "1.3.2",
 				},
 			},
 		},
@@ -108,7 +108,7 @@ func TestPackageInfo(t *testing.T) {
 			}
 
 			for index, pkg := range test.wantInstalledPkgs {
-				checkPackage(t, installedPackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.Revision)
+				checkPackage(t, installedPackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.EbuildVersion)
 			}
 
 			buildTimePackages := packageInfo.BuildTimePackages
@@ -117,13 +117,13 @@ func TestPackageInfo(t *testing.T) {
 			}
 
 			for index, pkg := range test.wantBuildTimePkgs {
-				checkPackage(t, buildTimePackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.Revision)
+				checkPackage(t, buildTimePackages[index], pkg.Category, pkg.Name, pkg.Version, pkg.EbuildVersion)
 			}
 		})
 	}
 }
 
-func checkPackage(t *testing.T, p Package, category string, name string, version string, revision int) {
+func checkPackage(t *testing.T, p Package, category string, name string, version string, ebuildVersion string) {
 	if p.Category != category {
 		t.Errorf("Wrong package category in package %v. want: %s, got: %s",
 			p, category, p.Category)
@@ -136,8 +136,8 @@ func checkPackage(t *testing.T, p Package, category string, name string, version
 		t.Errorf("Wrong package version in package %v. want: %s, got: %s",
 			p, version, p.Version)
 	}
-	if p.Revision != revision {
-		t.Errorf("Wrong package revision in package %v. want: %d, got: %d",
-			p, revision, p.Revision)
+	if p.EbuildVersion != ebuildVersion {
+		t.Errorf("Wrong package ebuild version in package %v. want: %s, got: %s",
+			p, ebuildVersion, p.EbuildVersion)
 	}
 }
