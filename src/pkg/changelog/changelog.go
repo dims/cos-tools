@@ -15,8 +15,9 @@
 // This package generates a changelog based on the commit history between
 // two build numbers. The changelog consists of two outputs - the commits
 // added to the target build that aren't present in the source build, and the
-// commits in the source build that aren't present in the target build. This
-// package uses concurrency to improve performance.
+// commits in the source build that aren't present in the target build. It
+// also finds the sysctl value changes between two builds by fetching artifacts
+// from GCS. This package uses concurrency to improve performance.
 //
 // This package uses Gitiles to request information from a Git on Borg instance.
 // To generate a changelog, the package first retrieves the the manifest files for
@@ -30,11 +31,16 @@
 package changelog
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
+	"cloud.google.com/go/storage"
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
 
@@ -298,7 +304,112 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 		}
 	}
 	outputChan <- additionsResult{Additions: repoCommits}
-	return
+}
+
+// getSysctlDiff finds sysctl difference between the two builds.
+// Returns a list of change lists:[[name, old-value, new-value], ...]
+func GetSysctlDiff(bucket, sourceBoard, sourceMilestone, source, targetBoard, targetMilestone, target string) (
+	[][]string, bool, bool) {
+	sourceBuildNum, targetBuildNum := resolveImageName(source), resolveImageName(target)
+	sourceChan := make(chan map[string]string)
+	targetChan := make(chan map[string]string)
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Errorf("failed to create storage client (error: %s)", err)
+		return [][]string{}, false, false
+	}
+	go fetchSysctlToMap(fmt.Sprintf("%s/%s-release/R%s-%s",
+		bucket, sourceBoard, sourceMilestone, sourceBuildNum), sourceChan, client, ctx)
+	go fetchSysctlToMap(fmt.Sprintf("%s/%s-release/R%s-%s",
+		bucket, targetBoard, targetMilestone, targetBuildNum), targetChan, client, ctx)
+	sourceSysctl := <-sourceChan
+	targetSysctl := <-targetChan
+	foundSource := false
+	foundTarget := false
+	// if either one of the sysctl file doesn't exist,
+	// return an empty list.
+	if len(sourceSysctl) > 0 {
+		foundSource = true
+	}
+	if len(targetSysctl) > 0 {
+		foundTarget = true
+	}
+	if !foundSource || !foundTarget {
+		return [][]string{}, foundSource, foundTarget
+	}
+
+	changes := [][]string{}
+	for newName, newValue := range targetSysctl {
+		if oldValue, found := sourceSysctl[newName]; !found {
+			changes = append(changes, []string{newName, "---", newValue})
+		} else if oldValue != newValue {
+			changes = append(changes, []string{newName, oldValue, newValue})
+		}
+	}
+	for oldName, oldValue := range sourceSysctl {
+		if _, found := targetSysctl[oldName]; !found {
+			changes = append(changes, []string{oldName, oldValue, "---"})
+		}
+	}
+
+	sort.SliceStable(changes, func(i, j int) bool {
+		return changes[i][0] < changes[j][0]
+	})
+
+	return changes, foundSource, foundTarget
+}
+
+// fetchSysctlToMap fetches sysctl file from artifacts in GCS created
+// by build-executor and map each line to a <parameter_name: value>
+// pair.
+func fetchSysctlToMap(path string, outputChan chan map[string]string, client *storage.Client, ctx context.Context) {
+	// Some sysctl value changes are insignificant and should not be displayed.
+	sysctlFilter := map[string]bool{
+		"kernel.hostname":                  true,
+		"kernel.version":                   true,
+		"fs.dentry-state":                  true,
+		"fs.file-nr":                       true,
+		"fs.inode-nr":                      true,
+		"fs.inode-state":                   true,
+		"fs.quota.syncs":                   true,
+		"kernel.ns_last_pid":               true,
+		"kernel.pty.nr":                    true,
+		"kernel.random.boot_id":            true,
+		"kernel.random.entropy_avail":      true,
+		"kernel.random.uuid":               true,
+		"net.netfilter.nf_conntrack_count": true,
+		"kernel.osrelease":                 true,
+	}
+	outMap := make(map[string]string)
+	defer func() { outputChan <- outMap }()
+	rc, err := client.Bucket(path).Object("sysctl_a.txt").NewReader(ctx)
+	if err != nil {
+		log.Errorf("failed to open %s at %s (error:%s)", "sysctl_a.txt", path, err)
+		return
+	}
+
+	byteBuf, err := ioutil.ReadAll(rc)
+	rc.Close()
+	if err != nil {
+		log.Errorf("failed to read sysctl file (error:%s)", err)
+		return
+	}
+	separator := " = "
+	for _, line := range strings.Split(string(byteBuf), "\n") {
+		parts := strings.Split(line, separator)
+		// Insignificant sysctl parameters are excluded.
+		if _, found := sysctlFilter[parts[0]]; found {
+			continue
+		}
+		// no value for this parameter
+		if len(parts) == 2 && parts[1] == "" {
+			outMap[parts[0]] = "---"
+		} else {
+			// assume the parameter name is before the first separator.
+			outMap[parts[0]] = strings.Join(parts[1:], separator)
+		}
+	}
 }
 
 // Changelog generates a changelog between 2 build numbers

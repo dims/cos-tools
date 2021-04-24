@@ -18,7 +18,7 @@
   </div>
   <div class="main">
     <h1>Changelog</h1>
-    <p class="feature-info">Retrieve a list of commits between two 
+    <p class="feature-info">Retrieve a list of commits and sysctl changes between two
       Container-Optimized OS builds.<br>
       Example Input: <b>cos-rc-85-13310-1034-0</b> or <b>13310.1034.0</b>
     </p>
@@ -43,7 +43,36 @@
           <input type="text" class="target" name="target" placeholder="Image Name or Build Number" required>
         {{end}}
         <input type="hidden" name="n" value={{.QuerySize}}>
+      </div>
+      <div class="text">
+        <label>From </label>
+        {{if (ne .SourceMilestone "")}}
+          <input type="text" class="source" name="source-milestone" placeholder="Milestone Number" value={{.SourceMilestone}} required>
+        {{else}}
+          <input type="text" class="source" name="source-milestone" placeholder="Milestone Number" required>
+        {{end}}
+        <label> to </label>
+        {{if (ne .TargetMilestone "")}}
+          <input type="text" class="target" name="target-milestone" placeholder="Milestone Number" value={{.TargetMilestone}} required>
+        {{else}}
+          <input type="text" class="target" name="target-milestone" placeholder="Milestone Number" required>
+        {{end}}
         <input class="submit" type="submit" value="Submit"><br>
+      </div>
+      <div class="text">
+        <label>From </label>
+        {{if (ne .SourceBoard "")}}
+          <input type="text" class="source" name="source-board" placeholder="Board Name" value={{.SourceBoard}}>
+        {{else}}
+          <input type="text" class="source" name="source-board" placeholder="Board Name">
+        {{end}}
+        <label> to </label>
+        {{if (ne .TargetBoard "")}}
+          <input type="text" class="target" name="target-board" placeholder="Board Name" value={{.TargetBoard}}>
+        {{else}}
+          <input type="text" class="target" name="target-board" placeholder="Board Name">
+        {{end}}
+        The default board is "lakitu".
       </div>
       <div class="radio">
         {{if .Internal}}
@@ -146,6 +175,25 @@
       </a>
     {{end}}
     {{end}}
+    {{if .Sysctl.NotEmpty}}
+    <h2>Runtime Sysctl Changes:</h2>
+      <table class="repo-table">
+        <tr>
+          <th class="sysctl">Sysctl</th>
+          <th class="sysctl">Old Value</th>
+          <th class="sysctl">New Value</th>
+        </tr>
+        {{range $sysctl := .Sysctl.Changes}}
+        <tr>
+          <td>{{index $sysctl 0}}</td>
+          <td class="sysctl removal">{{index $sysctl 1}}</td>
+          <td class="sysctl addition">{{index $sysctl 2}}</td>
+        </tr>
+        {{end}}
+      </table>
+      <div>{{.Sysctl.NotFound}}</div>
+    {{end}}
+  </table>
   </div>
 </body>
 </html>

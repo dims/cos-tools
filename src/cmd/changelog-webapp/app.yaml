@@ -8,10 +8,12 @@ env_variables:
   COS_CHANGELOG_CLIENT_SECRET_NAME: "cos-changelog-client-secret"
   COS_CHANGELOG_SESSION_SECRET_NAME: "cos-changelog-session-secret"
   COS_CHANGELOG_OAUTH_CALLBACK_NAME: "cos-changelog-oauth-callback"
+  COS_CHANGELOG_ARTIFACTS_BUCKET_NAME: "cos-changelog-artifacts-bucket"
 
   # Webpage configuration
   STATIC_BASE_PATH: "src/cmd/changelog-webapp/static/"
   CHANGELOG_QUERY_SIZE: "50"
+  BOARD_NAME: "lakitu"
 
   # External sources
   COS_EXTERNAL_GERRIT_INSTANCE: "https://cos-review.googlesource.com"

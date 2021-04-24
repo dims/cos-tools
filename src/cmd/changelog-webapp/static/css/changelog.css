@@ -129,3 +129,7 @@ th.commit-sha {
 .build-info-link {
     font-size: 15;
 }
+
+.sysctl{
+    text-align: center;
+}
