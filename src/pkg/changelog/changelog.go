@@ -15,8 +15,9 @@
 // This package generates a changelog based on the commit history between
 // two build numbers. The changelog consists of two outputs - the commits
 // added to the target build that aren't present in the source build, and the
-// commits in the source build that aren't present in the target build. This
-// package uses concurrency to improve performance.
+// commits in the source build that aren't present in the target build. It
+// also finds the sysctl value changes between two builds by fetch artifacts
+// from GCS. This package uses concurrency to improve performance.
 //
 // This package uses Gitiles to request information from a Git on Borg instance.
 // To generate a changelog, the package first retrieves the the manifest files for
@@ -30,11 +31,16 @@
 package changelog
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
+	"cloud.google.com/go/storage"
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"github.com/beevik/etree"
 
@@ -298,7 +304,98 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 		}
 	}
 	outputChan <- additionsResult{Additions: repoCommits}
-	return
+}
+
+// getSysctlDiff finds sysctl difference between the two builds.
+func GetSysctlDiff(bucket, pathSuffix, sourceBoard, sourceMilestone, source, targetBoard, targetMilestone, target string) (
+	[]string, []string, []string, bool, bool) {
+	sourceBuildNum, targetBuildNum := resolveImageName(source), resolveImageName(target)
+	sourceChan := make(chan map[string]string)
+	targetChan := make(chan map[string]string)
+	go fetchSysctlToMap(fmt.Sprintf("%s/%s%s/R%s-%s",
+		bucket, sourceBoard, pathSuffix, sourceMilestone, sourceBuildNum), sourceChan)
+	go fetchSysctlToMap(fmt.Sprintf("%s/%s%s/R%s-%s",
+		bucket, targetBoard, pathSuffix, targetMilestone, targetBuildNum), targetChan)
+	sourceSysctl := <-sourceChan
+	targetSysctl := <-targetChan
+	foundSource := false
+	foundTarget := false
+	// if either one of the sysctl file doesn't exsit,
+	// return an empty list.
+	if len(sourceSysctl) > 0 {
+		foundSource = true
+	}
+	if len(targetSysctl) > 0 {
+		foundTarget = true
+	}
+	if !foundSource || !foundTarget {
+		return []string{}, []string{}, []string{}, foundSource, foundTarget
+	}
+
+	addList := []string{}
+	changeList := []string{}
+	deleteList := []string{}
+	for newName, newValue := range targetSysctl {
+		if oldValue, found := sourceSysctl[newName]; !found {
+			addList = append(addList,
+				fmt.Sprintf("%s: %s", newName, newValue))
+		} else if oldValue != newValue {
+			changeList = append(changeList,
+				fmt.Sprintf("%s: %s -> %s", newName, oldValue, newValue))
+		}
+	}
+	for oldName, oldValue := range sourceSysctl {
+		if _, found := targetSysctl[oldName]; !found {
+			deleteList = append(deleteList,
+				fmt.Sprintf("%s: %s", oldName, oldValue))
+		}
+	}
+
+	sort.Strings(addList)
+	sort.Strings(changeList)
+	sort.Strings(deleteList)
+
+	return addList, changeList, deleteList, foundSource, foundTarget
+}
+
+// fetchSysctlToMap fetches sysctl file from artifacts in GCS created
+// by build-executor and map each line to a <parameter_name: value>
+// pair.
+func fetchSysctlToMap(path string, outputChan chan map[string]string) {
+	outMap := make(map[string]string)
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Errorf("failed to create storage client (error: %s)", err)
+		outputChan <- outMap
+		return
+	}
+
+	rc, err := client.Bucket(path).Object("sysctl_a.txt").NewReader(ctx)
+	if err != nil {
+		log.Errorf("failed to open %s at %s (error:%s)", "sysctl_a.txt", path, err)
+		outputChan <- outMap
+		return
+	}
+
+	byteBuf, err := ioutil.ReadAll(rc)
+	if err != nil {
+		log.Errorf("failed to read sysctl file (error:%s)", err)
+		outputChan <- outMap
+		return
+	}
+	separator := " = "
+	for _, line := range strings.Split(string(byteBuf), "\n") {
+		parts := strings.Split(line, separator)
+		// no value for this parameter
+		if len(parts) == 1 {
+			outMap[parts[0]] = " "
+		} else {
+			// assume the parameter name is before the first separator.
+			outMap[parts[0]] = strings.Join(parts[1:], separator)
+		}
+	}
+	outputChan <- outMap
 }
 
 // Changelog generates a changelog between 2 build numbers
@@ -324,6 +421,9 @@ func additions(clients map[string]gitilesProto.GitilesClient, sourceRepos map[st
 //
 // The second changelog contains all commits that are present in the source build
 // but not present in the target build
+//
+// It also finds the sysctl value difference between two builds by comparing
+// sysctl files in GCS.
 func Changelog(httpClient *http.Client, source, target, host, repo, croslandURL string, querySize int) (map[string]*RepoLog, map[string]*RepoLog, utils.ChangelogError) {
 	if httpClient == nil {
 		log.Error("httpClient is nil")
