@@ -46,9 +46,6 @@ var (
 	externalGoBInstance            string
 	externalManifestRepo           string
 	envQuerySize                   string
-	envBoard                       string
-	artifactsBucket                string
-	artifactsPathSuffix            string
 
 	staticBasePath          string
 	indexTemplate           *template.Template
@@ -86,20 +83,10 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed to retrieve secret for CROSLAND_NAME with key name %s\n%v", os.Getenv("CROSLAND_NAME"), err)
 	}
-	artifactsBucket, err = getSecret(client, os.Getenv("COS_CHANGELOG_ARTIFACTS_BUCKET_NAME"))
-	if err != nil {
-		log.Fatalf("Failed to retrieve secret for COS_CHANGELOG_ARTIFACTS_BUCKET_NAME with key name %s\n%v", os.Getenv("COS_CHANGELOG_ARTIFACTS_BUCKET_NAME"), err)
-	}
-	artifactsPathSuffix, err = getSecret(client, os.Getenv("COS_CHANGELOG_ARTIFACTS_PATH_SUFFIX_NAME"))
-	if err != nil {
-		log.Fatalf("Failed to retrieve secret for COS_CHANGELOG_ARTIFACTS_PATH_SUFFIX_NAME with key name %s\n%v", os.Getenv("COS_CHANGELOG_ARTIFACTS_PATH_SUFFIX_NAME"), err)
-	}
-
 	externalGerritInstance = os.Getenv("COS_EXTERNAL_GERRIT_INSTANCE")
 	externalFallbackGerritInstance = os.Getenv("COS_EXTERNAL_FALLBACK_GERRIT_INSTANCE")
 	externalGoBInstance = os.Getenv("COS_EXTERNAL_GOB_INSTANCE")
 	externalManifestRepo = os.Getenv("COS_EXTERNAL_MANIFEST_REPO")
-	envBoard = os.Getenv("BOARD_NAME")
 	envQuerySize = getIntVerifiedEnv("CHANGELOG_QUERY_SIZE")
 	staticBasePath = os.Getenv("STATIC_BASE_PATH")
 	indexTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/index.html"))
@@ -119,24 +106,11 @@ type changelogData struct {
 }
 
 type changelogPage struct {
-	Source          string
-	Target          string
-	SourceBoard     string
-	SourceMilestone string
-	TargetBoard     string
-	TargetMilestone string
-	QuerySize       string
-	RepoTables      []*repoTable
-	Internal        bool
-	Sysctl          *sysctlChanges
-}
-
-type sysctlChanges struct {
-	Added    []string
-	Changed  []string
-	Deleted  []string
-	NotFound string
-	NotEmpty bool
+	Source     string
+	Target     string
+	QuerySize  string
+	RepoTables []*repoTable
+	Internal   bool
 }
 
 type findBuildPage struct {
@@ -336,7 +310,7 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	if err := r.ParseForm(); err != nil {
-		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Sysctl: new(sysctlChanges)})
+		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize})
 		if err != nil {
 			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -345,19 +319,9 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 	}
 	source := r.FormValue("source")
 	target := r.FormValue("target")
-	sourceMilestone := r.FormValue("source milestone")
-	targetMilestone := r.FormValue("target milestone")
-	sourceBoard := r.FormValue("source board")
-	if sourceBoard == "" {
-		sourceBoard = envBoard
-	}
-	targetBoard := r.FormValue("target board")
-	if targetBoard == "" {
-		targetBoard = envBoard
-	}
 	// If no source/target values specified in request, display empty changelog page
 	if source == "" || target == "" {
-		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true, Sysctl: new(sysctlChanges)})
+		err = changelogTemplate.Execute(w, &changelogPage{QuerySize: envQuerySize, Internal: true})
 		if err != nil {
 			log.Errorf("error executing findbuild template: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -392,28 +356,6 @@ func HandleChangelog(w http.ResponseWriter, r *http.Request) {
 		Removals:  removed,
 		Internal:  internal,
 	})
-	page.SourceMilestone = sourceMilestone
-	page.SourceBoard = sourceBoard
-	page.TargetMilestone = targetMilestone
-	page.TargetBoard = targetBoard
-
-	page.Sysctl = new(sysctlChanges)
-	var foundSource, foundTarget bool
-	page.Sysctl.Added, page.Sysctl.Changed, page.Sysctl.Deleted,
-		foundSource, foundTarget = changelog.GetSysctlDiff(artifactsBucket, artifactsPathSuffix, sourceBoard,
-		sourceMilestone, source, targetBoard, targetMilestone, target)
-	page.Sysctl.NotEmpty = false
-	if !foundSource {
-		page.Sysctl.NotFound += fmt.Sprintf("sysctl file for %s-%s-%s not found.<br>", sourceBoard, sourceMilestone, source)
-		page.Sysctl.NotEmpty = true
-	}
-	if !foundTarget {
-		page.Sysctl.NotFound += fmt.Sprintf("sysctl file for %s-%s-%s not found.<br>", targetBoard, targetMilestone, target)
-		page.Sysctl.NotEmpty = true
-	}
-	if len(page.Sysctl.Added) > 0 || len(page.Sysctl.Changed) > 0 || len(page.Sysctl.Deleted) > 0 {
-		page.Sysctl.NotEmpty = true
-	}
 	err = changelogTemplate.Execute(w, page)
 	if err != nil {
 		log.Errorf("error executing changelog template: %v", err)
