@@ -12,7 +12,7 @@ steps:
 
       echo "Building $d ... "
       (
-        gcloud builds submit $d --config=${config}
+        gcloud builds submit --config=${config} --substitutions=_OUTPUT_PROJECT=${_OUTPUT_PROJECT},TAG_NAME=${COMMIT_SHA}
       ) &
     done
     wait
