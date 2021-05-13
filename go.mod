@@ -1,14 +1,14 @@
 module cos.googlesource.com/cos/tools.git
 
-go 1.14
+go 1.16
 
 require (
-	cloud.google.com/go v0.57.0
-	cloud.google.com/go/storage v1.10.0
+	cloud.google.com/go v0.75.0
+	cloud.google.com/go/storage v1.13.0
 	github.com/andygrunwald/go-gerrit v0.0.0-20201231163137-46815e48bfe0
 	github.com/beevik/etree v1.1.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/google/go-cmp v0.5.1
+	github.com/google/go-cmp v0.5.4
 	github.com/google/subcommands v1.2.0
 	github.com/gorilla/sessions v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
@@ -18,9 +18,9 @@ require (
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/urfave/cli/v2 v2.2.0
 	go.chromium.org/luci v0.0.0-20200722211809-bab0c30be68b
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	google.golang.org/api v0.28.0
-	google.golang.org/genproto v0.0.0-20200618031413-b414f8b61790
-	google.golang.org/grpc v1.29.1
+	golang.org/x/oauth2 v0.0.0-20210201163806-010130855d6c
+	google.golang.org/api v0.39.0
+	google.golang.org/genproto v0.0.0-20210203152818-3206188e46ba
+	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
 )
