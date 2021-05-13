@@ -1,0 +1,134 @@
+{
+  "Name": "build-image",
+  "Vars": {
+    "source_image": {"Required": true, "Description": "URL of the source image to preload."},
+    "output_image_name": {"Required": true, "Description": "Name of output image."},
+    "output_image_family": {"Value": "", "Description": "Family of output image."},
+    "output_image_project": {"Required": true, "Description": "Project of output image."},
+    "cidata_img": {"Required": true, "Description": "Path to CIDATA vfat image containing cloud-init user-data and the provisioner program. Must be in .tar.gz format."},
+    "disk_size_gb": {"Value": "10", "Description": "The disk size to use for preloading."},
+    "host_maintenance": {"Value": "MIGRATE", "Description": "VM behavior when there is maintenance."}
+  },
+  "Sources": {
+    "cloud-config": "/data/startup.yaml",
+    "cidata.tar.gz_": "${cidata_img}"
+  },
+  "Steps": {
+    "copy-gcs": {
+      "CopyGCSObjects": [
+        {
+          "Source": "${SOURCESPATH}/cidata.tar.gz_",
+          "Destination": "${SOURCESPATH}/cidata.tar.gz"
+        }
+      ]
+    },
+    "create-cidata": {
+      "CreateImages": [
+        {
+          "Name": "cidata",
+          "RawDisk": {
+            "Source": "${SOURCESPATH}/cidata.tar.gz"
+          }
+        }
+      ]
+    },
+    "setup": {
+      "CreateDisks": [
+        {
+          "Name": "boot-disk",
+          "SourceImage": "${source_image}",
+          "SizeGb": "${disk_size_gb}"
+        },
+        {
+          "Name": "cidata-disk",
+          "SourceImage": "cidata"
+        }
+      ]
+    },
+    "run": {
+      "CreateInstances": [
+        {
+          "Name": "preload-vm",
+          "Disks": [{"Source": "boot-disk"}, {"Source": "cidata-disk"}],
+          "guestAccelerators": {{.Accelerators}},
+          "scheduling": {
+            "onHostMaintenance": "${host_maintenance}"
+          },
+          "Metadata": {
+            "user-data": "${SOURCE:cloud-config}",
+            "block-project-ssh-keys": "TRUE",
+            "cos-update-strategy": "update_disabled"
+          },
+          "Scopes": [
+            "https://www.googleapis.com/auth/devstorage.read_write",
+            "https://www.googleapis.com/auth/cloud-platform"
+          ]
+        }
+      ]
+    },
+    "wait-preload-finished": {
+      "WaitForInstancesSignal": [
+        {
+          "Name": "preload-vm",
+          "Interval": "30s",
+          "SerialOutput": {
+            "Port": 3,
+            "FailureMatch": "BuildFailed:",
+            "SuccessMatch": "BuildSucceeded:",
+            "StatusMatch": "BuildStatus:"
+          }
+        }
+      ]
+    },
+    "send-logging-end-msg": {
+      "UpdateInstancesMetadata": [
+        {
+          "Instance": "preload-vm",
+          "Metadata": {
+            "DaisyEnd": "ack"
+          }
+        }
+      ]
+    },
+    "wait-vm-shutdown": {
+      "WaitForInstancesSignal": [
+        {
+          "Name": "preload-vm",
+          "Interval": "2s",
+          "Stopped": true
+        }
+      ]
+    },
+    "wait-for-resize": {
+      {{.WaitResize}}
+    },
+    "resize-disk": {
+      {{.ResizeDisks}}
+    },
+    "image": {
+      "CreateImages": [
+        {
+          "RealName": "${output_image_name}",
+          "Project": "${output_image_project}",
+          "NoCleanup": true,
+          "SourceDisk": "boot-disk",
+          "labels": {{.Labels}},
+          "description": "Derivative of ${source_image}.",
+          "family": "${output_image_family}",
+          "licenses": {{.Licenses}}
+        }
+      ]
+    }
+  },
+  "Dependencies": {
+    "create-cidata": ["copy-gcs"],
+    "setup": ["create-cidata"],
+    "run": ["setup"],
+    "wait-preload-finished": ["run"],
+    "wait-for-resize": ["run"],
+    "resize-disk": ["wait-for-resize"],
+    "send-logging-end-msg": ["wait-preload-finished", "resize-disk"],
+    "wait-vm-shutdown": ["send-logging-end-msg"],
+    "image": ["wait-vm-shutdown"]
+  }
+}

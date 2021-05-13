@@ -1,0 +1,74 @@
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the License);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an AS IS BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "cos_customizer_lib",
+    srcs = [
+        "disable_auto_update.go",
+        "finish_image_build.go",
+        "flag_vars.go",
+        "install_gpu.go",
+        "main.go",
+        "run_script.go",
+        "seal_oem.go",
+        "start_image_build.go",
+    ],
+    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/cmd/cos_customizer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/pkg/config",
+        "//src/pkg/fs",
+        "//src/pkg/gce",
+        "//src/pkg/preloader",
+        "//src/pkg/provisioner",
+        "//src/pkg/tools/partutil",
+        "//src/pkg/utils",
+        "@com_github_google_subcommands//:subcommands",
+        "@com_google_cloud_go_storage//:storage",
+        "@org_golang_google_api//compute/v1:compute",
+        "@org_golang_google_api//iterator",
+        "@org_golang_google_api//option",
+        "@org_golang_x_oauth2//google",
+    ],
+)
+
+go_test(
+    name = "cos_customizer_test",
+    srcs = [
+        "finish_image_build_test.go",
+        "flag_vars_test.go",
+        "install_gpu_test.go",
+        "run_script_test.go",
+        "start_image_build_test.go",
+    ],
+    embed = [":cos_customizer_lib"],
+    deps = [
+        "//src/pkg/config",
+        "//src/pkg/fakes",
+        "//src/pkg/fs",
+        "//src/pkg/provisioner",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_subcommands//:subcommands",
+        "@com_google_cloud_go_storage//:storage",
+        "@org_golang_google_api//compute/v1:compute",
+    ],
+)
+
+go_binary(
+    name = "cos_customizer",
+    embed = [":cos_customizer_lib"],
+    visibility = ["//visibility:public"],
+)

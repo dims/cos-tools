@@ -1,3 +1,17 @@
+// Copyright 2021 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package utils provides utility functions.
 package utils
 
@@ -8,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,7 +33,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	log "github.com/golang/glog"
+	"github.com/golang/glog"
 )
 
 var (
@@ -60,17 +75,17 @@ func Flock() {
 	// TODO(mikewu): generalize Flock to make it useful for other use cases.
 	f, err := os.OpenFile(lockFile, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		log.Exitf("Failed to open lock file: %v", err)
+		glog.Exitf("Failed to open lock file: %v", err)
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		log.Exitf("File %s is locked. Other process might be running.", lockFile)
+		glog.Exitf("File %s is locked. Other process might be running.", lockFile)
 	}
 }
 
 // DownloadContentFromURL downloads file from a given URL.
 func DownloadContentFromURL(url, outputPath, infoStr string) error {
 	url = strings.TrimSpace(url)
-	log.Infof("Downloading %s from %s", infoStr, url)
+	glog.Infof("Downloading %s from %s", infoStr, url)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -99,10 +114,10 @@ func DownloadContentFromURL(url, outputPath, infoStr string) error {
 	for retries > 0 {
 		response, err = client.Do(req)
 		if err != nil {
-			log.Errorf("Failed to download %s: %v", infoStr, err)
+			glog.Errorf("Failed to download %s: %v", infoStr, err)
 			retries--
 			time.Sleep(time.Second)
-			log.Info("Retry...")
+			glog.Info("Retry...")
 		} else {
 			break
 		}
@@ -118,7 +133,7 @@ func DownloadContentFromURL(url, outputPath, infoStr string) error {
 		return errors.Wrapf(err, "failed to download %s", infoStr)
 	}
 
-	log.Infof("Successfully downloaded %s from %s", infoStr, url)
+	glog.Infof("Successfully downloaded %s from %s", infoStr, url)
 	return nil
 }
 
@@ -132,7 +147,7 @@ func DownloadFromGCS(destDir, gcsBucket, gcsPath string) error {
 
 // ListGCSBucket lists the objects whose names begin with the given prefix in the given GCS bucekt.
 func ListGCSBucket(bucket, prefix string) ([]string, error) {
-	log.Infof("Listing objects from GCS bucekt %s with prefix %s", bucket, prefix)
+	glog.Infof("Listing objects from GCS bucekt %s with prefix %s", bucket, prefix)
 
 	url := fmt.Sprintf("https://storage.googleapis.com/storage/v1/b/%s/o?prefix=%s", bucket, prefix)
 	dir, err := ioutil.TempDir("", "bucketlist")
@@ -268,17 +283,17 @@ func CreateTarFile(tarFilename string, files map[string][]byte) error {
 
 // RunCommandAndLogOutput runs the given command and logs the stdout and stderr in parallel.
 func RunCommandAndLogOutput(cmd *exec.Cmd, expectError bool) error {
-	errLogger := log.Error
+	errLogger := glog.Error
 	if expectError {
-		errLogger = log.V(1).Info
+		errLogger = glog.V(1).Info
 	}
 
-	cmd.Stdout = &loggingWriter{logger: log.Info}
+	cmd.Stdout = &loggingWriter{logger: glog.Info}
 	cmd.Stderr = &loggingWriter{logger: errLogger}
 
 	err := cmd.Run()
 	if _, ok := err.(*exec.ExitError); ok && expectError {
-		log.Warningf("command %s didn't complete successfully: %v", cmd.Path, err)
+		glog.Warningf("command %s didn't complete successfully: %v", cmd.Path, err)
 		return nil
 	}
 	return err
@@ -344,4 +359,41 @@ func (l *loggingWriter) Write(p []byte) (int, error) {
 		l.buf = append(l.buf, b)
 	}
 	return len(p), nil
+}
+
+// CheckClose closes an io.Closer and checks its error. Useful for checking the
+// errors on deferred Close() behaviors.
+func CheckClose(closer io.Closer, errMsgOnClose string, err *error) {
+	if closeErr := closer.Close(); closeErr != nil {
+		var fullErr error
+		if errMsgOnClose != "" {
+			fullErr = fmt.Errorf("%s: %v", errMsgOnClose, closeErr)
+		} else {
+			fullErr = closeErr
+		}
+		if *err == nil {
+			*err = fullErr
+		} else {
+			log.Println(fullErr)
+		}
+	}
+}
+
+// RunCommand runs a command using exec.Command. The command runs in the working
+// directory "dir" with environment "env" and outputs to stdout and stderr.
+func RunCommand(args []string, dir string, env []string) error {
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = dir
+	cmd.Env = env
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf(`error in cmd "%v", see stderr for details: %v`, args, err)
+	}
+	return nil
+}
+
+// QuoteForShell quotes a string for use in a bash shell.
+func QuoteForShell(str string) string {
+	return fmt.Sprintf("'%s'", strings.Replace(str, "'", "'\"'\"'", -1))
 }

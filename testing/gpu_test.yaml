@@ -1,0 +1,81 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the License);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an AS IS BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+steps:
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - |
+    test_list=("gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=390.46 --async --format='value(ID)' ." 
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=396.26 --async --format='value(ID)' ."   
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=396.37 --async --format='value(ID)' ." 
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=396.44 --async --format='value(ID)' ."
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=418.67,_INPUT_IMAGE=cos-73-11647-656-0\
+                  --async --format='value(ID)' ."
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=418.67,_INPUT_IMAGE=cos-77-12371-1079-0\
+                  --async --format='value(ID)' ."
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-81-12871-1196-0\
+                  --async --format='value(ID)' ."
+               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-rc-85-13310-1040-0\
+                  --async --format='value(ID)' .")
+    build_ids=()
+    exit_code=0
+    for test in "${test_list[@]}"; do
+      build_ids+=("$(eval "${test}")")
+    done
+    for build_id in "${build_ids[@]}"; do
+      status=""
+      while true; do
+        status="$(gcloud builds describe "${build_id}" --format='value(status)')"
+        case "${status}" in
+          "SUCCESS"|"FAILURE"|"INTERNAL_ERROR"|"TIMEOUT"|"CANCELLED")
+            echo "${status}"
+            break
+            ;;
+          "QUEUED"|"WORKING")
+            sleep 5
+            ;;
+          "STATUS_UNKNOWN")
+            echo "Received STATUS_UNKNOWN for build ${build_id}" 1>&2
+            sleep 5
+            ;;
+          *)
+            echo "Unknown status for build ${build_id}: ${status}" 1>&2
+            break
+            ;;
+        esac
+      done
+      if [[ "${status}" == "SUCCESS" ]]; then
+        echo "Build ${build_id} succeeded"
+      else
+        log_url="$(gcloud builds describe "${build_id}" --format='value(logUrl)')"
+        echo "Build ${build_id} failed"
+        echo "Logs: ${log_url}"
+        exit_code=1
+      fi
+    done
+    exit "${exit_code}"
+options:
+  machineType: 'N1_HIGHCPU_32'
+timeout: "7200s"
