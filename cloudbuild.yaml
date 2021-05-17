@@ -36,4 +36,4 @@ steps:
     fi
     echo "All builds succeeded."
 
-timeout: 3600s
+timeout: 7200s
