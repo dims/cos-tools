@@ -21,5 +21,5 @@ steps:
 # image after building it, because a subsequent `docker push` won't find the
 # image locally.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['buildx', 'build', '--platform', 'linux/amd64,linux/arm64', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:${TAG_NAME}', '--push', '.']
+  args: ['buildx', 'build', '--platform', 'linux/amd64,linux/arm64', '-f', 'src/cmd/toolbox/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:${TAG_NAME}', '--push', 'src/cmd/toolbox']
 timeout: 1800s

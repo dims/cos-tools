@@ -4,6 +4,10 @@ steps:
   args:
   - '-c'
   - |
+    # File that contains failures.
+    failure_file=failure.log
+    touch ${failure_file}
+
     for d in src/cmd/*/; do
       config="${d}cloudbuild.yaml"
       if [[ ! -f "${config}" ]]; then
@@ -12,8 +16,24 @@ steps:
 
       echo "Building $d ... "
       (
-        gcloud builds submit --config=${config} --substitutions=_OUTPUT_PROJECT=${_OUTPUT_PROJECT},TAG_NAME=${COMMIT_SHA}
+        logfile="${d::-1}.log"
+        gcloud builds submit --config=${config} --substitutions=_OUTPUT_PROJECT=${_OUTPUT_PROJECT},TAG_NAME=${COMMIT_SHA} > ${logfile} 2>&1
+        if [[ $? -ne 0 ]]; then
+          echo "$d failed" | tee -a ${failure_file}
+          cat ${logfile}
+        fi
       ) &
     done
     wait
+
+    # Check if there is any failure.
+    if [[ -s ${failure_file} ]]; then
+      echo
+      echo "Some builds failed:"
+      cat ${failure_file}
+      echo "Exiting."
+      exit 1
+    fi
+    echo "All builds succeeded."
+
 timeout: 3600s
