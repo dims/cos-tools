@@ -1,0 +1,24 @@
+entry {
+    cos_image_family: "cos-89-lts"
+    gpu_driver_version: "450.119.04"
+}
+
+entry {
+    cos_image_family: "cos-85-lts"
+    gpu_driver_version: "450.119.04"
+}
+
+entry {
+    cos_image_family: "cos-85-lts"
+    gpu_driver_version: "450.80.02"
+}
+
+entry {
+    cos_image_family: "cos-85-lts"
+    gpu_driver_version: "450.51.06"
+}
+
+entry {
+    cos_image_family: "cos-81-lts"
+    gpu_driver_version: "418.67"
+}

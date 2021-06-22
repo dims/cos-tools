@@ -34,4 +34,10 @@ src/cmd/cos_gpu_installer/release/build_and_release.sh <GCR-project> <image-tag>
 
 ## Test
 
+### Source code
 Currently only unittest is available. Use `go test` to run unittest.
+
+### GPU drivers availability
+The test `test/check_drivers_test.go` is available for checking GPU drivers
+availability. It checks which drivers are available for live COS images.
+Use `test/run_test.sh` to run the test.

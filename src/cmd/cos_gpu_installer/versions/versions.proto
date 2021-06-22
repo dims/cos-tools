@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package versions;
+
+option go_package = "cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_installer/versions";
+
+// This proto defines a list of Nvidia precompiled drivers that are required for COS customers.
+message GpuVersionMap {
+ repeated GpuVersionMapEntry entry = 1;
+}
+
+message GpuVersionMapEntry {
+  // Name of a COS image family.
+  // Required.
+  optional string cos_image_family = 1;
+
+  // Version of a GPU driver.
+  // Required.
+  optional string gpu_driver_version = 2;
+}
