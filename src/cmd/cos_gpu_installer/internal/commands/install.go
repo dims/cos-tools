@@ -49,7 +49,9 @@ func (*InstallCommand) Usage() string { return "install [-dir <filepath>]\n" }
 // SetFlags implements subcommands.Command.SetFlags.
 func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.driverVersion, "version", "",
-		"The GPU driver verion to install. It will install the default GPU driver if the flag is not set explicitly.")
+		"The GPU driver verion to install. "+
+			"It will install the default GPU driver if the flag is not set explicitly. "+
+			"Set the flag to 'latest' to install the latest GPU driver version.")
 	f.StringVar(&c.hostInstallDir, "host-dir", "",
 		"Host directory that GPU drivers should be installed to. "+
 			"It tries to read from the env NVIDIA_INSTALL_DIR_HOST if the flag is not set explicitly.")
@@ -78,13 +80,10 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
 
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
-	if c.driverVersion == "" {
-		defaultVersion, err := installer.GetDefaultGPUDriverVersion(downloader)
-		if err != nil {
-			c.logError(errors.Wrap(err, "failed to get default driver version"))
-			return subcommands.ExitFailure
-		}
-		c.driverVersion = defaultVersion
+	c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
+	if err != nil {
+		c.logError(errors.Wrap(err, "failed to get default driver version"))
+		return subcommands.ExitFailure
 	}
 	log.Infof("Installing GPU driver version %s", c.driverVersion)
 
@@ -128,6 +127,16 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 
 	return subcommands.ExitSuccess
+}
+
+func getDriverVersion(downloader *cos.GCSDownloader, argVersion string) (string, error) {
+	if argVersion == "" {
+		return installer.GetDefaultGPUDriverVersion(downloader)
+	} else if argVersion == "latest" {
+		return installer.GetLatestGPUDriverVersion(downloader)
+	}
+	// argVersion is an acutal verson, return it as-is.
+	return argVersion, nil
 }
 
 func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.EnvReader, downloader *cos.GCSDownloader) error {

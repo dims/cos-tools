@@ -23,6 +23,7 @@ import (
 const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
 	defaultGPUDriverFile          = "gpu_default_version"
+	latestGPUDriverFile           = "gpu_latest_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
 )
@@ -188,6 +189,16 @@ func GetDefaultGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, err
 	content, err := downloader.GetArtifact(defaultGPUDriverFile)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get default GPU driver version")
+	}
+	return strings.Trim(string(content), "\n "), nil
+}
+
+// GetLatestGPUDriverVersion gets the latest GPU driver version.
+func GetLatestGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
+	log.Info("Getting the latest GPU driver version")
+	content, err := downloader.GetArtifact(latestGPUDriverFile)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get latest GPU driver version")
 	}
 	return strings.Trim(string(content), "\n "), nil
 }

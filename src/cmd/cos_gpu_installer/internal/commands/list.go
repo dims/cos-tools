@@ -62,11 +62,21 @@ func (c *ListCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfa
 		c.logError(errors.Wrap(err, "failed to get default driver version"))
 		return subcommands.ExitFailure
 	}
+	latestVersion, err := installer.GetLatestGPUDriverVersion(downloader)
+	if err != nil {
+		c.logWarning(errors.Wrap(err, "failed to get latest driver version"))
+	}
 	for _, artifact := range artifacts {
 		if strings.HasSuffix(artifact, ".signature.tar.gz") {
 			driverVersion := strings.TrimSuffix(artifact, ".signature.tar.gz")
 			if defaultVersion == driverVersion {
-				fmt.Printf("%s [default]\n", driverVersion)
+				if latestVersion == driverVersion {
+					fmt.Printf("%s [default][latest]\n", driverVersion)
+				} else {
+					fmt.Printf("%s [default]\n", driverVersion)
+				}
+			} else if latestVersion == driverVersion {
+				fmt.Printf("%s [latest]\n", driverVersion)
 			} else {
 				fmt.Printf("%s\n", driverVersion)
 			}
@@ -80,5 +90,13 @@ func (c *ListCommand) logError(err error) {
 		log.Errorf("%+v", err)
 	} else {
 		log.Errorf("%v", err)
+	}
+}
+
+func (c *ListCommand) logWarning(err error) {
+	if c.debug {
+		log.Warningf("%+v", err)
+	} else {
+		log.Warningf("%v", err)
 	}
 }
