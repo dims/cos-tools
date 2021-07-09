@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"flag"
 
@@ -14,6 +15,7 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_installer/internal/signing"
 	"cos.googlesource.com/cos/tools.git/src/pkg/cos"
 	"cos.googlesource.com/cos/tools.git/src/pkg/modules"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	log "github.com/golang/glog"
 	"github.com/google/subcommands"
@@ -21,6 +23,7 @@ import (
 )
 
 const (
+	grepNotFound    = 1
 	hostRootPath    = "/root"
 	kernelSrcDir    = "/build/usr/src/linux"
 	kernelHeaderDir = "/build/usr/src/linux-headers"
@@ -78,6 +81,22 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 
 	log.Infof("Running on COS build id %s", envReader.BuildNumber())
+
+	if releaseTrack := envReader.ReleaseTrack(); releaseTrack == "dev-channel" || releaseTrack == "beta-channel" {
+		c.logError(fmt.Errorf("GPU installation is not supported on dev & beta image for now; Please use LTS image."))
+		return subcommands.ExitFailure
+	}
+
+	var isGpuConfigured bool
+	if isGpuConfigured, err = c.isGpuConfigured(); err != nil {
+		c.logError(errors.Wrapf(err, "failed to check if GPU is configured"))
+		return subcommands.ExitFailure
+	}
+
+	if !isGpuConfigured {
+		c.logError(fmt.Errorf("Please have GPU device configured"))
+		return subcommands.ExitFailure
+	}
 
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
 	c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
@@ -148,6 +167,9 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 
 	if !c.unsignedDriver {
 		if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
+			if strings.Contains(err.Error(), "404 Not Found") {
+				return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
+			}
 			return errors.Wrap(err, "failed to download driver signature")
 		}
 	}
@@ -187,4 +209,14 @@ func (c *InstallCommand) logError(err error) {
 	} else {
 		log.Errorf("%v", err)
 	}
+}
+
+func (c *InstallCommand) isGpuConfigured() (bool, error) {
+	cmd := "lspci | grep -i \"nvidia\""
+	returnCode, err := utils.RunCommandWithExitCode([]string{cmd}, "", nil)
+	if err != nil {
+		return false, err
+	}
+	isConfigured := returnCode == grepNotFound
+	return isConfigured, nil
 }

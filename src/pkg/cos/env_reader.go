@@ -12,17 +12,20 @@ import (
 
 const (
 	osReleasePath     = "/etc/os-release"
+	lsbReleasePath    = "/etc/lsb-release"
 	toolchainPathFile = "/etc/toolchain-path"
 
 	buildID        = "BUILD_ID"
 	version        = "VERSION"
 	kernelCommitID = "KERNEL_COMMIT_ID"
+	releaseTrack   = "CHROMEOS_RELEASE_TRACK"
 )
 
 // EnvReader is to read system configurations of COS.
 // TODO(mikewu): rename EnvReader to a better name.
 type EnvReader struct {
 	osRelease     map[string]string
+	lsbRelease    map[string]string
 	toolchainPath string
 	uname         syscall.Utsname
 }
@@ -33,6 +36,11 @@ func NewEnvReader(hostRootPath string) (reader *EnvReader, err error) {
 	reader.osRelease, err = utils.LoadEnvFromFile(hostRootPath, osReleasePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read OsRelease file from %s", osReleasePath)
+	}
+
+	reader.lsbRelease, err = utils.LoadEnvFromFile(hostRootPath, lsbReleasePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read lsbRelease file from %s", lsbReleasePath)
 	}
 
 	if toolchainPath, err := ioutil.ReadFile(filepath.Join(hostRootPath, toolchainPathFile)); err == nil {
@@ -47,6 +55,9 @@ func NewEnvReader(hostRootPath string) (reader *EnvReader, err error) {
 
 // OsRelease returns configs of /etc/os-release as a map.
 func (c *EnvReader) OsRelease() map[string]string { return c.osRelease }
+
+// ReleaseTrack returns the COS release track.
+func (c *EnvReader) ReleaseTrack() string { return c.lsbRelease[releaseTrack] }
 
 // BuildNumber returns COS build number.
 func (c *EnvReader) BuildNumber() string { return c.osRelease[buildID] }

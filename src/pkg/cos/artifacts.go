@@ -107,7 +107,7 @@ func (d *GCSDownloader) GetArtifact(artifactPath string) ([]byte, error) {
 func (d *GCSDownloader) DownloadArtifact(destDir, artifactPath string) error {
 	gcsPath := path.Join(d.gcsDownloadPrefix, artifactPath)
 	if err := utils.DownloadFromGCS(destDir, d.gcsDownloadBucket, gcsPath); err != nil {
-		return errors.Errorf("failed to download %s from gs://%s/%s", artifactPath, d.gcsDownloadBucket, gcsPath)
+		return errors.Errorf("failed to download %s from gs://%s/%s : %s", artifactPath, d.gcsDownloadBucket, gcsPath, err)
 	}
 	return nil
 }

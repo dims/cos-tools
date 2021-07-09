@@ -379,15 +379,32 @@ func CheckClose(closer io.Closer, errMsgOnClose string, err *error) {
 	}
 }
 
-// RunCommand runs a command using exec.Command. The command runs in the working
-// directory "dir" with environment "env" and outputs to stdout and stderr.
-func RunCommand(args []string, dir string, env []string) error {
+func runCommand(args []string, dir string, env []string) error {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = dir
 	cmd.Env = env
-	if err := cmd.Run(); err != nil {
+	return cmd.Run()
+}
+
+// RunCommandWithExitCode runs a command using exec.Command. The command runs in the working
+// directory "dir" with environment "env" and outputs to stdout and stderr. Further it returns the exit code of the executed command.
+func RunCommandWithExitCode(args []string, dir string, env []string) (int, error) {
+	if err := runCommand(args, dir, env); err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			return exitError.ExitCode(), err
+		} else {
+			log.Fatal(fmt.Errorf(`error in cmd "%v", unable to parse exit error code, see stderr for details: %v`, args, err))
+		}
+	}
+	return 0, nil
+}
+
+// RunCommand runs a command using exec.Command. The command runs in the working
+// directory "dir" with environment "env" and outputs to stdout and stderr.
+func RunCommand(args []string, dir string, env []string) error {
+	if err := runCommand(args, dir, env); err != nil {
 		return fmt.Errorf(`error in cmd "%v", see stderr for details: %v`, args, err)
 	}
 	return nil
