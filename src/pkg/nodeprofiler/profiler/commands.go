@@ -26,6 +26,16 @@ type vmstat struct {
 	titles []string
 }
 
+// NewVMStat function helps to initialize a vmstat structure.
+func NewVMStat(name string, delay int, count int, titles []string) *vmstat {
+	return &vmstat{
+		name:   name,
+		delay:  delay,
+		count:  count,
+		titles: titles,
+	}
+}
+
 // Name returns the name for vmstat command.
 func (v *vmstat) Name() string {
 	return v.name
@@ -71,6 +81,14 @@ type lscpu struct {
 	titles []string
 }
 
+// NewLscpu function helps to initialize a lscpu structure.
+func NewLscpu(name string, titles []string) *lscpu {
+	return &lscpu{
+		name:   name,
+		titles: titles,
+	}
+}
+
 // Name returns the name for the lscpu command.
 func (l *lscpu) Name() string {
 	return l.name
@@ -96,6 +114,14 @@ type free struct {
 	name string
 	// titles specifies the titles to get values for.
 	titles []string
+}
+
+// NewFree function helps to initialize a free structure.
+func NewFree(name string, titles []string) *free {
+	return &free{
+		name:   name,
+		titles: titles,
+	}
 }
 
 // Name returns the name for the free command.
@@ -131,6 +157,17 @@ type iostat struct {
 	count int
 	// titles specifies the titles to get values for.
 	titles []string
+}
+
+// NewIOStat function helps to initialize a iostat structure.
+func NewIOStat(name string, flags string, delay int, count int, titles []string) *iostat {
+	return &iostat{
+		name:   name,
+		flags:  flags,
+		delay:  delay,
+		count:  count,
+		titles: titles,
+	}
 }
 
 // Name returns the name for the iostat command.

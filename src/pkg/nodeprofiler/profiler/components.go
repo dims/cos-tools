@@ -30,7 +30,7 @@ type Component interface {
 	CollectUSEMetrics(cmdOutputs map[string]utils.ParsedOutput) error
 	// USEMetrics returns the USEMetrics of the component.
 	USEMetrics() *USEMetrics
-	// Name retuns the name of the component.
+	// Name returns the name of the component.
 	Name() string
 }
 
@@ -39,6 +39,27 @@ type Component interface {
 type CPU struct {
 	name    string
 	metrics *USEMetrics
+}
+
+// NewCPU holds information about the CPU component:
+// this can be used to initialize CPU outside of the
+// profiler package.
+func NewCPU(name string) *CPU {
+
+	return &CPU{
+		name:    name,
+		metrics: &USEMetrics{},
+	}
+}
+
+// Name returns the name of the CPU component.
+func (c *CPU) Name() string {
+	return c.name
+}
+
+// USEMetrics returns USEMetrics for the CPU component.
+func (c *CPU) USEMetrics() *USEMetrics {
+	return c.metrics
 }
 
 // CollectUtilization calculates the utilization score for the CPU Component.
@@ -137,16 +158,6 @@ func (c *CPU) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	return nil
 }
 
-// USEMetrics returns the USE Metrics for the CPU Component.
-func (c *CPU) USEMetrics() *USEMetrics {
-	return c.metrics
-}
-
-// Name returns the name of the CPU component.
-func (c *CPU) Name() string {
-	return c.name
-}
-
 // CollectUSEMetrics collects USE Metrics for the CPU component.
 func (c *CPU) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
 	metrics := c.metrics
@@ -178,6 +189,27 @@ func (c *CPU) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
 type MemCap struct {
 	name    string
 	metrics *USEMetrics
+}
+
+// NewMemCap holds information about the Memory capacity component:
+// this can be used to initialize MemCap outside of the
+// profiler package.
+func NewMemCap(name string) *MemCap {
+
+	return &MemCap{
+		name:    name,
+		metrics: &USEMetrics{},
+	}
+}
+
+// Name returns the name of the Memory capacity component.
+func (m *MemCap) Name() string {
+	return m.name
+}
+
+// USEMetrics returns USEMetrics for the Memory capacity component.
+func (m *MemCap) USEMetrics() *USEMetrics {
+	return m.metrics
 }
 
 // CollectUtilization calculates the utilization score for Memory Capacity.
@@ -297,16 +329,6 @@ func (m *MemCap) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	return nil
 }
 
-// USEMetrics returns the USE Metrics for the Memory Capacity Component.
-func (m *MemCap) USEMetrics() *USEMetrics {
-	return m.metrics
-}
-
-// Name returns the name of the Memory Capacity component.
-func (m *MemCap) Name() string {
-	return m.name
-}
-
 // CollectUSEMetrics collects USE Metrics for the MemCap component.
 func (m *MemCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
 	metrics := m.metrics
@@ -338,6 +360,27 @@ func (m *MemCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error 
 type StorageDevIO struct {
 	name    string
 	metrics *USEMetrics
+}
+
+// NewStorageDevIO holds information about the Storage device I/O component:
+// this can be used to initialize Storage device I/O outside of the
+// profiler package.
+func NewStorageDevIO(name string) *StorageDevIO {
+
+	return &StorageDevIO{
+		name:    name,
+		metrics: &USEMetrics{},
+	}
+}
+
+// Name returns the name of the Storage device I/O component.
+func (d *StorageDevIO) Name() string {
+	return d.name
+}
+
+// USEMetrics returns USEMetrics for the Storage Device I/O Component.
+func (d *StorageDevIO) USEMetrics() *USEMetrics {
+	return d.metrics
 }
 
 // CollectUtilization collects the utilization score for the StorageDevIO component.
@@ -372,11 +415,11 @@ func (d *StorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutput) 
 	cmd := "iostat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missig output for iostat")
+		return fmt.Errorf("missing output for iostat")
 	}
 	queue, ok := parsedOutput["aqu-sz"]
 	if !ok {
-		return fmt.Errorf("mising iostat column 'aqu-sz'")
+		return fmt.Errorf("missing iostat column 'aqu-sz'")
 	}
 	total, err := utils.SumParseFloat(queue)
 	if err != nil {
@@ -392,16 +435,6 @@ func (d *StorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutput) 
 func (d *StorageDevIO) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	// yet to be implemented
 	return nil
-}
-
-// USEMetrics returns the USE Metrics for the Storage Device I/O Component.
-func (d *StorageDevIO) USEMetrics() *USEMetrics {
-	return d.metrics
-}
-
-// Name returns the name of the Storage Device I/O component.
-func (d *StorageDevIO) Name() string {
-	return d.name
 }
 
 // CollectUSEMetrics collects USE Metrics for the Storage Device I/O component.
