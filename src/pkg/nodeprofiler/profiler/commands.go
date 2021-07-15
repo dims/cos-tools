@@ -12,28 +12,18 @@ import (
 // structs to execute shell commands.
 type Command interface {
 	Name() string
-	Run(opts Options) (map[string][]string, error)
-}
-
-// Options stores the options that can be passed to a command and
-// to parsing functions.
-type Options struct {
-	// Delay specifies times between updates in seconds.
-	Delay int
-	// Count specifies number of updates.
-	Count int
-	// Titles specifies the titles to get values for.
-	Titles []string
+	Run() (map[string][]string, error)
 }
 
 // vmstat represents a vmstat command.
 type vmstat struct {
 	name string
-}
-
-// lscpu represents an lscpu command.
-type lscpu struct {
-	name string
+	// delay specifies times between updates in seconds.
+	delay int
+	// count specifies number of updates.
+	count int
+	// titles specifies the titles to get values for.
+	titles []string
 }
 
 // Name returns the name for vmstat command.
@@ -41,32 +31,42 @@ func (v *vmstat) Name() string {
 	return v.name
 }
 
+func (v *vmstat) setDefaults() {
+	if v.delay == 0 {
+		v.delay = 1
+	}
+	if v.count == 0 {
+		v.count = 5
+	}
+}
+
 // Run executes the vmstat command, parses the output and returns it as
 // a map of titles to their values.
-func (v *vmstat) Run(opts Options) (map[string][]string, error) {
-	// delay and count not set
-	if opts.Delay == 0 {
-		opts.Delay = 1
-	}
-	if opts.Count == 0 {
-		opts.Count = 5
-	}
-	interval := strconv.Itoa(opts.Delay)
-	count := strconv.Itoa(opts.Count)
+func (v *vmstat) Run() (map[string][]string, error) {
+	// if delay and count not set
+	v.setDefaults()
+	interval := strconv.Itoa(v.delay)
+	count := strconv.Itoa(v.count)
 	out, err := utils.RunCommand(v.Name(), "-n", interval, count)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run vmstat command: %v", err)
+		return nil, fmt.Errorf("failed to run the command 'vmstat': %v", err)
 	}
 
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
 	// ignore the first row in vmstat's output
 	lines = lines[1:]
-	titles := opts.Titles
+	titles := v.titles
 	// parse output by columns
 	output, err := utils.ParseColumns(lines, titles...)
 	return output, err
+}
 
+// lscpu represents an lscpu command.
+type lscpu struct {
+	name string
+	// titles specifies the titles to get values for.
+	titles []string
 }
 
 // Name returns the name for the lscpu command.
@@ -76,15 +76,94 @@ func (l *lscpu) Name() string {
 
 // Run executes the lscpu command, parses the output and returns a
 // a map of title(s) to their values.
-func (l *lscpu) Run(opts Options) (map[string][]string, error) {
+func (l *lscpu) Run() (map[string][]string, error) {
 	out, err := utils.RunCommand(l.Name())
 	if err != nil {
-		return nil, fmt.Errorf("failed to run vmstat command: %v", err)
+		return nil, fmt.Errorf("failed to run the command 'lscpu': %v", err)
 	}
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
-	titles := opts.Titles
+	titles := l.titles
 	// parse output by rows
-	output, err := utils.ParseRows(lines, titles...)
+	output, err := utils.ParseRows(lines, ":", titles...)
+	return output, err
+}
+
+// free represents a free command.
+type free struct {
+	name string
+	// titles specifies the titles to get values for.
+	titles []string
+}
+
+// Name returns the name for the free command.
+func (f *free) Name() string {
+	return f.name
+}
+
+// Run executes the free commands, parses the output and returns a
+// a map of title(s) to their values.
+func (f *free) Run() (map[string][]string, error) {
+	out, err := utils.RunCommand(f.Name(), "-m")
+	if err != nil {
+		return nil, fmt.Errorf("failed to run the command 'free': %v", err)
+	}
+
+	s := string(out)
+	lines := strings.Split(strings.Trim(s, "\n"), "\n")
+	titles := f.titles
+	// parse output by rows and columns
+	output, err := utils.ParseRowsAndColumns(lines, titles...)
+
+	return output, err
+}
+
+// iostat represents an iostat command
+type iostat struct {
+	name string
+	// flags specify the flags to be passed into the command.
+	flags string
+	// delay specifies times between updates in seconds.
+	delay int
+	// count specifies number of updates.
+	count int
+	// titles specifies the titles to get values for.
+	titles []string
+}
+
+// Name returns the name for the iostat command.
+func (i *iostat) Name() string {
+	return i.name
+}
+
+func (i *iostat) setDefaults() {
+	if i.delay == 0 {
+		i.delay = 1
+	}
+	if i.count == 0 {
+		i.count = 5
+	}
+}
+
+// Run executes the iostat commands, parses the output and returns a
+// a map of title(s) to their values.
+func (i *iostat) Run() (map[string][]string, error) {
+	// if delay and count not set
+	i.setDefaults()
+	interval := strconv.Itoa(i.delay)
+	count := strconv.Itoa(i.count)
+	out, err := utils.RunCommand(i.Name(), i.flags, interval, count)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run the command 'iostat': %v", err)
+	}
+
+	s := string(out)
+	lines := strings.Split(strings.Trim(s, "\n"), "\n")
+	titles := i.titles
+	// ignore the first 2 lines in iostat's output so that the first line
+	// is column titles.
+	lines = lines[2:]
+	// parse output by rows and columns
+	output, err := utils.ParseColumns(lines, titles...)
 	return output, err
 }
