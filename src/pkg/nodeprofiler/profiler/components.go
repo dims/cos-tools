@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/utils"
@@ -72,7 +73,7 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 	cmd := "vmstat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for vmstat")
+		return fmt.Errorf("missing output for %q", cmd)
 	}
 	us, usPresent := parsedOutput["us"]
 	if !usPresent {
@@ -97,6 +98,7 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 		total += sum
 	}
 	count := len(us)
+
 	c.metrics.Utilization = math.Round((float64(total)/float64(count))*100) / 100
 	return nil
 }
@@ -107,7 +109,7 @@ func (c *CPU) calculateCPUCount(outputs map[string]utils.ParsedOutput) (int, err
 	cmd := "lscpu"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return 0, fmt.Errorf("missing output for lscpu")
+		return 0, fmt.Errorf("missing output for %q", cmd)
 	}
 	val, ok := parsedOutput["CPU(s)"]
 	if !ok {
@@ -130,7 +132,7 @@ func (c *CPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
 	cmd := "vmstat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for vmstat")
+		return fmt.Errorf("missing output for %q", cmd)
 	}
 	running, present := parsedOutput["r"]
 	if !present {
@@ -222,7 +224,7 @@ func (m *MemCap) CollectUtilization(outputs map[string]utils.ParsedOutput) error
 	cmd := "free"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for free")
+		return fmt.Errorf("missing output for %q", cmd)
 	}
 	memUsed, muPresent := parsedOutput["Mem:used"]
 	if !muPresent {
@@ -259,7 +261,7 @@ func (m *MemCap) calculateTotalMemory(outputs map[string]utils.ParsedOutput) (in
 	cmd := "free"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return 0, fmt.Errorf("missing output for free")
+		return 0, fmt.Errorf("missing output for %q", cmd)
 	}
 	memTotal, mtPresent := parsedOutput["Mem:total"]
 	if !mtPresent {
@@ -293,7 +295,7 @@ func (m *MemCap) CollectSaturation(outputs map[string]utils.ParsedOutput) error 
 	cmd := "vmstat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for vmstat")
+		return fmt.Errorf("missing output for %q", cmd)
 	}
 	si, siPresent := parsedOutput["si"]
 	if !siPresent {
@@ -390,7 +392,7 @@ func (d *StorageDevIO) CollectUtilization(outputs map[string]utils.ParsedOutput)
 	cmd := "iostat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for iostat")
+		return fmt.Errorf("missing output for %q", cmd)
 	}
 	util, ok := parsedOutput["%util"]
 	if !ok {
@@ -415,7 +417,7 @@ func (d *StorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutput) 
 	cmd := "iostat"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
-		return fmt.Errorf("missing output for iostat")
+		return fmt.Errorf("missig output for %q", cmd)
 	}
 	queue, ok := parsedOutput["aqu-sz"]
 	if !ok {
@@ -463,12 +465,152 @@ func (d *StorageDevIO) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) 
 	return nil
 }
 
+// StorageCap holds information about the Storage Capacity component:
+// name and USE Metrics collected.
+type StorageCap struct {
+	name    string
+	metrics *USEMetrics
+	devices []string
+}
+
+// NewStorageCap holds information about the StorageCap component:
+// this can be used to initialize StorageCap outside of the
+// profiler package.
+func NewStorageCap(name string) *StorageCap {
+
+	return &StorageCap{
+		name:    name,
+		metrics: &USEMetrics{},
+		devices: []string{},
+	}
+}
+
+// sets the boot disk as default if no devices are specified
+func (s *StorageCap) setDefaults() {
+	if len(s.devices) == 0 {
+		s.devices = []string{"/dev/sda"}
+	}
+}
+
+// CollectUtilization calculates the utilization value for Storage Capacity.
+// It does this by getting disk usage of particular devices on the file system.
+// Disk usage on a particular device can be found using the 'df' command by
+// getting the 'Used' value of that device divided by its total size, found
+// on the column specifying metrics of block size. In this case, this column is
+// "1K-blocks", since "-k" was passed as a flag to 'df'. The devices to collect
+// disk usage for are found on StorageCap's devices field. If this field is not
+// set, "/dev/sda", i.e. the boot disk, is used as default.
+func (s *StorageCap) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
+	// if devices are not set
+	s.setDefaults()
+
+	dfCmd := "df"
+	parsedOutput, ok := outputs[dfCmd]
+	if !ok {
+		return fmt.Errorf("missing output for %q", dfCmd)
+	}
+	usedBlocks, uPresent := parsedOutput["Used"]
+	if !uPresent {
+		return fmt.Errorf("missing df column 'Used'")
+	}
+	// total column is represented by the column displaying metrics of block size,
+	// in this case "1K-blocks"
+	totalBlocks, tPresent := parsedOutput["1K-blocks"]
+	if !tPresent {
+		return fmt.Errorf("missing df column '1K-blocks'")
+	}
+	fsystems, fsPresent := parsedOutput["Filesystem"]
+	if !fsPresent {
+		return fmt.Errorf("missing column 'Filesystem'")
+	}
+	// loop over all devices, if a device was specified by the struct,
+	// get its index and use that to find its "Used" and "total" values
+	var fUsed int
+	var fSize int
+	hasDevice := make([]bool, len(s.devices))
+	for index, fsystem := range fsystems {
+		for i, device := range s.devices {
+			if strings.HasPrefix(fsystem, device) {
+				// keep track of valid devices to collect statitics from
+				hasDevice[i] = true
+				s := usedBlocks[index]
+				val, err := strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("failed to convert %q to int: %v", val, err)
+				}
+				fUsed += val
+
+				s = totalBlocks[index]
+				val, err = strconv.Atoi(s)
+				if err != nil {
+					return fmt.Errorf("failed to convert %q to int: %v", val, err)
+				}
+				fSize += val
+			}
+		}
+	}
+	// check if there are missing devices
+	for i, ok := range hasDevice {
+		if !ok {
+			return fmt.Errorf("failed to find the device %q", s.devices[i])
+		}
+	}
+	utiil := (float64(fUsed) / float64(fSize)) * 100
+	fsUtilization := math.Round((utiil)*100) / 100
+
+	s.metrics.Utilization = fsUtilization
+	return nil
+}
+
+// CollectSaturation collects the saturation value for Storage Capacity.
+func (s *StorageCap) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
+	// Not yet implemented
+	return nil
+}
+
+// CollectErrors collects errors for the Storage Capacity component.
+func (s *StorageCap) CollectErrors(outputs map[string]utils.ParsedOutput) error {
+	// Not yet implemented
+	return nil
+}
+
+// CollectUSEMetrics collects USE Metrics for the Storage Capacity component
+func (s *StorageCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
+	metrics := s.metrics
+	metrics.Timestamp = time.Now()
+	start := metrics.Timestamp
+
+	var gotErr bool
+	if err := s.CollectUtilization(outputs); err != nil {
+		gotErr = true
+		log.Errorf("failed to collect utilization for Storage capacity: %v", err)
+	}
+	if err := s.CollectSaturation(outputs); err != nil {
+		gotErr = true
+		log.Errorf("failed to collect saturation for Storage capacity: %v", err)
+	}
+	end := time.Now()
+	metrics.Interval = end.Sub(start)
+
+	if gotErr {
+		return fmt.Errorf("got error when collecting USE Metrics for Storage Capacity")
+	}
+	return nil
+}
+
+func (s *StorageCap) USEMetrics() *USEMetrics {
+	return s.metrics
+}
+
+func (s *StorageCap) Name() string {
+	return s.name
+}
+
 // GenerateUSEReport generates USE Metrics for all the components
 // as well as an analysis string to help the diagnose performance issues.
 func GenerateUSEReport(components []Component, cmds []Command) (USEReport, error) {
 	useReport := USEReport{Components: components}
 	outputs := make(map[string]utils.ParsedOutput)
-
 	for _, cmd := range cmds {
 		output, err := cmd.Run()
 		if err != nil {
@@ -489,7 +631,6 @@ func GenerateUSEReport(components []Component, cmds []Command) (USEReport, error
 		err := "failed to generate USE report for %s components" +
 			"Please check the logs for more information"
 		return useReport, fmt.Errorf(err, failed)
-
 	}
 	return useReport, nil
 }

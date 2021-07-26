@@ -38,7 +38,7 @@ func TestCollectUtilization(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "missing commands",
+			name:      "missing commands output",
 			component: &CPU{"fake", &USEMetrics{}},
 			outputs:   map[string]utils.ParsedOutput{},
 			wantErr:   true,
@@ -65,7 +65,7 @@ func TestCollectUtilization(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "missing commands",
+			name:      "missing commands output",
 			component: &MemCap{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"vmstat": {
@@ -76,7 +76,7 @@ func TestCollectUtilization(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "storage device",
+			name:      "storage device I/O",
 			component: &StorageDevIO{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"iostat": {
@@ -96,17 +96,91 @@ func TestCollectUtilization(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "missing commands",
+			name:      "missing commands output",
 			component: &StorageDevIO{"fake", &USEMetrics{}},
 			outputs:   map[string]utils.ParsedOutput{},
 			wantErr:   true,
 		},
+		{
+			name:      "storage capacity",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{"/dev/vda"}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Filesystem": {"/dev/vdb", "/dev/vda"},
+					"Used":       {"4764604", "50448"},
+					"1K-blocks":  {"7864320", "50540"},
+				},
+			},
+			want: 99.82,
+		},
+		{
+			name:      "devices not set",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Filesystem": {"/dev/sda", "/dev/vda"},
+					"Used":       {"4764604", "50448"},
+					"1K-blocks":  {"7864320", "50540"},
+				},
+			},
+			want: 60.59,
+		},
+		{
+			name:      "device (sda) with different partitions",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Filesystem": {"/dev/sda1", "/dev/sda8"},
+					"Used":       {"95384", "24"},
+					"1K-blocks":  {"5971884", "11756"},
+				},
+			},
+			want: 1.59,
+		},
+		{
+			name:      "several occurrences of same device",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{"tmpfs"}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Filesystem": {"tmpfs", "tmpfs", "/dev/root", "tmpfs"},
+					"Used":       {"0", "468", "1051636", "168"},
+					"1K-blocks":  {"1884128", "1884128", "2003760", "1024"},
+				},
+			},
+			want: 0.02,
+		},
+		{
+			name:      "missing [default] device",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Filesystem": {"/dev/vdb", "/dev/vda"},
+					"Used":       {"4764604", "50448"},
+					"1K-blocks":  {"7864320", "50540"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "missing titles",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{"/dev/vda"}},
+			outputs: map[string]utils.ParsedOutput{
+				"df": {
+					"Use%": {"67%", "0%", "100%", "2%"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "missing commands output",
+			component: &StorageCap{"fake", &USEMetrics{}, []string{"/dev/vda"}},
+			outputs:   map[string]utils.ParsedOutput{},
+			wantErr:   true,
+		},
 	}
-
 	for _, test := range tests {
 		err := test.component.CollectUtilization(test.outputs)
 		got := test.component.USEMetrics().Utilization
-
 		if gotErr := err != nil; gotErr != test.wantErr {
 			t.Fatalf("CollectUtilization(%v) err %v, wantErr %t", test.outputs, err, test.wantErr)
 		}
@@ -115,7 +189,6 @@ func TestCollectUtilization(t *testing.T) {
 		}
 	}
 }
-
 func TestCollectSaturation(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -149,7 +222,7 @@ func TestCollectSaturation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:      "missing command",
+			name:      "missing commands output",
 			component: &CPU{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"vmstat": {
@@ -173,7 +246,7 @@ func TestCollectSaturation(t *testing.T) {
 			},
 		},
 		{
-			name:      "missing command",
+			name:      "missing commands output",
 			component: &MemCap{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"vmstat": {
@@ -205,7 +278,7 @@ func TestCollectSaturation(t *testing.T) {
 			},
 		},
 		{
-			name:      "missing commands",
+			name:      "missing commands output",
 			component: &StorageDevIO{"fake", &USEMetrics{}},
 			outputs:   map[string]utils.ParsedOutput{},
 			wantErr:   true,
@@ -219,11 +292,9 @@ func TestCollectSaturation(t *testing.T) {
 			wantErr: true,
 		},
 	}
-
 	for _, test := range tests {
 		err := test.component.CollectSaturation(test.outputs)
 		got := test.component.USEMetrics().Saturation
-
 		if gotErr := err != nil; gotErr != test.wantErr {
 			t.Fatalf("CollectSaturation(%v) err %v, wantErr %t", test.outputs, err, test.wantErr)
 		}
