@@ -40,7 +40,7 @@ func VerifyDriverInstallation() error {
 	}
 
 	// Create unified memory device file.
-	if err := utils.RunCommandAndLogOutput(exec.Command("nvidia-modprobe", "-c0", "-u"), false); err != nil {
+	if err := utils.RunCommandAndLogOutput(exec.Command("nvidia-modprobe", "-c0", "-u", "-m"), false); err != nil {
 		return errors.Wrap(err, "failed to create unified memory device file")
 	}
 
@@ -131,6 +131,8 @@ func RunDriverInstaller(installerFilename string, needSigned bool) error {
 	cmd = exec.Command(filepath.Join(extractDir, "nvidia-installer"),
 		"--utility-prefix="+gpuInstallDirContainer,
 		"--opengl-prefix="+gpuInstallDirContainer,
+		"--x-prefix="+gpuInstallDirContainer,
+		"--install-libglvnd",
 		"--no-install-compat32-libs",
 		"--log-file-name="+filepath.Join(gpuInstallDirContainer, "nvidia-installer.log"),
 		"--silent",
@@ -299,12 +301,13 @@ func loadGPUDrivers(needSigned bool) error {
 		}
 	}
 	gpuModules := map[string]string{
-		"nvidia":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia.ko"),
-		"nvidia_uvm": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-uvm.ko"),
-		"nvidia_drm": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-drm.ko"),
+		"nvidia":         filepath.Join(gpuInstallDirContainer, "drivers", "nvidia.ko"),
+		"nvidia_uvm":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-uvm.ko"),
+		"nvidia_drm":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-drm.ko"),
+		"nvidia_modeset": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-modeset.ko"),
 	}
 	// Need to load modules in order due to module dependency.
-	moduleNames := []string{"nvidia", "nvidia_uvm", "nvidia_drm"}
+	moduleNames := []string{"nvidia", "nvidia_uvm", "nvidia_drm", "nvidia_modeset"}
 	for _, moduleName := range moduleNames {
 		modulePath := gpuModules[moduleName]
 		if err := modules.LoadModule(moduleName, modulePath); err != nil {
