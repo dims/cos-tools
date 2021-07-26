@@ -8,13 +8,13 @@ import (
 
 func TestParseColumns(t *testing.T) {
 	tests := []struct {
-		name    string
-		rows    []string
-		titles  []string
-		want    map[string][]string
-		wantErr bool
+		name       string
+		rows       []string
+		allTitles  []string
+		wantTitles []string
+		want       map[string][]string
+		wantErr    bool
 	}{
-
 		{
 			name: "vmstat's output with spaced rows",
 			rows: []string{
@@ -26,11 +26,33 @@ func TestParseColumns(t *testing.T) {
 				"                                                                                ",
 				"2  0      0 14827096      0  25608    0    0     0     0 5283 8037  7  3 90  0  0",
 			},
-			titles: []string{"us", "sy", "st"},
+			allTitles: []string{"r", "b", "swpd", "free", "buff", "cache", "si", "so", "bi", "bo",
+				"in", "cs", "us", "sy", "id", "wa", "st"},
+			wantTitles: []string{"us", "sy", "st"},
 			want: map[string][]string{
 				"us": {"1", "2", "7"},
 				"sy": {"0", "1", "3"},
 				"st": {"0", "1", "0"},
+			},
+		},
+		{
+			name: "df's output with empty titles slice",
+			rows: []string{
+				"Filesystem      Size  Used Avail Use% Mounted on",
+				"/dev/vdb        7.5G  4.5G  2.4G  66% /",
+				"none            492K     0  492K   0% /dev",
+				"devtmpfs        7.1G     0  7.1G   0% /dev/tty",
+				"/dev/vdb        7.5G  4.5G  2.4G  66% /dev/kvm",
+			},
+			allTitles: []string{"Filesystem", "Size", "Used", "Avail",
+				"Use%", "Mounted on"},
+			want: map[string][]string{
+				"Filesystem": {"/dev/vdb", "none", "devtmpfs", "/dev/vdb"},
+				"Size":       {"7.5G", "492K", "7.1G", "7.5G"},
+				"Used":       {"4.5G", "0", "0", "4.5G"},
+				"Avail":      {"2.4G", "492K", "7.1G", "2.4G"},
+				"Use%":       {"66%", "0%", "0%", "66%"},
+				"Mounted on": {"/", "/dev", "/dev/tty", "/dev/kvm"},
 			},
 		},
 		{
@@ -44,6 +66,7 @@ func TestParseColumns(t *testing.T) {
 				"r  b   swpd   free   buff",
 				"5  0      0 14827096      0",
 			},
+			allTitles: []string{"r", "b", "swpd", "free", "buff"},
 			want: map[string][]string{
 				"r":    {"5"},
 				"b":    {"0"},
@@ -65,7 +88,9 @@ func TestParseColumns(t *testing.T) {
 				"																																		 ",
 				"Device            r/s     w/s     rkB/s     wkB/s   rrqm/s   wrqm/s  %rrqm  %wrqm r_await w_await aqu-sz rareq-sz wareq-sz  svctm  %util",
 			},
-			titles: []string{"%util"},
+			allTitles: []string{"Device", "r/s", "w/s", "rkB/s", "wkB/s", "rrqm/s", "wrqm/s", "%rrqm", "%wrqm", "%r_await", "w_await", "aqu-sz", "rareq-sz",
+				"wareq-sz", "svctm", "%util"},
+			wantTitles: []string{"%util"},
 			want: map[string][]string{
 				"%util": {"5.62", "0.00"},
 			},
@@ -77,8 +102,9 @@ func TestParseColumns(t *testing.T) {
 				"Mem:          14520          13       14481           0          25       14506",
 				"Swap:             0           0           0",
 			},
-			titles:  []string{"total"},
-			wantErr: true,
+			allTitles:  []string{"total", "used", "free", "shared", "buff/cache", "available"},
+			wantTitles: []string{"total"},
+			wantErr:    true,
 		},
 		{
 			name: "unknown titles",
@@ -86,22 +112,34 @@ func TestParseColumns(t *testing.T) {
 				"r  b   swpd    free   buff   cache",
 				"5  0      0 14827096     0   25608",
 			},
-			titles:  []string{"r", "b", "used"},
-			wantErr: true,
+			allTitles:  []string{"r", "b", "swpd", "free", "buff", "cache"},
+			wantTitles: []string{"r", "b", "used"},
+			wantErr:    true,
+		},
+		{
+			name: "incomplete slice of all titles",
+			rows: []string{
+				"Filesystem      Size  Used Avail Use% Mounted on",
+				"/dev/vdb        7.5G  4.5G  2.4G  67% /",
+				"none            492K     0  492K   0% /dev",
+				"devtmpfs        7.1G     0  7.1G   0% /dev/tty",
+				"/dev/vdb        7.5G  4.5G  2.4G  67% /dev/kvm",
+			},
+			allTitles: []string{"Filesystem", "Size", "Used", "Avail", "Use%"},
+			wantErr:   true,
 		},
 	}
-
 	for _, test := range tests {
-		got, err := ParseColumns(test.rows, test.titles...)
+		got, err := ParseColumns(test.rows, test.allTitles, test.wantTitles...)
 		if gotErr := err != nil; gotErr != test.wantErr {
-			t.Fatalf("ParseColumns(%v, %v) err %v, wantErr: %t", test.rows, test.titles, err, test.wantErr)
+			t.Fatalf("ParseColumns(%v, %v, %v) err %v, wantErr: %t", test.rows, test.allTitles, test.wantTitles, err, test.wantErr)
 		}
 		if diff := cmp.Diff(test.want, got); diff != "" {
-			t.Errorf("Ran ParseColumns(%v, %v), but got mismatch between got and want (+got, -want): \n diff %s", test.rows, test.titles, diff)
+			t.Errorf("Ran ParseColumns(%v, %v, %v), but got mismatch between got and want (+got, -want): \n diff %s", test.rows,
+				test.allTitles, test.wantTitles, diff)
 		}
 	}
 }
-
 func TestParseRows(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -187,7 +225,6 @@ func TestParseRows(t *testing.T) {
 			wantErr: true,
 		},
 	}
-
 	for _, test := range tests {
 		got, err := ParseRows(test.rows, test.delim, test.titles...)
 		if gotErr := err != nil; gotErr != test.wantErr {
@@ -198,7 +235,6 @@ func TestParseRows(t *testing.T) {
 		}
 	}
 }
-
 func TestParseRowsAndColumns(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -249,7 +285,6 @@ func TestParseRowsAndColumns(t *testing.T) {
 			wantErr: true,
 		},
 	}
-
 	for _, test := range tests {
 		got, err := ParseRowsAndColumns(test.rows, test.titles...)
 		if gotErr := err != nil; gotErr != test.wantErr {
@@ -259,5 +294,4 @@ func TestParseRowsAndColumns(t *testing.T) {
 			t.Errorf("Ran ParseRowsAndColumns(%v, %v), but got mismatch between got and want (+got, -want): \n diff %s", test.rows, test.titles, diff)
 		}
 	}
-
 }

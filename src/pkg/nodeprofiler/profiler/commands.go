@@ -56,9 +56,11 @@ func (v *vmstat) Run() (map[string][]string, error) {
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
 	// ignore the first row in vmstat's output
 	lines = lines[1:]
-	titles := v.titles
+	// split first row into columns based on titles
+	allTitles := strings.Fields(lines[0])
+	wantTitles := v.titles
 	// parse output by columns
-	output, err := utils.ParseColumns(lines, titles...)
+	output, err := utils.ParseColumns(lines, allTitles, wantTitles...)
 	return output, err
 }
 
@@ -156,14 +158,16 @@ func (i *iostat) Run() (map[string][]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to run the command 'iostat': %v", err)
 	}
-
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
-	titles := i.titles
 	// ignore the first 2 lines in iostat's output so that the first line
 	// is column titles.
 	lines = lines[2:]
+
+	// split first row into columns based on titles
+	allTitles := strings.Fields(lines[0])
+	wantTitles := i.titles
 	// parse output by rows and columns
-	output, err := utils.ParseColumns(lines, titles...)
+	output, err := utils.ParseColumns(lines, allTitles, wantTitles...)
 	return output, err
 }

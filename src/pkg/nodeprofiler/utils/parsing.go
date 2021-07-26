@@ -12,7 +12,19 @@ import (
 type ParsedOutput map[string][]string
 
 // ParseColumns parses command outputs which are in a column table.
-// The function takes in an optional titles argument which specifies the
+// It takes in a slice of strings which has all the column titles of the
+// command in the correct order. This is necessary because some titles
+// contain multiple strings, thus splitting by whitespaces will split row
+// incorrectly. E.g, splitting the titles row in df's output based on
+// whitespaces will result in:
+//
+// "Filesystem  Use% Mounted on" -> ["Filesystem", "Use%", "Mounted", "on"] instead of:
+//                                  ["Filesystem", "Use%", "Mounted on"]
+// The allTitles slice is used to give each title its correct index. If the
+// titles in the slice are in wrong order, the function's output will be
+// incorrect.
+//
+// The function also takes in an optional want titles slice which specifies the
 // columns to parse. If this argument is missing, then all columns are parsed.
 //
 // Eg, ParseColumns(["r        b        swpd      buff",
@@ -24,11 +36,11 @@ type ParsedOutput map[string][]string
 // The output needs to have titles on all its columns else the function will
 // return an error:
 //
-// Eg ParseColumns(["              total        used",
-//                  "Mem:          14520          12",
-//                  "Swap:             0           0"],
-//                  ["total", "used"])
-//                  err : "row has different number of columns from header row"
+// Eg [FAIL] ParseColumns(["              total        used",
+//                        "Mem:          14520          12",
+//                        "Swap:             0           0"],
+//                        ["total", "used"])
+//                        err : "row has different number of columns from header row"
 //
 // Some edge cases that will be parsed by this function include:
 //
@@ -44,9 +56,9 @@ type ParsedOutput map[string][]string
 //  "kB_read/s" : {"57.39"},
 //  ...
 // }
-func ParseColumns(rows []string, titles ...string) (map[string][]string, error) {
-
+func ParseColumns(rows []string, allTitles []string, wantTitles ...string) (map[string][]string, error) {
 	parsedOutput := ParsedOutput{}
+
 	// maps each column title to its index eg columns["r"] = 0 wth vmstat.
 	columns := make(map[string]int)
 	// header saves the row that contains the titles
@@ -57,16 +69,15 @@ func ParseColumns(rows []string, titles ...string) (map[string][]string, error) 
 		if row = strings.TrimSpace(row); row == "" {
 			continue
 		}
-		tokens := strings.Fields(row)
 
 		if i == 0 {
 			header = row
 			// if no titles were specified, use all of them
-			if len(titles) == 0 {
-				titles = tokens
+			if len(wantTitles) == 0 {
+				wantTitles = allTitles
 			}
-			// map column title to its index eg "r" : 0 with vmstat
-			for index, str := range tokens {
+			// map each column title to its index eg "r" : 0 with vmstat
+			for index, str := range allTitles {
 				columns[str] = index
 			}
 			continue
@@ -75,23 +86,24 @@ func ParseColumns(rows []string, titles ...string) (map[string][]string, error) 
 		if row == header {
 			continue
 		}
+
+		tokens := strings.Fields(row)
 		// checks that number of columns in row is equal to number of column
 		// titles that were in header. Thus trying to parse the rows below
 		// will return an error here:
 		// "             total        used", (len 2)
 		// "Mem:         14520          12", (len 3)
 		// "Swap:            0           0",(len 3)
-		if len(columns) != len(tokens) {
+		if len(allTitles) != len(tokens) {
 			err := "row has different number of columns from header row: \n" +
 				"header row: \n %q \n " +
 				"current row: \n %q"
 			return nil, fmt.Errorf(err, header, row)
 		}
-
 		// loop over titles, get index of each title using map,
 		// use that to get the actual values, add title and its value(s) to
 		// parsedOutput.
-		for _, title := range titles {
+		for _, title := range wantTitles {
 			index, ok := columns[title]
 			if !ok {
 				return nil, fmt.Errorf("unknown column title %q", title)
@@ -110,7 +122,7 @@ func ParseColumns(rows []string, titles ...string) (map[string][]string, error) 
 // ParseRows parses command outputs which are in a row table. It takes in a
 // string which specifies the delimiter that separates row title from values.
 // The function does not support '\n' as a delimiter for now. It takes in an
-// optional titles argument which specifies which rows to parse.
+// optional titles slice which specifies which rows to parse.
 //
 // Eg, ParseRows(["avg-cpu:  %user %nice %system  %iowait %steal  %idle"],
 //               [avg-cpu]) = map[string][]string {
@@ -142,12 +154,10 @@ func ParseColumns(rows []string, titles ...string) (map[string][]string, error) 
 //    "cpu family" : {"6"}
 // }
 func ParseRows(lines []string, delim string, titles ...string) (map[string][]string, error) {
-
 	parsedOutput := ParsedOutput{}
 	// rows maps each row title to their value(s) which is the rest of the row
 	// after delimiter
 	rows := make(map[string][]string)
-
 	for _, line := range lines {
 		// skip empty lines
 		if line = strings.TrimSpace(line); line == "" {
@@ -171,7 +181,6 @@ func ParseRows(lines []string, delim string, titles ...string) (map[string][]str
 		tokens = strings.Fields(strings.Join(value, " "))
 		rows[header] = tokens
 	}
-
 	// if no titles were passed, use all the row titles.
 	if len(titles) == 0 {
 		for key := range rows {
@@ -192,7 +201,7 @@ func ParseRows(lines []string, delim string, titles ...string) (map[string][]str
 }
 
 // ParseRowsAndColumns parses command outputs that have row and column headers.
-// It takes in an optional titles argument which specifies the row column
+// It also takes in an optional titles slice which specifies the row column
 // combination to parse. If the titles argument is missing, then an empty map
 // is returned.
 //
@@ -219,7 +228,6 @@ func ParseRows(lines []string, delim string, titles ...string) (map[string][]str
 // "vdb               0.74        10.39        23.23     859900    1922916",
 // "vda               0.01         0.46         0.00      37829          0"
 func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string, error) {
-
 	parsedOutput := make(ParsedOutput)
 	// columns maps column title to its index eg columns["total"] = 0 wth free.
 	columns := make(map[string]int)
@@ -228,7 +236,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 	// Eg "Mem" : ["total", "used"] for "Mem:total", "Mem:used"
 	//    "Swap": ["total", "used"] for "Swap:total", "Swap:used"
 	titlesMap := make(map[string][]string)
-
 	// loop over titles and split them by row and column titles.
 	for _, title := range titles {
 		headers := strings.Split(strings.Trim(title, ":"), ":")
@@ -242,7 +249,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 			return nil, fmt.Errorf(err, title)
 		}
 	}
-
 	var diff int
 	// rows stores each title in rows as key and the rest of the row as value.
 	rows := make(map[string][]string)
@@ -253,7 +259,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 		if len(tokens) == 0 {
 			continue
 		}
-
 		if i == 0 {
 			// Looking at the edge case example above (iostat's output), since
 			// rows are split by whitespaces, the index of "tps" will be 1
@@ -283,7 +288,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 		//everything to the right of the row title is its value
 		rows[rHeader] = tokens[1:]
 	}
-
 	// loop over the titlesMap and use the row titles to access all
 	// the values for that row. From those values, access the columns
 	// we're interested in
@@ -304,7 +308,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 	for rowTitle, colTitles := range titlesMap {
 		values := rows[rowTitle]
 		for _, columnTitle := range colTitles {
-
 			index := columns[columnTitle]
 			value := values[index]
 			// combine the row and column title again when adding to the parsed
