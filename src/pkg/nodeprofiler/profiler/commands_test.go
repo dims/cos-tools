@@ -62,6 +62,16 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
+			name: "df",
+			fakeCmd: &df{
+				name:   "testdata/df.sh",
+				titles: []string{"Use%"},
+			},
+			want: map[string][]string{
+				"Use%": {"68%", "0%", "2%", "1%", "100%"},
+			},
+		},
+		{
 			name: "no titles",
 			fakeCmd: &vmstat{
 				name:  "testdata/vmstat.sh",

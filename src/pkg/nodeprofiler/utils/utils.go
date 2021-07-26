@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -13,14 +14,13 @@ import (
 // RunCommand is a wrapper function for exec.Command that will run the command
 // specified return its output and/or error.
 func RunCommand(cmd string, args ...string) ([]byte, error) {
-	log.Printf("running %q", cmd)
-
+	str := cmd + " " + strings.Join(args, " ")
+	log.Infof("running %q", str)
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run %q, %v: %v", cmd, args, err)
+		return nil, fmt.Errorf("failed to run %q': %v", str, err)
 	}
-
-	log.Printf("finished running %s command successfully", cmd)
+	log.Infof("finished running %q command successfully", str)
 	return out, nil
 }
 
@@ -45,9 +45,20 @@ func SumParseFloat(a []string) (float64, error) {
 	for _, str := range a {
 		val, err := strconv.ParseFloat(str, 64)
 		if err != nil {
-			return 0, fmt.Errorf("could not convert %q to float64: %v", str, err)
+			return 0, fmt.Errorf("could not convert %q to float64", str)
 		}
 		sum += val
 	}
 	return sum, nil
+}
+
+// TrimCharacter trims the specified character from each string in a slice of strings and
+// returns a slice with the trimmed strings.
+func TrimCharacter(a []string, char string) []string {
+	var res []string
+	for _, str := range a {
+		str = strings.Trim(str, char)
+		res = append(res, str)
+	}
+	return res
 }

@@ -2,6 +2,7 @@ package profiler
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -57,9 +58,13 @@ func (v *vmstat) Run() (map[string][]string, error) {
 	v.setDefaults()
 	interval := strconv.Itoa(v.delay)
 	count := strconv.Itoa(v.count)
-	out, err := utils.RunCommand(v.Name(), "-n", interval, count)
+
+	args := []string{"-n", interval, count}
+	out, err := utils.RunCommand(v.Name(), args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run the command 'vmstat': %v", err)
+		str := v.Name() + " " + strings.Join(args, " ")
+		return nil, fmt.Errorf("failed to run the command %q: %v",
+			str, err)
 	}
 
 	s := string(out)
@@ -68,9 +73,8 @@ func (v *vmstat) Run() (map[string][]string, error) {
 	lines = lines[1:]
 	// split first row into columns based on titles
 	allTitles := strings.Fields(lines[0])
-	wantTitles := v.titles
 	// parse output by columns
-	output, err := utils.ParseColumns(lines, allTitles, wantTitles...)
+	output, err := utils.ParseColumns(lines, allTitles, v.titles...)
 	return output, err
 }
 
@@ -99,13 +103,12 @@ func (l *lscpu) Name() string {
 func (l *lscpu) Run() (map[string][]string, error) {
 	out, err := utils.RunCommand(l.Name())
 	if err != nil {
-		return nil, fmt.Errorf("failed to run the command 'lscpu': %v", err)
+		return nil, fmt.Errorf("failed to run the command '%s': %v", l.Name(), err)
 	}
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
-	titles := l.titles
 	// parse output by rows
-	output, err := utils.ParseRows(lines, ":", titles...)
+	output, err := utils.ParseRows(lines, ":", l.titles...)
 	return output, err
 }
 
@@ -134,14 +137,15 @@ func (f *free) Name() string {
 func (f *free) Run() (map[string][]string, error) {
 	out, err := utils.RunCommand(f.Name(), "-m")
 	if err != nil {
-		return nil, fmt.Errorf("failed to run the command 'free': %v", err)
+		cmd := f.Name() + " " + "-m"
+		return nil, fmt.Errorf("failed to run the command %q: %v",
+			cmd, err)
 	}
 
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
-	titles := f.titles
 	// parse output by rows and columns
-	output, err := utils.ParseRowsAndColumns(lines, titles...)
+	output, err := utils.ParseRowsAndColumns(lines, f.titles...)
 
 	return output, err
 }
@@ -191,9 +195,13 @@ func (i *iostat) Run() (map[string][]string, error) {
 	i.setDefaults()
 	interval := strconv.Itoa(i.delay)
 	count := strconv.Itoa(i.count)
-	out, err := utils.RunCommand(i.Name(), i.flags, interval, count)
+
+	args := []string{i.flags, interval, count}
+	out, err := utils.RunCommand(i.Name(), args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run the command 'iostat': %v", err)
+		str := i.Name() + " " + strings.Join(args, " ")
+		return nil, fmt.Errorf("failed to run the command %q: %v",
+			str, err)
 	}
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
@@ -203,8 +211,46 @@ func (i *iostat) Run() (map[string][]string, error) {
 
 	// split first row into columns based on titles
 	allTitles := strings.Fields(lines[0])
-	wantTitles := i.titles
 	// parse output by rows and columns
-	output, err := utils.ParseColumns(lines, allTitles, wantTitles...)
+	output, err := utils.ParseColumns(lines, allTitles, i.titles...)
+	return output, err
+}
+
+// df represents the command 'df'
+type df struct {
+	name   string
+	titles []string
+}
+
+// Name returns the name for the 'df' command
+func (fs *df) Name() string {
+	return fs.name
+}
+
+// Run executes the 'df' command, parses its output and returns a
+// map of title(s) to their values.
+func (fs *df) Run() (map[string][]string, error) {
+	// get output in 1K size to make summing values direct
+	out, err := utils.RunCommand(fs.Name(), "-k")
+	if err != nil {
+		cmd := fs.Name() + " " + "-k"
+		return nil, fmt.Errorf("failed to run the command %q: %v",
+			cmd, err)
+	}
+	s := string(out)
+	lines := strings.Split(strings.Trim(s, "\n"), "\n")
+	// match all strings that start with an uppercase letter. This
+	// pattern makes it possible to split df's titles row since some
+	// titles are multi-worded (as seen with "Mounted on" below) so
+	// splitting by whitespaces will result in incorrect titles slice.
+	//
+	// "Filesystem      Size  Used Avail Use% Mounted on" ->
+	// ["Filesystem", "Size", "Used", "Avail", "Use%", "Mounted on"]
+	re := regexp.MustCompile(`[A-Z][^A-Z]*`)
+	allTitles := re.FindAllString(lines[0], -1)
+	// trim trailing or leading white spaces in all titles.
+	allTitles = utils.TrimCharacter(allTitles, " ")
+	// parse output by columns
+	output, err := utils.ParseColumns(lines, allTitles, fs.titles...)
 	return output, err
 }
