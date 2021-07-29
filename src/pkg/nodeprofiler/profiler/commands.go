@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/utils"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Command interface defines functions that can be implemented by
@@ -44,9 +46,11 @@ func (v *vmstat) Name() string {
 
 func (v *vmstat) setDefaults() {
 	if v.delay == 0 {
+		log.Info("delay cannot be 0. Value set to 1")
 		v.delay = 1
 	}
 	if v.count == 0 {
+		log.Info("count of 0 gives averages since reboot. Count set to 5")
 		v.count = 5
 	}
 }

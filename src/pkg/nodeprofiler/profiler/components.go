@@ -87,6 +87,21 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 	if !stPresent {
 		return fmt.Errorf("missing vmstat column 'st'")
 	}
+
+	if len(us) == 0 {
+		return fmt.Errorf("no vmstat report collected")
+	} else if len(us) == 1 {
+		err := "only averages values since last reboot were collected. To calculate utilization value" +
+			" reflecting current conditions of component, additional reports are needed"
+		return fmt.Errorf(err)
+	}
+
+	// ignore the first values of 'us', 'sy' and 'st' since they reflect averages
+	// since last reboot and can bring averages down
+	us = us[1:]
+	sy = sy[1:]
+	st = st[1:]
+
 	columns := [][]string{us, sy, st}
 	var total int
 	// loop over us, sy, st columns and sum their values
@@ -138,6 +153,18 @@ func (c *CPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
 	if !present {
 		return fmt.Errorf("missing vmstat column 'r'")
 	}
+
+	if len(running) == 0 {
+		return fmt.Errorf("no vmstat report collected")
+	} else if len(running) == 1 {
+		err := "only averages values since last reboot were collected. To calculate utilization value" +
+			" reflecting current conditions of component, additional reports are needed"
+		return fmt.Errorf(err)
+	}
+
+	// ignore the first values of 'r' since they reflect averages since last
+	// reboot and can bring the average down
+	running = running[1:]
 	// loop over the "r" column and sum the values
 	sum, err := utils.SumAtoi(running)
 	if err != nil {

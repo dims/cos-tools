@@ -24,7 +24,31 @@ func TestCollectUtilization(t *testing.T) {
 					"st": {"0", "0", "0"},
 				},
 			},
-			want: 4.67,
+			want: 6.5,
+		},
+		{
+			name:      "vmstat slices of length 1",
+			component: &CPU{"fake", &USEMetrics{}},
+			outputs: map[string]utils.ParsedOutput{
+				"vmstat": {
+					"us": {"1"},
+					"sy": {"0"},
+					"st": {"0"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "empty vmstat slices",
+			component: &CPU{"fake", &USEMetrics{}},
+			outputs: map[string]utils.ParsedOutput{
+				"vmstat": {
+					"us": {},
+					"sy": {},
+					"st": {},
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name:      "missing titles",
@@ -202,13 +226,39 @@ func TestCollectSaturation(t *testing.T) {
 			component: &CPU{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"vmstat": {
-					"r": {"15", "12", "2"},
+					"r": {"15", "12", "12"},
 				},
 				"lscpu": {
 					"CPU(s)": {"8"},
 				},
 			},
 			want: true,
+		},
+		{
+			name:      "vmstat slices of length 1",
+			component: &CPU{"fake", &USEMetrics{}},
+			outputs: map[string]utils.ParsedOutput{
+				"vmstat": {
+					"r": {"15"},
+				},
+				"lscpu": {
+					"CPU(s)": {"8"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:      "empty vmstat slices",
+			component: &CPU{"fake", &USEMetrics{}},
+			outputs: map[string]utils.ParsedOutput{
+				"vmstat": {
+					"r": {},
+				},
+				"lscpu": {
+					"CPU(s)": {"8"},
+				},
+			},
+			wantErr: true,
 		},
 		{
 			name:      "missing titles",
