@@ -43,13 +43,13 @@ func CheckKernelModuleSigning(kernelCmdline string) bool {
 // SetCompilationEnv sets compilation environment variables (e.g. CC, CXX) for third-party kernel module compilation.
 // TODO(mikewu): pass environment variables to the *exec.Cmd that runs the installer.
 func SetCompilationEnv(downloader ArtifactsDownloader) error {
-	log.Info("Downloading compilation environment variables")
+	log.V(2).Info("Downloading compilation environment variables")
 
 	compilationEnvs := make(map[string]string)
 
 	if err := downloader.DownloadToolchainEnv(os.TempDir()); err != nil {
 		// Required to support COS builds not having toolchain_env file
-		log.Info("Using default compilation environment variables")
+		log.V(2).Info("Using default compilation environment variables")
 		compilationEnvs["CC"] = "x86_64-cros-linux-gnu-gcc"
 		compilationEnvs["CXX"] = "x86_64-cros-linux-gnu-g++"
 	} else {
@@ -58,9 +58,9 @@ func SetCompilationEnv(downloader ArtifactsDownloader) error {
 		}
 	}
 
-	log.Info("Setting compilation environment variables")
+	log.V(2).Info("Setting compilation environment variables")
 	for key, value := range compilationEnvs {
-		log.Infof("%s=%s", key, value)
+		log.V(2).Infof("%s=%s", key, value)
 		os.Setenv(key, value)
 	}
 	return nil
@@ -85,7 +85,7 @@ func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error
 		}
 	}
 
-	log.Info("Configuring environment variables for cross-compilation")
+	log.V(2).Info("Configuring environment variables for cross-compilation")
 	os.Setenv("PATH", fmt.Sprintf("%s/bin:%s", destDir, os.Getenv("PATH")))
 	os.Setenv("SYSROOT", filepath.Join(destDir, "usr/x86_64-cros-linux-gnu"))
 	return nil

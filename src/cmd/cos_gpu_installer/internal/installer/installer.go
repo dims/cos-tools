@@ -49,7 +49,7 @@ func VerifyDriverInstallation() error {
 
 // ConfigureCachedInstalltion updates ldconfig and installs the cached GPU driver kernel modules.
 func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned bool) error {
-	log.Info("Configuring cached driver installation")
+	log.V(2).Info("Configuring cached driver installation")
 
 	if err := createHostDirBindMount(gpuInstallDirHost, gpuInstallDirContainer); err != nil {
 		return errors.Wrap(err, "failed to create driver installation dir")
@@ -206,7 +206,7 @@ func GetLatestGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, erro
 }
 
 func updateContainerLdCache() error {
-	log.Info("Updating container's ld cache")
+	log.V(2).Info("Updating container's ld cache")
 
 	f, err := os.Create("/etc/ld.so.conf.d/nvidia.conf")
 	if err != nil {

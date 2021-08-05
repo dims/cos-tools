@@ -80,7 +80,13 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitFailure
 	}
 
-	log.Infof("Running on COS build id %s", envReader.BuildNumber())
+	if c.debug {
+		if err := flag.Set("v", "2"); err != nil {
+			log.Errorf("Unable to set debug logging: %v", err)
+		}
+	}
+
+	log.V(2).Infof("Running on COS build id %s", envReader.BuildNumber())
 
 	if releaseTrack := envReader.ReleaseTrack(); releaseTrack == "dev-channel" || releaseTrack == "beta-channel" {
 		c.logError(fmt.Errorf("GPU installation is not supported on dev & beta image for now; Please use LTS image."))
@@ -123,7 +129,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	hostInstallDir := filepath.Join(hostRootPath, c.hostInstallDir)
 	cacher := installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 	if isCached, err := cacher.IsCached(); isCached && err == nil {
-		log.Info("Found cached version, NOT building the drivers.")
+		log.V(2).Info("Found cached version, NOT building the drivers.")
 		if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver); err != nil {
 			c.logError(errors.Wrap(err, "failed to configure cached installation"))
 			return subcommands.ExitFailure
@@ -139,7 +145,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitSuccess
 	}
 
-	log.Info("Did not find cached version, installing the drivers...")
+	log.V(2).Info("Did not find cached version, installing the drivers...")
 	if err := installDriver(c, cacher, envReader, downloader); err != nil {
 		c.logError(err)
 		return subcommands.ExitFailure

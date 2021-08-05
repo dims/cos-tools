@@ -117,7 +117,7 @@ func DownloadContentFromURL(url, outputPath, infoStr string) error {
 			glog.Errorf("Failed to download %s: %v", infoStr, err)
 			retries--
 			time.Sleep(time.Second)
-			glog.Info("Retry...")
+			glog.V(2).Info("Retry...")
 		} else {
 			break
 		}
@@ -133,7 +133,7 @@ func DownloadContentFromURL(url, outputPath, infoStr string) error {
 		return errors.Wrapf(err, "failed to download %s", infoStr)
 	}
 
-	glog.Infof("Successfully downloaded %s from %s", infoStr, url)
+	glog.V(2).Infof("Successfully downloaded %s from %s", infoStr, url)
 	return nil
 }
 
@@ -145,9 +145,9 @@ func DownloadFromGCS(destDir, gcsBucket, gcsPath string) error {
 	return DownloadContentFromURL(downloadURL, outputPath, filename)
 }
 
-// ListGCSBucket lists the objects whose names begin with the given prefix in the given GCS bucekt.
+// ListGCSBucket lists the objects whose names begin with the given prefix in the given GCS bucket.
 func ListGCSBucket(bucket, prefix string) ([]string, error) {
-	glog.Infof("Listing objects from GCS bucekt %s with prefix %s", bucket, prefix)
+	glog.V(2).Infof("Listing objects from GCS bucket %s with prefix %s", bucket, prefix)
 
 	url := fmt.Sprintf("https://storage.googleapis.com/storage/v1/b/%s/o?prefix=%s", bucket, prefix)
 	dir, err := ioutil.TempDir("", "bucketlist")
@@ -285,10 +285,10 @@ func CreateTarFile(tarFilename string, files map[string][]byte) error {
 func RunCommandAndLogOutput(cmd *exec.Cmd, expectError bool) error {
 	errLogger := glog.Error
 	if expectError {
-		errLogger = glog.V(1).Info
+		errLogger = glog.V(2).Info
 	}
 
-	cmd.Stdout = &loggingWriter{logger: glog.Info}
+	cmd.Stdout = &loggingWriter{logger: glog.V(2).Info}
 	cmd.Stderr = &loggingWriter{logger: errLogger}
 
 	err := cmd.Run()

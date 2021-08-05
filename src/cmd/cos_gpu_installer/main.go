@@ -18,7 +18,7 @@ func main() {
 	flag.Set("alsologtostderr", "true")
 	flag.Parse()
 
-	log.Info("Checking if this is the only cos_gpu_installer that is running.")
+	log.V(2).Info("Checking if this is the only cos_gpu_installer that is running.")
 	utils.Flock()
 
 	subcommands.Register(subcommands.HelpCommand(), "")
