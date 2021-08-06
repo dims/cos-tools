@@ -1,7 +1,6 @@
 package cloudlogger
 
 import (
-	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -9,8 +8,8 @@ import (
 	"cloud.google.com/go/logging"
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/profiler"
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/utils"
-
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 // fakeCPU is a struct that implements the Component interface.
@@ -33,24 +32,6 @@ func (f *fakeCPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error
 
 // CollectErrors behavior with regards to type fakeCPU.
 func (f *fakeCPU) CollectErrors(outputs map[string]utils.ParsedOutput) error {
-	return nil
-}
-
-// Collect USEMetrics behavior with regards to type fakeCPU.
-func (f *fakeCPU) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := f.Metrics
-	metrics.Timestamp = time.Date(2021, time.July, 21, 9, 59, 30, 0, time.UTC)
-	// setting an arbitrary start time.
-	start := metrics.Timestamp
-	if err := f.CollectUtilization(outputs); err != nil {
-		return fmt.Errorf("failed to collect utilization for CPU: %v", err)
-	}
-	if err := f.CollectSaturation(outputs); err != nil {
-		return fmt.Errorf("failed to collect saturation for CPU: %v", err)
-	}
-	// setting an arbitrary end time.
-	end := time.Date(2021, time.July, 21, 10, 3, 0, 0, time.UTC)
-	metrics.Interval = end.Sub(start)
 	return nil
 }
 
@@ -87,24 +68,6 @@ func (f *fakeMemCap) CollectErrors(outputs map[string]utils.ParsedOutput) error 
 	return nil
 }
 
-// Collect USEMetrics behavior with regards to type fakeMemCap.
-func (f *fakeMemCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := f.Metrics
-	metrics.Timestamp = time.Date(2021, time.July, 21, 9, 59, 30, 0, time.UTC)
-	// setting an arbitrary start time.
-	start := metrics.Timestamp
-	if err := f.CollectUtilization(outputs); err != nil {
-		return fmt.Errorf("failed to collect utilization for CPU: %v", err)
-	}
-	if err := f.CollectSaturation(outputs); err != nil {
-		return fmt.Errorf("failed to collect saturation for CPU: %v", err)
-	}
-	// setting an arbitrary end time.
-	end := time.Date(2021, time.July, 21, 10, 3, 0, 0, time.UTC)
-	metrics.Interval = end.Sub(start)
-	return nil
-}
-
 // USEMetrics behavior with regards to type fakeMemCap.
 func (f *fakeMemCap) USEMetrics() *profiler.USEMetrics {
 	return f.Metrics
@@ -135,24 +98,6 @@ func (f *fakeStorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutp
 
 // CollectErrors behavior with regards to type fakeStorageDevIO.
 func (f *fakeStorageDevIO) CollectErrors(outputs map[string]utils.ParsedOutput) error {
-	return nil
-}
-
-// Collect USEMetrics behavior with regards to type fakeStorageDevIO.
-func (f *fakeStorageDevIO) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := f.Metrics
-	metrics.Timestamp = time.Date(2021, time.July, 21, 9, 59, 30, 0, time.UTC)
-	// setting an arbitrary start time.
-	start := metrics.Timestamp
-	if err := f.CollectUtilization(outputs); err != nil {
-		return fmt.Errorf("failed to collect utilization for CPU: %v", err)
-	}
-	if err := f.CollectSaturation(outputs); err != nil {
-		return fmt.Errorf("failed to collect saturation for CPU: %v", err)
-	}
-	// setting an arbitrary end time.
-	end := time.Date(2021, time.July, 21, 10, 3, 0, 0, time.UTC)
-	metrics.Interval = end.Sub(start)
 	return nil
 }
 
@@ -461,7 +406,8 @@ func TestTableLogProfilerReport(t *testing.T) {
 		if gotErr := err != nil; gotErr != test.wantErr {
 			t.Errorf("LogProfilerReport(%v, %v) = %v, wantErr %t", f, test.input, err, test.wantErr)
 		}
-		if diff := cmp.Diff(test.wantOutput, f.logged); diff != "" {
+
+		if diff := cmp.Diff(f.logged, test.wantOutput, cmpopts.IgnoreFields(profiler.USEMetrics{}, "Timestamp", "Interval")); diff != "" {
 			t.Errorf("ran LogProfilerReport(fakeStructuredLogger,%+v), but got mismatch between got and want (-got, +want): \n diff %s", test.input, diff)
 
 		}

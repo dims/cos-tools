@@ -27,8 +27,6 @@ type Component interface {
 	// It takes in a map of commands to their parsed output and uses that
 	// to specify which commands (and therefore output) it needs.
 	CollectErrors(cmdOutputs map[string]utils.ParsedOutput) error
-	// CollectUSEMetrics collects USEMetrics for the component.
-	CollectUSEMetrics(cmdOutputs map[string]utils.ParsedOutput) error
 	// USEMetrics returns the USEMetrics of the component.
 	USEMetrics() *USEMetrics
 	// Name returns the name of the component.
@@ -187,32 +185,6 @@ func (c *CPU) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	return nil
 }
 
-// CollectUSEMetrics collects USE Metrics for the CPU component.
-func (c *CPU) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := c.metrics
-	metrics.Timestamp = time.Now()
-	start := metrics.Timestamp
-
-	var gotErr bool
-	if err := c.CollectUtilization(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect utilization for CPU: %v", err)
-	}
-	if err := c.CollectSaturation(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect saturation for CPU: %v", err)
-	}
-	end := time.Now()
-	metrics.Interval = end.Sub(start)
-
-	if gotErr {
-		err := "failed to collect all USE Metrics for CPU. " +
-			"Please check the logs for more information"
-		return fmt.Errorf(err)
-	}
-	return nil
-}
-
 // MemCap holds information about the Memory capacity component:
 // name and USE Metrics collected.
 type MemCap struct {
@@ -358,32 +330,6 @@ func (m *MemCap) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	return nil
 }
 
-// CollectUSEMetrics collects USE Metrics for the MemCap component.
-func (m *MemCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := m.metrics
-	metrics.Timestamp = time.Now()
-	start := metrics.Timestamp
-
-	var gotErr bool
-	if err := m.CollectUtilization(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect utilization for Memory capacity: %v", err)
-	}
-	if err := m.CollectSaturation(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect saturation for Memory capacity: %v", err)
-	}
-	end := time.Now()
-	metrics.Interval = end.Sub(start)
-
-	if gotErr {
-		err := "failed to collect all USE metrics for Memory Capacity. " +
-			"Please check the logs for more information"
-		return fmt.Errorf(err)
-	}
-	return nil
-}
-
 // StorageDevIO holds information about the Storage device I/O component:
 // name and USE Metrics collected.
 type StorageDevIO struct {
@@ -463,32 +409,6 @@ func (d *StorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutput) 
 // CollectErrors collects errors for the Storage Device I/O component.
 func (d *StorageDevIO) CollectErrors(outputs map[string]utils.ParsedOutput) error {
 	// yet to be implemented
-	return nil
-}
-
-// CollectUSEMetrics collects USE Metrics for the Storage Device I/O component.
-func (d *StorageDevIO) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := d.metrics
-	metrics.Timestamp = time.Now()
-	start := metrics.Timestamp
-
-	var gotErr bool
-	if err := d.CollectUtilization(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect utilization for Storage Device I/O: %v", err)
-	}
-	if err := d.CollectSaturation(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect saturation for Storage Device I/O: %v", err)
-	}
-	end := time.Now()
-	metrics.Interval = end.Sub(start)
-
-	if gotErr {
-		err := "failed to collect all USE metrics for Storage Device I/O. " +
-			"Please check the logs for more information"
-		return fmt.Errorf(err)
-	}
 	return nil
 }
 
@@ -601,36 +521,40 @@ func (s *StorageCap) CollectErrors(outputs map[string]utils.ParsedOutput) error 
 	return nil
 }
 
-// CollectUSEMetrics collects USE Metrics for the Storage Capacity component
-func (s *StorageCap) CollectUSEMetrics(outputs map[string]utils.ParsedOutput) error {
-	metrics := s.metrics
-	metrics.Timestamp = time.Now()
-	start := metrics.Timestamp
-
-	var gotErr bool
-	if err := s.CollectUtilization(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect utilization for Storage capacity: %v", err)
-	}
-	if err := s.CollectSaturation(outputs); err != nil {
-		gotErr = true
-		log.Errorf("failed to collect saturation for Storage capacity: %v", err)
-	}
-	end := time.Now()
-	metrics.Interval = end.Sub(start)
-
-	if gotErr {
-		return fmt.Errorf("got error when collecting USE Metrics for Storage Capacity")
-	}
-	return nil
-}
-
 func (s *StorageCap) USEMetrics() *USEMetrics {
 	return s.metrics
 }
 
 func (s *StorageCap) Name() string {
 	return s.name
+}
+
+// CollectUSEMetrics collects USE Metrics for the component specified. It does this by calling
+// the necessary methods to collect utilization, saturation and errors.
+func CollectUSEMetrics(component Component, outputs map[string]utils.ParsedOutput) error {
+
+	metrics := component.USEMetrics()
+	metrics.Timestamp = time.Now()
+	start := metrics.Timestamp
+
+	var gotErr bool
+	if err := component.CollectUtilization(outputs); err != nil {
+		gotErr = true
+		log.Errorf("failed to collect utilization for %q: %v", component.Name(), err)
+	}
+	if err := component.CollectSaturation(outputs); err != nil {
+		gotErr = true
+		log.Errorf("failed to collect saturation for %q: %v", component.Name(), err)
+	}
+	end := time.Now()
+	metrics.Interval = end.Sub(start)
+
+	if gotErr {
+		err := "failed to collect all USE metrics for %q. " +
+			"Please check the logs for more information"
+		return fmt.Errorf(err, component.Name())
+	}
+	return nil
 }
 
 // GenerateUSEReport generates USE Metrics for all the components
@@ -649,7 +573,7 @@ func GenerateUSEReport(components []Component, cmds []Command) (USEReport, error
 	}
 	var failed []string
 	for _, s := range components {
-		if err := s.CollectUSEMetrics(outputs); err != nil {
+		if err := CollectUSEMetrics(s, outputs); err != nil {
 			log.Errorf("failed to collect USE metrics for %q", s.Name())
 			failed = append(failed, s.Name())
 		}
