@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	grepNotFound    = 1
+	grepFound       = 0
 	hostRootPath    = "/root"
 	kernelSrcDir    = "/build/usr/src/linux"
 	kernelHeaderDir = "/build/usr/src/linux-headers"
@@ -219,10 +219,10 @@ func (c *InstallCommand) logError(err error) {
 
 func (c *InstallCommand) isGpuConfigured() (bool, error) {
 	cmd := "lspci | grep -i \"nvidia\""
-	returnCode, err := utils.RunCommandWithExitCode([]string{cmd}, "", nil)
+	returnCode, err := utils.RunCommandWithExitCode([]string{"/bin/bash", "-c", cmd}, "", nil)
 	if err != nil {
 		return false, err
 	}
-	isConfigured := returnCode == grepNotFound
+	isConfigured := returnCode == grepFound
 	return isConfigured, nil
 }
