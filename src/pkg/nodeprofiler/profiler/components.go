@@ -31,6 +31,9 @@ type Component interface {
 	USEMetrics() *USEMetrics
 	// Name returns the name of the component.
 	Name() string
+	// AdditionalInformation returns additional information unique to each
+	// component.
+	AdditionalInformation() string
 }
 
 // CPU holds information about the CPU component:
@@ -49,6 +52,12 @@ func NewCPU(name string) *CPU {
 		name:    name,
 		metrics: &USEMetrics{},
 	}
+}
+
+// AdditionalInformation returns additional information unique to the
+// the CPU component.
+func (c *CPU) AdditionalInformation() string {
+	return ""
 }
 
 // Name returns the name of the CPU component.
@@ -203,6 +212,12 @@ func NewMemCap(name string) *MemCap {
 	}
 }
 
+// AdditionalInformation returns additional information unique to the
+// the MemCap component.
+func (m *MemCap) AdditionalInformation() string {
+	return ""
+}
+
 // Name returns the name of the Memory capacity component.
 func (m *MemCap) Name() string {
 	return m.name
@@ -348,6 +363,13 @@ func NewStorageDevIO(name string) *StorageDevIO {
 	}
 }
 
+// AdditionalInformation returns additional information unique to the
+// the StorageDevIO component.
+func (d *StorageDevIO) AdditionalInformation() string {
+	return ""
+
+}
+
 // Name returns the name of the Storage device I/O component.
 func (d *StorageDevIO) Name() string {
 	return d.name
@@ -430,6 +452,14 @@ func NewStorageCap(name string) *StorageCap {
 		metrics: &USEMetrics{},
 		devices: []string{},
 	}
+}
+
+// AdditionalInformation returns additional information unique to the
+// the StorageCap component.
+func (s *StorageCap) AdditionalInformation() string {
+	info := "The utilization value for this component was measured using the " +
+		"following devices: " + strings.Join(s.devices, ",")
+	return info
 }
 
 // sets the boot disk as default if no devices are specified

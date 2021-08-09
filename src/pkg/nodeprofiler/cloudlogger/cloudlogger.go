@@ -21,8 +21,9 @@ const defaultCommandTimeout = 300 * time.Second
 // fields that each profiler component has. componentInfo helps to export
 // component fields to log them to Google Cloud Logging backend.
 type componentInfo struct {
-	Name    string
-	Metrics *profiler.USEMetrics
+	Name       string
+	Metrics    *profiler.USEMetrics
+	Additional string
 }
 
 // LoggerOpts contains the options supported when logging the Profiler Report
@@ -184,7 +185,7 @@ func logUSEReport(g StructuredLogger, useReport *profiler.USEReport) error {
 	}
 	var cInfos []componentInfo
 	for _, c := range useReport.Components {
-		cInfos = append(cInfos, componentInfo{Name: c.Name(), Metrics: c.USEMetrics()})
+		cInfos = append(cInfos, componentInfo{Name: c.Name(), Metrics: c.USEMetrics(), Additional: c.AdditionalInformation()})
 	}
 	entry := logging.Entry{
 		// Log anything that can be marshaled to JSON.

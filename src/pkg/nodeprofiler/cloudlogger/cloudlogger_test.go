@@ -45,6 +45,11 @@ func (f *fakeCPU) Name() string {
 	return f.CPUName
 }
 
+// AdditionalInformation returns unique information for fakeCPU
+func (f *fakeCPU) AdditionalInformation() string {
+	return ""
+}
+
 // fakeMemCap is a struct that implement the Component interface.
 type fakeMemCap struct {
 	MemCapName string
@@ -78,6 +83,11 @@ func (f *fakeMemCap) Name() string {
 	return f.MemCapName
 }
 
+// AdditionalInformation behaviro with regards to fakeMemCap.
+func (f *fakeMemCap) AdditionalInformation() string {
+	return ""
+}
+
 // fakeStorageDevIO is a struct that implement the Component interface.
 type fakeStorageDevIO struct {
 	StorageDevIOName string
@@ -109,6 +119,10 @@ func (f *fakeStorageDevIO) USEMetrics() *profiler.USEMetrics {
 // Name behavior with regards to type fakeStorageDevIO.
 func (f *fakeStorageDevIO) Name() string {
 	return f.StorageDevIOName
+}
+
+func (f *fakeStorageDevIO) AdditionalInformation() string {
+	return ""
 }
 
 // fakeTextLogger is a struct that implements the TextLogger interface.
@@ -225,7 +239,7 @@ func TestTableLogProfilerReport(t *testing.T) {
 		},
 	}
 	for _, c := range useReport.Components {
-		cInfos = append(cInfos, componentInfo{Name: c.Name(), Metrics: expected.Metrics})
+		cInfos = append(cInfos, componentInfo{Name: c.Name(), Metrics: expected.Metrics, Additional: c.AdditionalInformation()})
 	}
 	var tests = []struct {
 		name       string
