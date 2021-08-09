@@ -84,10 +84,10 @@ func generateProfilerOpts() ([]profiler.Component, []profiler.Command) {
 	components := []profiler.Component{cpu, memcap, sDevIO}
 	// End Getting Components
 	// Getting Commands
-	vmstat := profiler.NewVMStat("vmstat", 1, 1, []string{"us", "sy", "st", "si", "so", "r"})
+	vmstat := profiler.NewVMStat("vmstat", 1, 5, []string{"us", "sy", "st", "si", "so", "r"})
 	lscpu := profiler.NewLscpu("lscpu", []string{"CPU(s)"})
 	free := profiler.NewFree("free", []string{"Mem:used", "Mem:total", "Swap:used", "Swap:total"})
-	iostat := profiler.NewIOStat("iostat", "-xdz", 1, 1, []string{"aqu-sz", "%util"})
+	iostat := profiler.NewIOStat("iostat", "-xdz", 1, 5, []string{"aqu-sz", "%util"})
 	commands := []profiler.Command{vmstat, lscpu, free, iostat}
 	// End Getting Commands
 	// [End generating ProfilerOpts from Profiler Package]
