@@ -304,15 +304,6 @@ func TestTableLogProfilerReport(t *testing.T) {
 			wantOutput: []logging.Entry{
 				{
 					Payload: struct {
-						Components []componentInfo
-						Analysis   string
-					}{
-						Components: cInfos,
-						Analysis:   useReport.Analysis,
-					},
-					Severity: logging.Debug,
-				}, {
-					Payload: struct {
 						CommandName   string
 						CommandOutput string
 					}{
@@ -321,7 +312,17 @@ func TestTableLogProfilerReport(t *testing.T) {
 					},
 					Severity: logging.Debug,
 				},
-			},
+
+				{
+					Payload: struct {
+						Components []componentInfo
+						Analysis   string
+					}{
+						Components: cInfos,
+						Analysis:   useReport.Analysis,
+					},
+					Severity: logging.Debug,
+				}},
 			wantErr: false,
 		},
 		{
@@ -340,24 +341,6 @@ func TestTableLogProfilerReport(t *testing.T) {
 			wantOutput: []logging.Entry{
 				{
 					Payload: struct {
-						Components []componentInfo
-						Analysis   string
-					}{
-						Components: cInfos,
-						Analysis:   useReport.Analysis,
-					},
-					Severity: logging.Debug,
-				}, {
-					Payload: struct {
-						Components []componentInfo
-						Analysis   string
-					}{
-						Components: cInfos,
-						Analysis:   useReport.Analysis,
-					},
-					Severity: logging.Debug,
-				}, {
-					Payload: struct {
 						CommandName   string
 						CommandOutput string
 					}{
@@ -384,7 +367,26 @@ func TestTableLogProfilerReport(t *testing.T) {
 					},
 					Severity: logging.Debug,
 				},
-			},
+
+				{
+					Payload: struct {
+						Components []componentInfo
+						Analysis   string
+					}{
+						Components: cInfos,
+						Analysis:   useReport.Analysis,
+					},
+					Severity: logging.Debug,
+				}, {
+					Payload: struct {
+						Components []componentInfo
+						Analysis   string
+					}{
+						Components: cInfos,
+						Analysis:   useReport.Analysis,
+					},
+					Severity: logging.Debug,
+				}},
 			wantErr: false,
 		},
 

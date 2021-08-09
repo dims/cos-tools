@@ -221,6 +221,27 @@ func LogProfilerReport(g StructuredLogger, opts *LoggerOpts) error {
 	log.Info("Running Profiler . . .")
 	// Ensure logging entries are written to the cloud logging backend.
 	defer g.Flush()
+	// Only log shell command if the user specified a command.
+	if len(opts.Command) == 0 {
+		emptyCmd = true
+	} else {
+		emptyCmd = false
+		log.Info("Running shell command . . .")
+		// Fetching command from user input and populating the cmdArray
+		// with the main command and its flags.
+		cmdArray := strings.Split(opts.Command, " ")
+		usrMainCmd := cmdArray[0]
+		usrMainCmdFlags := cmdArray[1:]
+		for i := 0; i < opts.CmdCount; i++ {
+			if err := logShellCommand(g, opts.CmdTimeOut, usrMainCmd, usrMainCmdFlags...); err != nil {
+				errArr = append(errArr, err)
+				continue
+			}
+			// Delaying execution by cmdInterval seconds.
+			time.Sleep(opts.CmdInterval)
+		}
+		log.Infof("Done running shell command.")
+	}
 	// Run the profiler profCount times. The default value is 1 time unless user
 	// set the counter to a different number.
 	for i := 0; i < opts.ProfilerCount; i++ {
@@ -237,26 +258,5 @@ func LogProfilerReport(g StructuredLogger, opts *LoggerOpts) error {
 		time.Sleep(opts.ProfilerInterval)
 	}
 	log.Info("Done running profiler.")
-	// Only log shell command if the user specified a command.
-	if len(opts.Command) == 0 {
-		emptyCmd = true
-		return checkLogError(emptyCmd, errArr)
-	}
-	emptyCmd = false
-	log.Info("Running shell command . . .")
-	// Fetching command from user input and populating the cmdArray
-	// with the main command and its flags.
-	cmdArray := strings.Split(opts.Command, " ")
-	usrMainCmd := cmdArray[0]
-	usrMainCmdFlags := cmdArray[1:]
-	for i := 0; i < opts.CmdCount; i++ {
-		if err := logShellCommand(g, opts.CmdTimeOut, usrMainCmd, usrMainCmdFlags...); err != nil {
-			errArr = append(errArr, err)
-			continue
-		}
-		// Delaying execution by cmdInterval seconds.
-		time.Sleep(opts.CmdInterval)
-	}
-	log.Infof("Done running shell command.")
 	return checkLogError(emptyCmd, errArr)
 }
