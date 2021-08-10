@@ -65,10 +65,22 @@ func TestRun(t *testing.T) {
 			name: "df",
 			fakeCmd: &df{
 				name:   "testdata/df.sh",
+				flags:  "1",
 				titles: []string{"Use%"},
 			},
 			want: map[string][]string{
-				"Use%": {"68%", "0%", "2%", "1%", "100%"},
+				"Use%": {"76%", "0%", "1%", "100%"},
+			},
+		},
+		{
+			name: "df's output with column titles mixed up",
+			fakeCmd: &df{
+				name:   "testdata/df.sh",
+				flags:  "2",
+				titles: []string{"Mounted on"},
+			},
+			want: map[string][]string{
+				"Mounted on": {"/", "/dev", "/dev/tty", "/dev/kvm", "/dev/.ssh/sshd_config"},
 			},
 		},
 		{

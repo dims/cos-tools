@@ -223,6 +223,7 @@ func (i *iostat) Run() (map[string][]string, error) {
 // df represents the command 'df'
 type df struct {
 	name   string
+	flags  string
 	titles []string
 }
 
@@ -235,7 +236,7 @@ func (fs *df) Name() string {
 // map of title(s) to their values.
 func (fs *df) Run() (map[string][]string, error) {
 	// get output in 1K size to make summing values direct
-	out, err := utils.RunCommand(fs.Name(), "-k")
+	out, err := utils.RunCommand(fs.Name(), "-k", fs.flags)
 	if err != nil {
 		cmd := fs.Name() + " " + "-k"
 		return nil, fmt.Errorf("failed to run the command %q: %v",
@@ -250,7 +251,7 @@ func (fs *df) Run() (map[string][]string, error) {
 	//
 	// "Filesystem      Size  Used Avail Use% Mounted on" ->
 	// ["Filesystem", "Size", "Used", "Avail", "Use%", "Mounted on"]
-	re := regexp.MustCompile(`[A-Z][^A-Z]*`)
+	re := regexp.MustCompile(`[0-9]?[A-Z]{1}[^A-Z0-9]*`)
 	allTitles := re.FindAllString(lines[0], -1)
 	// trim trailing or leading white spaces in all titles.
 	allTitles = utils.TrimCharacter(allTitles, " ")
