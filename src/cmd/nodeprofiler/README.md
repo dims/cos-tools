@@ -157,3 +157,66 @@ To delete the daemonset in this scenario, a user can just run `kubectl delete ds
 delete all pods and nodes associated with the daemonset.
 
 More information about kubernetes daemonsets can be found at: https://kubernetes.io/docs/reference/kubectl/overview/
+
+# Useful Ways to Query information on Google Cloud Logging backend
+## Individual Sorting
+#### Filtering information by logs
+All the logs from the profiler tool will have cos_node_profiler as their log name.
+```
+logName="projects/<project-name>/logs/cos_node_profiler"
+```
+
+#### Filtering by resource type.
+To view logs from containers on a Kubernetes clusters in our Cloud Logging UI, we can narrow down the resource type as follows:
+```
+resource.type="k8s_container"
+```
+
+#### Filtering by podname
+To retrieve logs from a pod on the cluster, run:
+```
+resource.labels.pod_name="<name_of_pod_for_which_to_collect_info>"
+```
+
+#### Filtering by saturation status
+To get output from resources that are saturated, run:
+```
+jsonPayload.Components.Metrics.Saturation="true"
+```
+
+#### Filtering by substring in json payload Analysis string
+```
+jsonPayload.Analysis : "<substring>"
+```
+
+#### Filtering by specific metrics value
+Developers might want to query all nodes that have a Utilization or Error  higher than a given threshold for a given component. To do that the following filter can be used:
+```
+jsonPayload.Components.Metrics.Utilization>"<integer representing the threshold>"
+```
+
+
+
+Running `jsonPayload.Components.Metrics.Utilization>"50"` will show logs for which at least one of the components has a utilization greater than 50. This can be expanded to errors. That is the filter
+`
+jsonPayload.Components.Metrics.Error>"<integer threshold>"` collects logs from nodes that have Error value greater than <integer threshold>
+
+
+## Combined Sorting
+Typically, developers may want to make queries using multiple filters. Here is an example of how it can be done.
+```
+logName="projects/<project-name>/logs/cos_node_profiler"
+resource.type="k8s_container"
+resource.labels.pod_name="<name_of_pod_for_which_to_collect_info>"
+jsonPayload.Components.Metrics.Saturation="true"
+```
+
+In the example above, the Google Cloud Logging backend will retrieve all the Profiler Tool’s logs from the pod specified in the above snippet that indicate whether it is saturated.
+To collect information about all the nodes on the cluster that are saturated, the following filter can be used:
+```
+logName="projects/<project-name>/logs/cos_node_profiler"
+resource.type="k8s_container"
+jsonPayload.Components.Metrics.Saturation="true"
+```
+
+Detailed information can be found at https://cloud.google.com/logging/docs/view/query-library
