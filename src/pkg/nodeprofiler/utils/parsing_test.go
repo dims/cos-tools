@@ -259,7 +259,7 @@ func TestParseRowsAndColumns(t *testing.T) {
 			},
 		},
 		{
-			name: "iostat with spaced rows",
+			name: "iostat",
 			rows: []string{
 				"Device             tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn",
 				"                                                                      ",
@@ -267,17 +267,13 @@ func TestParseRowsAndColumns(t *testing.T) {
 				"                                                                       ",
 				"vda               0.00         0.20         0.00      37845          0",
 			},
-			titles: []string{"vdb:tps", "vda:kB_read", "vdb:kB_wrtn"},
-			want: map[string][]string{
-				"vdb:tps":     {"1.27"},
-				"vdb:kB_wrtn": {"8072028"},
-				"vda:kB_read": {"37845"},
-			},
+			titles:  []string{"vdb:tps", "vda:kB_read", "vdb:kB_wrtn"},
+			wantErr: true,
 		},
 		{
 			name: "wrongly formatted titles",
 			rows: []string{
-				"Device             tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn",
+				"                  tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn",
 				"vdb               1.27         3.79        41.80     732408    8072028",
 				"vda               0.00         0.20         0.00      37845          0",
 			},

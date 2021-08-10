@@ -201,7 +201,20 @@ func ParseRows(lines []string, delim string, titles ...string) (map[string][]str
 }
 
 // ParseRowsAndColumns parses command outputs that have row and column headers.
-// It also takes in an optional titles slice which specifies the row column
+// Specifically, it parses command outputs that have an empty string on row 0
+// column 0. For example, the output of free as seen below:
+//            total        used        free
+// Mem:       14518          12       14479
+// Swap:          0           0           0
+//
+// If the command output has a non-empty string on row 0 column 0 as with
+// iostat below, the function will throw an error since this is an output that
+// should be parsed by columns instead
+// "Device             tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn",
+// "vdb               0.74        10.39        23.23     859900    1922916",
+// "vda               0.01         0.46         0.00      37829          0"
+//
+// The function takes in an optional titles slice which specifies the row column
 // combination to parse. If the titles argument is missing, then an empty map
 // is returned.
 //
@@ -219,14 +232,6 @@ func ParseRows(lines []string, delim string, titles ...string) (map[string][]str
 //                                  "Swap:      0      0       0        "],
 //                                  ["Mem+used", "Swap+total"])
 //                                  err : "title string not well-formatted"
-//
-// Here are some edge cases parsed by the function:
-//
-// Rows with non-empty strings on row 0 column 0 E.g., with iostat (The default is
-// an empty string on row 0 column 0):
-// "Device             tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn",
-// "vdb               0.74        10.39        23.23     859900    1922916",
-// "vda               0.01         0.46         0.00      37829          0"
 func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string, error) {
 	parsedOutput := make(ParsedOutput)
 	// columns maps column title to its index eg columns["total"] = 0 wth free.
@@ -249,7 +254,6 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 			return nil, fmt.Errorf(err, title)
 		}
 	}
-	var diff int
 	// rows stores each title in rows as key and the rest of the row as value.
 	rows := make(map[string][]string)
 	// loop over each row, mapping its title to the rest of the row (which is
@@ -260,27 +264,25 @@ func ParseRowsAndColumns(lines []string, titles ...string) (map[string][]string,
 			continue
 		}
 		if i == 0 {
-			// Looking at the edge case example above (iostat's output), since
-			// rows are split by whitespaces, the index of "tps" will be 1
-			// after split. When the second row is split, and divided into row
-			// title and values, the following will result:
-			// "vdb" : {"0.74", "10.39", "23.23", "859900", "1922916"}
+			// This function parses command outputs that have an empty string on
+			// row 0 column 0. If the output has a non-empty string on row 0
+			// column 0 like iostat(see above), then the function throws an error
+			// here since this output should be parsed by columns. Hence the
+			// need for splitting by regular expression.
 			//
-			// Index of column titles will be used to access values from slice
-			// above. Index of "tps" = 1 and index 1 of slice above is 10.39
-			// (which is incorrect). The correct value is in index 0 (which we
-			// we would have gotten if col 0 row 0 was empty). To deal with this,
-			// if column 0 of row 0 is a non-empty string, then 1 is subtracted
-			// from the actual index of the rest of the colums in row 0. Thus the
-			// need for the diff variable.
+			// The expression splits the line into characters. If the first character
+			// is not an empty string, then the output had a non-empty string on row 0
+			// col 0 and an error is returned.
 			exp := regexp.MustCompile(`\s*`)
 			chars := exp.Split(line, -1)
 			if chars[0] != "" {
-				diff = -1
+				err := "command output has non-empty string on row 0 column 0: " +
+					"%q"
+				return nil, fmt.Errorf(err, line)
 			}
 			// map header name to its index
 			for index, str := range tokens {
-				columns[str] = index + diff
+				columns[str] = index
 			}
 			continue
 		}
