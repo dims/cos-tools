@@ -54,11 +54,22 @@ func TestRun(t *testing.T) {
 			name: "iostat",
 			fakeCmd: &iostat{
 				name:   "testdata/iostat.sh",
-				flags:  "xdz",
+				flags:  "-dxz",
 				titles: []string{"%util"},
 			},
 			want: map[string][]string{
 				"%util": {"5.59", "0.00"},
+			},
+		},
+		{
+			name: "iostat ignoring first report",
+			fakeCmd: &iostat{
+				name:   "testdata/iostat.sh",
+				flags:  "-dxyz",
+				titles: []string{"%util"},
+			},
+			want: map[string][]string{
+				"%util": {"100.00", "100.00", "100.00", "100.00", "100.00", "100.00"},
 			},
 		},
 		{

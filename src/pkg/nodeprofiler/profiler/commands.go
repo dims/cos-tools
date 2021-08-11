@@ -209,9 +209,18 @@ func (i *iostat) Run() (map[string][]string, error) {
 	}
 	s := string(out)
 	lines := strings.Split(strings.Trim(s, "\n"), "\n")
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("failed to collect output of iostat, rows: %v", lines)
+	}
 	// ignore the first 2 lines in iostat's output so that the first line
 	// is column titles.
 	lines = lines[2:]
+
+	// if the "-y" flag was specified, there will be an extra new line added
+	// to indicate that the first report was ignored
+	if first := strings.Fields(lines[0]); len(first) == 0 {
+		lines = lines[1:]
+	}
 
 	// split first row into columns based on titles
 	allTitles := strings.Fields(lines[0])
