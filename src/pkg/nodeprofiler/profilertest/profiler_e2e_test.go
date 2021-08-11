@@ -92,3 +92,71 @@ func TestCPUOverload(t *testing.T) {
 	}
 	t.Logf("finished running %q command successfully", str)
 }
+
+// TestStorageDevOverload tests whether package profiler is able to collect USEMEtrics
+// for the StorageDevIO component. It does this by overloading the storage devices I/O
+// using the "stress-ng" package. It then checks that this was reflected in the USEMetrics
+// collected. The flags specified to the shell command "stress-ng" include:
+//        --iomix N: start N workers that will perform a mix of I/O operations
+//        --iomix-bytes N: write N bytes for each iomix worker process. In this case N is
+//                         specified as a percemtage of the free space on the file system
+//        -t N: stop stress after N units of time (units also specified in N)
+func TestStorageDevOverload(t *testing.T) {
+
+	// initialize all commands needed and the mem cap component
+	titles := []string{"%util", "aqu-sz"}
+	iostat := profiler.NewIOStat("iostat", "-dxyz", 1, 10, titles)
+
+	commands := []profiler.Command{iostat}
+
+	dev := profiler.NewStorageDevIO("StorageDevIO")
+	components := []profiler.Component{dev}
+
+	// stress test will run for 1 minute perfoming a number of I/O operations
+	// that will take up 80% of free space on  the file system
+	args := []string{"--iomix", "1", "--iomix-bytes", "80%", "-t", "1m"}
+	cmd := exec.Command("stress-ng", args...)
+	// get pipe that will be connected to command's standard output when comamnd starts.
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Errorf("failed to connect to command's standard output: %v", err)
+	}
+	// Use the same pipe for standard error
+	cmd.Stderr = cmd.Stdout
+
+	str := "stress-ng" + " " + strings.Join(args, " ")
+	t.Logf("running %q", str)
+	// starts the command but does not wait for it to complete.
+	if err := cmd.Start(); err != nil {
+		t.Errorf("failed to start the command %q: %v", str, err)
+	}
+	scanner := bufio.NewScanner(stdout)
+
+	// print to stdout in real time
+	go func() {
+		for scanner.Scan() {
+			m := scanner.Text()
+			t.Log(m)
+		}
+	}()
+
+	// generates USE report while stress test is running
+	report, err := profiler.GenerateUSEReport(components, commands)
+	t.Logf("USE Report generated:\n %+v", report.Components[0].USEMetrics())
+	if err != nil {
+		t.Errorf("failed to generate USE report for StorageDevIO component, %v", err)
+	}
+	if utilization := dev.USEMetrics().Utilization; utilization < 80 {
+		err := "overloaded the StorageDevIO component but utilization was less that 80: %v"
+		t.Errorf(err, utilization)
+	}
+	if saturated := dev.USEMetrics().Saturation; !saturated {
+		err := "overloaded the StorageDevIO component but saturation was false"
+		t.Errorf(err)
+	}
+	// wait for command to exit and release any resources associated with it.
+	if err = cmd.Wait(); err != nil {
+		t.Errorf("failed to finish running the command %q: %v", str, err)
+	}
+	t.Logf("finished running %q command successfully", str)
+}
