@@ -13,6 +13,13 @@ spec:
     spec:
       containers:
       - name: cos-node-profiler
-        image: gcr.io/cos-interns-playground/cos_node_profiler
+        image: gcr.io/cos-interns-playground/cos_node_profiler:latest
         command: ["/nodeprofiler"]
         args: ["--project=cos-interns-playground","--cmd=lscpu","--cmd-count=1", "--cmd-interval=0"]
+        resources:
+          limits:
+            cpu: 120m # Container is capped to use 12% of the CPU
+            memory: 30Mi # Container is capped to use 30 Mi of memory
+          requests:
+            cpu: 60m # The container should run with 6% of the CPU
+            memory: 15Mi # The container should run with 15 Mi of memory
