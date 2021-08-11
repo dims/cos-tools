@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/utils"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,7 +46,6 @@ type CPU struct {
 // this can be used to initialize CPU outside of the
 // profiler package.
 func NewCPU(name string) *CPU {
-
 	return &CPU{
 		name:    name,
 		metrics: &USEMetrics{},
@@ -94,7 +92,6 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 	if !stPresent {
 		return fmt.Errorf("missing vmstat column 'st'")
 	}
-
 	if len(us) == 0 {
 		return fmt.Errorf("no vmstat report collected")
 	} else if len(us) == 1 {
@@ -102,13 +99,11 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 			" reflecting current conditions of component, additional reports are needed"
 		return fmt.Errorf(err)
 	}
-
 	// ignore the first values of 'us', 'sy' and 'st' since they reflect averages
 	// since last reboot and can bring averages down
 	us = us[1:]
 	sy = sy[1:]
 	st = st[1:]
-
 	columns := [][]string{us, sy, st}
 	var total int
 	// loop over us, sy, st columns and sum their values
@@ -120,7 +115,6 @@ func (c *CPU) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 		total += sum
 	}
 	count := len(us)
-
 	c.metrics.Utilization = math.Round((float64(total)/float64(count))*100) / 100
 	return nil
 }
@@ -160,7 +154,6 @@ func (c *CPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
 	if !present {
 		return fmt.Errorf("missing vmstat column 'r'")
 	}
-
 	if len(running) == 0 {
 		return fmt.Errorf("no vmstat report collected")
 	} else if len(running) == 1 {
@@ -168,7 +161,6 @@ func (c *CPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
 			" reflecting current conditions of component, additional reports are needed"
 		return fmt.Errorf(err)
 	}
-
 	// ignore the first values of 'r' since they reflect averages since last
 	// reboot and can bring the average down
 	running = running[1:]
@@ -177,7 +169,6 @@ func (c *CPU) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
 	if err != nil {
 		return err
 	}
-
 	num := len(running)
 	runningProcs := sum / num
 	count, err := c.calculateCPUCount(outputs)
@@ -205,7 +196,6 @@ type MemCap struct {
 // this can be used to initialize MemCap outside of the
 // profiler package.
 func NewMemCap(name string) *MemCap {
-
 	return &MemCap{
 		name:    name,
 		metrics: &USEMetrics{},
@@ -366,7 +356,6 @@ type StorageDevIO struct {
 // this can be used to initialize Storage device I/O outside of the
 // profiler package.
 func NewStorageDevIO(name string) *StorageDevIO {
-
 	return &StorageDevIO{
 		name:    name,
 		metrics: &USEMetrics{},
@@ -377,7 +366,6 @@ func NewStorageDevIO(name string) *StorageDevIO {
 // the StorageDevIO component.
 func (d *StorageDevIO) AdditionalInformation() string {
 	return ""
-
 }
 
 // Name returns the name of the Storage device I/O component.
@@ -403,7 +391,6 @@ func (d *StorageDevIO) CollectUtilization(outputs map[string]utils.ParsedOutput)
 	if !ok {
 		return fmt.Errorf("mising iostat column util")
 	}
-
 	total, err := utils.SumParseFloat(util)
 	if err != nil {
 		return err
@@ -434,7 +421,6 @@ func (d *StorageDevIO) CollectSaturation(outputs map[string]utils.ParsedOutput) 
 	}
 	average := total / float64(len(queue))
 	d.metrics.Saturation = average > 1
-
 	return nil
 }
 
@@ -456,7 +442,6 @@ type StorageCap struct {
 // this can be used to initialize StorageCap outside of the
 // profiler package.
 func NewStorageCap(name string) *StorageCap {
-
 	return &StorageCap{
 		name:    name,
 		metrics: &USEMetrics{},
@@ -490,7 +475,6 @@ func (s *StorageCap) setDefaults() {
 func (s *StorageCap) CollectUtilization(outputs map[string]utils.ParsedOutput) error {
 	// if devices are not set
 	s.setDefaults()
-
 	dfCmd := "df"
 	parsedOutput, ok := outputs[dfCmd]
 	if !ok {
@@ -526,7 +510,6 @@ func (s *StorageCap) CollectUtilization(outputs map[string]utils.ParsedOutput) e
 					return fmt.Errorf("failed to convert %q to int: %v", val, err)
 				}
 				fUsed += val
-
 				s = totalBlocks[index]
 				val, err = strconv.Atoi(s)
 				if err != nil {
@@ -544,7 +527,6 @@ func (s *StorageCap) CollectUtilization(outputs map[string]utils.ParsedOutput) e
 	}
 	util := (float64(fUsed) / float64(fSize)) * 100
 	fsUtilization := math.Round((util)*100) / 100
-
 	s.metrics.Utilization = fsUtilization
 	return nil
 }
@@ -560,11 +542,9 @@ func (s *StorageCap) CollectErrors(outputs map[string]utils.ParsedOutput) error 
 	// Not yet implemented
 	return nil
 }
-
 func (s *StorageCap) USEMetrics() *USEMetrics {
 	return s.metrics
 }
-
 func (s *StorageCap) Name() string {
 	return s.name
 }
@@ -572,11 +552,9 @@ func (s *StorageCap) Name() string {
 // CollectUSEMetrics collects USE Metrics for the component specified. It does this by calling
 // the necessary methods to collect utilization, saturation and errors.
 func CollectUSEMetrics(component Component, outputs map[string]utils.ParsedOutput) error {
-
 	metrics := component.USEMetrics()
 	metrics.Timestamp = time.Now()
 	start := metrics.Timestamp
-
 	var gotErr bool
 	if err := component.CollectUtilization(outputs); err != nil {
 		gotErr = true
@@ -588,7 +566,6 @@ func CollectUSEMetrics(component Component, outputs map[string]utils.ParsedOutpu
 	}
 	end := time.Now()
 	metrics.Interval = end.Sub(start)
-
 	if gotErr {
 		err := "failed to collect all USE metrics for %q. " +
 			"Please check the logs for more information"

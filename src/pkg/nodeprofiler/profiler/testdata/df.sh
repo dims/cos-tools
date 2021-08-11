@@ -1,8 +1,8 @@
 #!/bin/bash
 
 main() {
-    case "$2" in
-    "1")
+    case "$1" in
+    "-k")
     cat <<EOF
     Filesystem     1K-blocks   Used Available Use% Mounted on
     /dev/vdb         7864320 5401876   1738492  76% /
@@ -11,7 +11,7 @@ main() {
     /dev/root         176176  173936         0 100% /dev/.ssh/sshd_config
 EOF
     ;;
-    "2")
+    "-h")
     cat <<EOF
     1K-blocks     Filesystem   Used Available Use% Mounted on
     /dev/vdb         7864320 5401876   1738492  76% /

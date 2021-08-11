@@ -1,0 +1,19 @@
+{
+    "ProjID":"cos-interns-playground",
+    "ShCmds":[
+       {
+          "Command":"lscpu",
+          "CmdCount":2,
+          "CmdInterval":1,
+          "CmdTimeOut":5
+       },
+       {
+          "Command":"vmstat",
+          "CmdCount":3,
+          "CmdInterval":1,
+          "CmdTimeOut": 5
+       }
+    ],
+    "ProfilerCount":2,
+    "ProfilerInterval":2
+}

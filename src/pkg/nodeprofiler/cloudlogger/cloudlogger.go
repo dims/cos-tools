@@ -26,25 +26,32 @@ type componentInfo struct {
 	Additional string
 }
 
+// ShellCmdOpts contains the options that each arbitrary shell command should
+// be mapped to.
+type ShellCmdOpts struct {
+	// Specifies raw commands for which to log output.
+	Command string `json:"Command"`
+	// Specifies the number of times to run an arbitrary shell command.
+	CmdCount int `json:"CmdCount"`
+	// Specifies the interval separating the number of times the user runs
+	// an arbitrary shell command.
+	CmdInterval time.Duration `json:"CmdInterval"`
+	// Specifies the amount of time it will take for the a raw shell command to
+	// timeout.
+	CmdTimeOut time.Duration `json: "CmdTimeOut"`
+}
+
 // LoggerOpts contains the options supported when logging the Profiler Report
 // to Google Cloud Logging backend.
 type LoggerOpts struct {
 	// Specifies the project ID to write logs to.
-	ProjID string
-	// Specifies raw commands for which to log output.
-	Command string
-	// Specifies the number of times to run an arbitrary shell command.
-	CmdCount int
-	// Specifies the interval separating the number of times the user runs
-	// an arbitrary shell command.
-	CmdInterval time.Duration
-	// Specifies the amount of time it will take for the a raw shell command to
-	// timeout.
-	CmdTimeOut time.Duration
+	ProjID string `json:"ProjID"`
+	// Specifies the commands to run mapped with their options.
+	ShCmds []ShellCmdOpts `json:"ShCmds"`
 	// Specifies the number of times to run the profiler.
-	ProfilerCount int
+	ProfilerCount int `json: "ProfilerCount"`
 	// Specifies the interval the profiler will run.
-	ProfilerInterval time.Duration
+	ProfilerInterval time.Duration `json: "ProfilerInterval"`
 	// Components on which to run profiler. It may contain CPU(s), Memory, etc.
 	Components []profiler.Component
 	// ProfilerCmds field specifies additional options needed to run the profiler
@@ -84,29 +91,34 @@ func (l *LoggerOpts) Validate() error {
 	if l.ProfilerCount == 0 && l.ProfilerInterval != 0 {
 		return fmt.Errorf("invalid Logger options: cannot set ProfilerInterval if ProfilerCount is not set")
 	}
-	// if the command configuration is nil, ensure CmdCount, CmdInterval, and
-	// CmdTimeOut configurations are all 0.
-	if l.Command == "" {
-		if l.CmdCount != 0 || l.CmdInterval != 0 || l.CmdTimeOut != 0 {
-			return fmt.Errorf("invalid Logger options: CmdCount, CmdInterval and CmdTimeout should not be set if Command is not set")
+	for _, shCmd := range l.ShCmds {
+		// if the command configuration is nil, ensure CmdCount, CmdInterval, and
+		// CmdTimeOut configurations are all 0.
+		if shCmd.Command == "" {
+			if shCmd.CmdCount != 0 || shCmd.CmdInterval != 0 || shCmd.CmdTimeOut != 0 {
+				return fmt.Errorf("invalid Logger options: CmdCount, CmdInterval and CmdTimeout should not be set if Command is not set")
+			}
+		} else {
+			// if the the command configuration was set, but the user did not specify
+			// when the command will timeout, then the CmdTimeOut configuration will be
+			// set to defaultCommandTimeout, which is 300 seconds.
+			if shCmd.CmdTimeOut == 0 {
+				shCmd.CmdTimeOut = defaultCommandTimeout
+			}
+
+			// if CmdCount config is not set, then CmdInterval must not be set.
+			if shCmd.CmdCount == 0 && shCmd.CmdInterval != 0 {
+				return fmt.Errorf("invalid Logger options: cannot set CmdInterval if CmdCount is not set")
+			}
+			// if the command configuration is set but no other options is set, run the
+			// command once.
+			if shCmd.CmdCount == 0 && shCmd.CmdInterval == 0 {
+				shCmd.CmdCount = 1
+			}
 		}
-	} else {
-		// if the the command configuration was set, but the user did not specify
-		// when the command will timeout, then the CmdTimeOut configuration will be
-		// set to defaultCommandTimeout, which is 300 seconds.
-		if l.CmdTimeOut == 0 {
-			l.CmdTimeOut = defaultCommandTimeout
-		}
-		// if CmdCount config is not set, then CmdInterval must not be set.
-		if l.CmdCount == 0 && l.CmdInterval != 0 {
-			return fmt.Errorf("invalid Logger options: cannot set CmdInterval if CmdCount is not set")
-		}
-		// if the command configuration is set but no other options is set, run the
-		// command once.
-		if l.CmdCount == 0 && l.CmdInterval == 0 {
-			l.CmdCount = 1
-		}
+
 	}
+
 	return nil
 }
 
@@ -219,30 +231,34 @@ func LogProfilerReport(g StructuredLogger, opts *LoggerOpts) error {
 		return err
 	}
 	log.Info("Done validating logger options.")
-	log.Info("Running Profiler . . .")
 	// Ensure logging entries are written to the cloud logging backend.
 	defer g.Flush()
-	// Only log shell command if the user specified a command.
-	if len(opts.Command) == 0 {
-		emptyCmd = true
-	} else {
-		emptyCmd = false
-		log.Info("Running shell command . . .")
-		// Fetching command from user input and populating the cmdArray
-		// with the main command and its flags.
-		cmdArray := strings.Split(opts.Command, " ")
-		usrMainCmd := cmdArray[0]
-		usrMainCmdFlags := cmdArray[1:]
-		for i := 0; i < opts.CmdCount; i++ {
-			if err := logShellCommand(g, opts.CmdTimeOut, usrMainCmd, usrMainCmdFlags...); err != nil {
-				errArr = append(errArr, err)
-				continue
+	for _, shCmd := range opts.ShCmds {
+		// Only log shell command if the user specified a command.
+		if len(shCmd.Command) == 0 {
+			emptyCmd = true
+		} else {
+			emptyCmd = false
+			log.Infof("Running %v . . .", shCmd.Command)
+			// Fetching command from user input and populating the cmdArray
+			// with the main command and its flags.
+			cmdArray := strings.Split(shCmd.Command, " ")
+			usrMainCmd := cmdArray[0]
+			usrMainCmdFlags := cmdArray[1:]
+			for i := 0; i < shCmd.CmdCount; i++ {
+				if err := logShellCommand(g, shCmd.CmdTimeOut, usrMainCmd, usrMainCmdFlags...); err != nil {
+					errArr = append(errArr, err)
+					continue
+				}
+				// Delaying execution by cmdInterval seconds.
+				time.Sleep(shCmd.CmdInterval)
+
 			}
-			// Delaying execution by cmdInterval seconds.
-			time.Sleep(opts.CmdInterval)
+			log.Infof("Done running %v\n", shCmd.Command)
+
 		}
-		log.Infof("Done running shell command.")
 	}
+	log.Info("Running Profiler . . .")
 	// Run the profiler profCount times. The default value is 1 time unless user
 	// set the counter to a different number.
 	for i := 0; i < opts.ProfilerCount; i++ {

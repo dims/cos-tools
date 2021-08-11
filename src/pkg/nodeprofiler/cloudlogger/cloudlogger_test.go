@@ -208,18 +208,22 @@ func TestTableLogText(t *testing.T) {
 
 			t.Errorf("LogText(%v, %v) = %v, wantErr %t", f, test.input, err, test.wantErr)
 		}
-		if diff := cmp.Diff(test.wantOutput, f.logged); diff != "" {
-			t.Errorf("ran logText(fakeTextLogger, %+v), but got mismatch between got and want (-got, +want): \n diff %s", test.input, diff)
+		if diff := cmp.Diff(f.logged, test.wantOutput); diff != "" {
+			t.Errorf("ran LogText(fakeTextLogger, %+v), but got mismatch between got and want (-got, +want): \n diff %s", test.input, diff)
 		}
 	}
 }
 
 func TestTableLogProfilerReport(t *testing.T) {
 	// Retrieving testing data.
-	inputFile := "testdata/testdata.txt"
-	inputFileData, err := ioutil.ReadFile(inputFile)
+	inputFile1, inputFile2 := "testdata/testdata.txt", "testdata/testdata2.txt"
+	inputFileData1, err := ioutil.ReadFile(inputFile1)
 	if err != nil {
-		t.Errorf("failed to open testing input file: %v\n", err)
+		t.Errorf("failed to open testing input file %v: %v\n", inputFile1, err)
+	}
+	inputFileData2, err := ioutil.ReadFile(inputFile2)
+	if err != nil {
+		t.Errorf("failed to open testing input file %v: %v\n", inputFile2, err)
 	}
 	// Retrieving profiler components and commands.
 	components, cmds := generateFakeProfilerOpts()
@@ -241,6 +245,7 @@ func TestTableLogProfilerReport(t *testing.T) {
 	for _, c := range useReport.Components {
 		cInfos = append(cInfos, componentInfo{Name: c.Name(), Metrics: expected.Metrics, Additional: c.AdditionalInformation()})
 	}
+
 	var tests = []struct {
 		name       string
 		input      *LoggerOpts
@@ -250,11 +255,15 @@ func TestTableLogProfilerReport(t *testing.T) {
 		{
 			name: "valid logger options and non-empty json payload log.",
 			input: &LoggerOpts{
-				ProjID:           "cos-interns-playground",
-				Command:          "bash testdata/testcmd.sh",
-				CmdCount:         1,
-				CmdInterval:      0 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "cos-interns-playground",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "bash testdata/testcmd.sh",
+						CmdCount:    1,
+						CmdInterval: 0 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    1,
 				ProfilerInterval: 0 * time.Second,
 				Components:       components,
@@ -267,7 +276,7 @@ func TestTableLogProfilerReport(t *testing.T) {
 						CommandOutput string
 					}{
 						CommandName:   "bash testdata/testcmd.sh",
-						CommandOutput: string(inputFileData),
+						CommandOutput: string(inputFileData1),
 					},
 					Severity: logging.Debug,
 				},
@@ -287,11 +296,20 @@ func TestTableLogProfilerReport(t *testing.T) {
 		{
 			name: "multiple commands executions and multiple profiler runs non-empty json payload log.",
 			input: &LoggerOpts{
-				ProjID:           "cos-interns-playground",
-				Command:          "bash testdata/testcmd.sh",
-				CmdCount:         3,
-				CmdInterval:      0 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "cos-interns-playground",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "bash testdata/testcmd.sh",
+						CmdCount:    1,
+						CmdInterval: 0 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					}, ShellCmdOpts{
+						Command:     "bash testdata/testhello.sh",
+						CmdCount:    1,
+						CmdInterval: 0 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    2,
 				ProfilerInterval: 0 * time.Second,
 				Components:       components,
@@ -304,25 +322,18 @@ func TestTableLogProfilerReport(t *testing.T) {
 						CommandOutput string
 					}{
 						CommandName:   "bash testdata/testcmd.sh",
-						CommandOutput: string(inputFileData),
+						CommandOutput: string(inputFileData1),
 					},
 					Severity: logging.Debug,
-				}, {
+				},
+
+				{
 					Payload: struct {
 						CommandName   string
 						CommandOutput string
 					}{
-						CommandName:   "bash testdata/testcmd.sh",
-						CommandOutput: string(inputFileData),
-					},
-					Severity: logging.Debug,
-				}, {
-					Payload: struct {
-						CommandName   string
-						CommandOutput string
-					}{
-						CommandName:   "bash testdata/testcmd.sh",
-						CommandOutput: string(inputFileData),
+						CommandName:   "bash testdata/testhello.sh",
+						CommandOutput: string(inputFileData2),
 					},
 					Severity: logging.Debug,
 				},
@@ -348,15 +359,18 @@ func TestTableLogProfilerReport(t *testing.T) {
 				}},
 			wantErr: false,
 		},
-
 		{
 			name: "invalid logger options payload log: empty command with CmdCount and/or CmdInterval.",
 			input: &LoggerOpts{
-				ProjID:           "cos-interns-playground",
-				Command:          "",
-				CmdCount:         1,
-				CmdInterval:      0 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "cos-interns-playground",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "",
+						CmdCount:    1,
+						CmdInterval: 0 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    1,
 				ProfilerInterval: 0 * time.Second,
 				Components:       components,
@@ -368,11 +382,15 @@ func TestTableLogProfilerReport(t *testing.T) {
 		{
 			name: "invalid logger options payload log: inconsistent CmdCount and CmdInterval.",
 			input: &LoggerOpts{
-				ProjID:           "cos-interns-playground",
-				Command:          "bash testdata/testcmd.sh",
-				CmdCount:         0,
-				CmdInterval:      3 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "cos-interns-playground",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "bash testdata/testcmd.sh",
+						CmdCount:    0,
+						CmdInterval: 3 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    1,
 				ProfilerInterval: 0 * time.Second,
 				Components:       components,
@@ -384,11 +402,15 @@ func TestTableLogProfilerReport(t *testing.T) {
 		{
 			name: "invalid logger options payload log: inconsistent ProfilerCount and ProfilerInterval.",
 			input: &LoggerOpts{
-				ProjID:           "",
-				Command:          "bash testdata/testcmd.sh",
-				CmdCount:         1,
-				CmdInterval:      1 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "cos-interns-playground",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "bash testdata/testcmd.sh",
+						CmdCount:    0,
+						CmdInterval: 3 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    0,
 				ProfilerInterval: 4 * time.Second,
 				Components:       components,
@@ -398,13 +420,17 @@ func TestTableLogProfilerReport(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name: "invalid logger options payload log: no project ID.",
+			name: "invalid logger options payload log: no project ID/invalid project ID.",
 			input: &LoggerOpts{
-				ProjID:           "",
-				Command:          "bash testdata/testcmd.sh",
-				CmdCount:         0,
-				CmdInterval:      3 * time.Second,
-				CmdTimeOut:       3 * time.Second,
+				ProjID: "",
+				ShCmds: []ShellCmdOpts{
+					ShellCmdOpts{
+						Command:     "bash testdata/testcmd.sh",
+						CmdCount:    0,
+						CmdInterval: 3 * time.Second,
+						CmdTimeOut:  3 * time.Second,
+					},
+				},
 				ProfilerCount:    1,
 				ProfilerInterval: 0 * time.Second,
 				Components:       components,

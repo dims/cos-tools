@@ -236,6 +236,15 @@ type df struct {
 	titles []string
 }
 
+// NewDF function helps to initialize a df structure.
+func NewDF(name string, flags string, titles []string) *df {
+	return &df{
+		name:   name,
+		flags:  flags,
+		titles: titles,
+	}
+}
+
 // Name returns the name for the 'df' command
 func (fs *df) Name() string {
 	return fs.name
@@ -245,9 +254,9 @@ func (fs *df) Name() string {
 // map of title(s) to their values.
 func (fs *df) Run() (map[string][]string, error) {
 	// get output in 1K size to make summing values direct
-	out, err := utils.RunCommand(fs.Name(), "-k", fs.flags)
+	out, err := utils.RunCommand(fs.Name(), fs.flags)
 	if err != nil {
-		cmd := fs.Name() + " " + "-k"
+		cmd := fs.Name() + " " + fs.flags
 		return nil, fmt.Errorf("failed to run the command %q: %v",
 			cmd, err)
 	}
