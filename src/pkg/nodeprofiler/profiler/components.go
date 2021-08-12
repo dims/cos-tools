@@ -542,8 +542,8 @@ func (s *StorageCap) CollectUtilization(outputs map[string]utils.ParsedOutput) e
 			return fmt.Errorf("failed to find the device %q", s.devices[i])
 		}
 	}
-	utiil := (float64(fUsed) / float64(fSize)) * 100
-	fsUtilization := math.Round((utiil)*100) / 100
+	util := (float64(fUsed) / float64(fSize)) * 100
+	fsUtilization := math.Round((util)*100) / 100
 
 	s.metrics.Utilization = fsUtilization
 	return nil

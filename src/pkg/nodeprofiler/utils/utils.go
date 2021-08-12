@@ -18,7 +18,7 @@ func RunCommand(cmd string, args ...string) ([]byte, error) {
 	log.Infof("running %q", str)
 	out, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run %q': %v", str, err)
+		return nil, fmt.Errorf("failed to run %q: %v", str, err)
 	}
 	log.Infof("finished running %q command successfully", str)
 	return out, nil

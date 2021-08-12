@@ -12,19 +12,19 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/profiler"
 )
 
-// TestCPUOverload tests whether the CPU's CollectUSEMetrics in package profiler
-// is working or not. It does this by overloading the CPU component using the
+// TestCPUOverload tests whether package profiler is able to collect USEMetrics
+// for the CPU component. It does this by overloading the CPU component using the
 // "stress-ng" package upto a certain threshold and checking whether this was
 // reflected in the component's metrics. The flags specificed to the shell command
 // "stress-ng" include:
-//        --cpu N: specifies the computer system the stress test is will be applied
-//                 on - the CPU and specifcally, N number of cores
+//        --cpu N: specifies the component the stress test will be applied on - the
+//                 CPU and specifcally, N number of cores
 //        --cpu-load P: load CPU with P percent loading for the stress workers to
 //                 set an approximate threshold on expetected utilization
 //		  --fork N: continually fork child processes that exit to increase wait time
 //                 for processes and thus make saturation true
 //        -v: (verbose) show all debug, warnings and normal information output
-//        -t N: stop stress after N units of time (also specified in N)
+// //        -t N: stop stress after N units of time (also specified in N)
 func TestCPUOverload(t *testing.T) {
 	// initialize all commands needed and the cpu component
 	titles := []string{"r", "us", "sy", "st"}
