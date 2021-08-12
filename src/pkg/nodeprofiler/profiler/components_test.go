@@ -78,7 +78,7 @@ func TestCollectUtilization(t *testing.T) {
 					"Swap:total": {"0"},
 				},
 			},
-			want: 0.001,
+			want: 0.09,
 		},
 		{
 			name:      "missing titles",
@@ -286,12 +286,11 @@ func TestCollectSaturation(t *testing.T) {
 			component: &MemCap{"fake", &USEMetrics{}},
 			outputs: map[string]utils.ParsedOutput{
 				"vmstat": {
-					"si": {"0", "0", "3"},
-					"so": {"0", "1", "5"},
+					"si": {"0", "7", "3"},
+					"so": {"0", "8", "5"},
 				},
 				"free": {
-					"Mem:total":  {"14520"},
-					"Swap:total": {"0"},
+					"Swap:total": {"701"},
 				},
 			},
 		},

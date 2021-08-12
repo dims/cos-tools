@@ -215,7 +215,10 @@ func NewMemCap(name string) *MemCap {
 // AdditionalInformation returns additional information unique to the
 // the MemCap component.
 func (m *MemCap) AdditionalInformation() string {
-	return ""
+	info := "The utilization value for this component was calculated as a " +
+		"percentage of total Main memory while saturation was calculated based on " +
+		"a threshold placed on total Swap memory "
+	return info
 }
 
 // Name returns the name of the Memory capacity component.
@@ -244,12 +247,8 @@ func (m *MemCap) CollectUtilization(outputs map[string]utils.ParsedOutput) error
 	if !muPresent {
 		return fmt.Errorf("missing free's Mem row and used column")
 	}
-	swapUsed, suPresent := parsedOutput["Swap:used"]
-	if !suPresent {
-		return fmt.Errorf("missing free's Swap row and used column")
-	}
 
-	memory := [][]string{memUsed, swapUsed}
+	memory := [][]string{memUsed}
 	var used int
 	for _, mem := range memory {
 		sum, err := utils.SumAtoi(mem)
@@ -258,41 +257,37 @@ func (m *MemCap) CollectUtilization(outputs map[string]utils.ParsedOutput) error
 		}
 		used += sum
 	}
-
-	total, err := m.calculateTotalMemory(outputs)
+	// get total [main] memory
+	total, err := m.calculateTotalMemory("Mem", outputs)
 	if err != nil {
 		return err
 	}
-	m.metrics.Utilization = math.Round((float64(used)/float64(total))*1000) / 1000
+	// get value as percentage and rount it off
+	util := (float64(used) / float64(total)) * 100
+	m.metrics.Utilization = math.Round((util)*1000) / 1000
+
 	return nil
 }
 
-// calculateTotalMemory calculates the total memory on the system.
-// It does this by summing the total Main and total Swap memory which
-// can be found on free's "Mem" row + "total" column, and "Swap" row +
-// "total" column.
-func (m *MemCap) calculateTotalMemory(outputs map[string]utils.ParsedOutput) (int, error) {
+// calculateTotalMemory calculates the total main or swap memory on the system,
+// depending on what string passed in: "Mem" or "Swap". If "Mem" is passed in,
+// it returns the value found on free's "Mem" row + "total" column and if "Swap"
+// is passed in, it returns the value on free's "Swap" row + "total" column.
+func (m *MemCap) calculateTotalMemory(mem string, outputs map[string]utils.ParsedOutput) (int, error) {
 	cmd := "free"
 	parsedOutput, ok := outputs[cmd]
 	if !ok {
 		return 0, fmt.Errorf("missing output for %q", cmd)
 	}
-	memTotal, mtPresent := parsedOutput["Mem:total"]
+	memType := mem + ":total"
+	memTotal, mtPresent := parsedOutput[memType]
 	if !mtPresent {
-		return 0, fmt.Errorf("missing free's Mem row and total column")
+		return 0, fmt.Errorf("missing free's %s row and total column", mem)
 	}
-	swapTotal, stPresent := parsedOutput["Swap:total"]
-	if !stPresent {
-		return 0, fmt.Errorf("missing free's Swap row and total column")
-	}
-	memory := [][]string{memTotal, swapTotal}
-	var total int
-	for _, mem := range memory {
-		sum, err := utils.SumAtoi(mem)
-		if err != nil {
-			return 0, err
-		}
-		total += sum
+
+	total, err := utils.SumAtoi(memTotal)
+	if err != nil {
+		return 0, err
 	}
 	return total, nil
 }
@@ -306,10 +301,10 @@ func (m *MemCap) calculateTotalMemory(outputs map[string]utils.ParsedOutput) (in
 // memory swapped in and out of disks can be found on vmstat's 'si'
 // (swapped in) and 'so' (swapped to) columns.
 func (m *MemCap) CollectSaturation(outputs map[string]utils.ParsedOutput) error {
-	cmd := "vmstat"
-	parsedOutput, ok := outputs[cmd]
+	vmstatCmd := "vmstat"
+	parsedOutput, ok := outputs[vmstatCmd]
 	if !ok {
-		return fmt.Errorf("missing output for %q", cmd)
+		return fmt.Errorf("missing output for %q", vmstatCmd)
 	}
 	si, siPresent := parsedOutput["si"]
 	if !siPresent {
@@ -328,14 +323,29 @@ func (m *MemCap) CollectSaturation(outputs map[string]utils.ParsedOutput) error 
 		}
 		swaps += sum
 	}
-	average := swaps / len(si)
-	total, err := m.calculateTotalMemory(outputs)
+	// get total [Swap] memory
+	total, err := m.calculateTotalMemory("Swap", outputs)
 	if err != nil {
 		return err
 	}
-	// ten percent of total memory
-	threshold := 0.1 * float64(total)
-	m.metrics.Saturation = float64(average) > threshold
+	// since metrics from free are in megabytes and those from vmstat are
+	// in kilobytes
+	totalBytes := total * 1024
+
+	// ten percent of total swap memory
+	log.Infof("swaps is %d and total swap memory is %d", swaps, totalBytes)
+
+	var threshold float64
+	// accounts for cases where swap memory is 0
+	if totalBytes == 0 {
+		// threshold set as 95 percent utilization
+		threshold = 95
+		m.metrics.Saturation = m.metrics.Utilization > threshold
+	} else {
+		// threshold set as 10 percent of total swap memory
+		threshold = 0.1 * float64(totalBytes)
+		m.metrics.Saturation = float64(swaps) > threshold
+	}
 	return nil
 }
 
