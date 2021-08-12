@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/nodeprofiler/profiler"
 )
@@ -152,6 +153,83 @@ func TestStorageDevOverload(t *testing.T) {
 	}
 	if saturated := dev.USEMetrics().Saturation; !saturated {
 		err := "overloaded the StorageDevIO component but saturation was false"
+		t.Errorf(err)
+	}
+	// wait for command to exit and release any resources associated with it.
+	if err = cmd.Wait(); err != nil {
+		t.Errorf("failed to finish running the command %q: %v", str, err)
+	}
+	t.Logf("finished running %q command successfully", str)
+}
+
+// TestMemOverload tests whether package profiler is able to collect USE Metrics
+// for the MemCap component. It does this by overloading the MemCap component using
+// the "stress-ng" package upto a certain threshold and checking whether this was reflected
+// in the component's metrics. The flags specified to the shell command "stress-ng" include:
+//        --vm-bytes N: allocate N bytes for use by the memory stressors. In this case N is
+//                      specified as a percentage of total available memory
+//        --vm N: starts N workers that will write to the allocated memory
+//        --brk N: starts N workers that grow the data segment by one page at
+//                 a time using mulitple brk calls. This stresses swapping
+//        --bigheap N: starts N workers that grow their heaps by reallocating memory
+//                      stressing both memory and swapping
+//        -t N: stop stress after N units of time (units also specified in N)
+func TestMemOverload(t *testing.T) {
+	// initialize all commands needed and the mem cap component
+	titles := []string{"Mem:used", "Mem:total", "Swap:used", "Swap:total"}
+	free := profiler.NewFree("free", titles)
+
+	titles = []string{"si", "so"}
+	vmstat := profiler.NewVMStat("vmstat", 1, 75, titles)
+
+	commands := []profiler.Command{vmstat, free}
+
+	mem := profiler.NewMemCap("MemCap")
+	components := []profiler.Component{mem}
+
+	// stress test will run for 2 minutes writing to the allocated memory (90%)
+	// and growing the data segment as well as the heap
+	args := []string{"--vm-bytes", "90%", "-vm", "1", "--brk", "2", "--bigheap", "2", "-t", "2m"}
+	cmd := exec.Command("stress-ng", args...)
+	// get pipe that will be connected to command's standard output when comamnd starts.
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Errorf("failed to connect to command's standard output: %v", err)
+	}
+	// Use the same pipe for standard error
+	cmd.Stderr = cmd.Stdout
+
+	str := "stress-ng" + " " + strings.Join(args, " ")
+	t.Logf("running %q", str)
+	// starts the command but does not wait for it to complete.
+	if err := cmd.Start(); err != nil {
+		t.Errorf("failed to start the command %q: %v", str, err)
+	}
+	scanner := bufio.NewScanner(stdout)
+
+	// print to stdout in real time
+	go func() {
+		for scanner.Scan() {
+			m := scanner.Text()
+			t.Log(m)
+		}
+	}()
+	// allow portion of memory to be written
+	t.Log("Sleep for 30s to allow memory to be overloaded")
+	time.Sleep(30 * time.Second)
+
+	// generates USE report while stress test is running
+	report, err := profiler.GenerateUSEReport(components, commands)
+	t.Logf("USE Report generated:\n %+v", report.Components[0].USEMetrics())
+	if err != nil {
+		t.Errorf("failed to generate USE report for MemCap component, %v", err)
+	}
+	if utilization := mem.USEMetrics().Utilization; utilization < 90 {
+		err := "overloaded the MemCap component but utilization was less that 90: %v"
+		t.Errorf(err, utilization)
+	}
+	if saturated := mem.USEMetrics().Saturation; !saturated {
+		err := "overloaded the MemCap component but saturation was false"
 		t.Errorf(err)
 	}
 	// wait for command to exit and release any resources associated with it.
