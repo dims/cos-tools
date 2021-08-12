@@ -220,3 +220,26 @@ jsonPayload.Components.Metrics.Saturation="true"
 ```
 
 Detailed information can be found at https://cloud.google.com/logging/docs/view/query-library
+
+## USE Metrics
+A crucial component of the debugging information collected by the agent is USE
+(Utilization, Saturation and Errors) Metrics. USE Metrics provide a way of analyzing
+the perfomance of any system. The metrics can be defined as the following:
+- Utilization: proportion of a resource that is used servicing work
+- Saturation: the degree to which the resource has exra work which it can't service, often queued
+- Errors: count of error events
+
+To collect USE Metrics, the USE Method was implemented. The USE Method can be summarized as: For every resource, check utilization, saturation and errors, where resource refers to any system component e.g., CPUs, disks, memory, etc. The USE Method was developed by Brendan Gregg. Detailed information can be found at https://www.brendangregg.com/usemethod.html
+
+## USE Method: Linux Perfomance Checklist
+To collect USE Metrics for various components of the Linux system, we used a Linux Perfomance 
+Checklist provided by the same engineer who developed the USE Method, Brendan Gregg. The checklist shows how one can collect USE Metrics for each component: https://www.brendangregg.com/USEmethod/use-linux.html
+
+For example, to collect CPU utilization, we can run the command `vmstat 1`. This might give us the following output:
+```
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 2  0      0 14834520      0  19376    0    0     0     5    1    6  0  0 97  2  0
+ ```
+Looking at the checklist, we can get the utilization value by summing the values under `us`, `sy` and `st` columns, which in this case would give us a CPU utilization of 6%. For each component of the system, we collected its USE Metrics and uploaded the resulting logs to Google
+Cloud Logging as described above. 
