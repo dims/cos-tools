@@ -11,7 +11,9 @@ access and examine debugging information.
 
 cos\_node\_profiler\_agent is deployed as a docker container. To run the
 app, open `nodeprofiler` directory located in the COS `tools` repository under
-src/cmd/, then run `make`. This will produce an executable that takes in flags as follows:
+src/cmd/, then run `make`. This will produce an executable that supports two
+configuration methods. The first way to configure the Profiler tool is to
+specify command flags as follows:
 ```
  ./<executable name> --project=<name of project to write logs to> \
  --cmd=<name of the command to run> \
@@ -42,6 +44,42 @@ provide any `--cmd-count` or `--cmd-interval` flags. Otherwise, the program will
 return an error. Note that the `--cmd-timeout` flag will be set to 300 seconds
 by default if the user did not specify a timeout option. The profiler-count will
 be set to 1 by default if the user did not specify how often to run the profiler.
+
+The second way to configure the Node Profiler tool using a JSON configuration
+file. In order to do that, the flag `--configFile` needs to be set as follows:
+`--configFile="<path to the JSON configuration file>"`. If the `--configFile`
+flag is passed, other command line flags (if any) to configure the Node Profiler
+tool will be ignored as input will be read from the specified file.
+
+Example:
+Given the following sample configuration file:
+```
+{
+    "ProjID":"cos-interns-playground",
+    "ShCmds":[
+       {
+          "Command":"lscpu",
+          "CmdCount":2,
+          "CmdInterval":1,
+          "CmdTimeOut":5
+       },
+       {
+          "Command":"vmstat",
+          "CmdCount":3,
+          "CmdInterval":1,
+          "CmdTimeOut": 5
+       }
+    ],
+    "ProfilerCount":2,
+    "ProfilerInterval":2
+}
+```
+Users can interact with the application in the following way:
+```
+./nodeprofiler --config-file="./sample-configuration.json"
+```
+The benefit of using a configuration file with the Node Profiler tool is that
+users can specify multiple shell commands to run in parallel.
 
 ## Instruction for building the COS Node Profiler Docker image
 
