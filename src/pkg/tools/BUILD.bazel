@@ -22,7 +22,7 @@ go_library(
         "handle_disk_layout.go",
         "seal_oem_partition.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/tools",
     visibility = ["//visibility:public"],
     deps = ["//src/pkg/tools/partutil"],
 )

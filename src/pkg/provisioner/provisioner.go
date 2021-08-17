@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -158,6 +159,11 @@ func stopServices(systemd *systemdClient) error {
 		"device_policy_manager.service",
 		"metrics-daemon.service",
 		"update-engine.service",
+		"systemd-random-seed.service",
+		"systemd-journald-audit.socket",
+		"systemd-journald-dev-log.socket",
+		"systemd-journald.socket",
+		"systemd-journald.service",
 	} {
 		if err := systemd.stop(s); err != nil {
 			return err
@@ -190,7 +196,7 @@ func zeroAllFiles(dir string) error {
 	})
 }
 
-func cleanupDir(dir string) error {
+func cleanupDir(dir string, exclude []string) error {
 	fileInfos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -200,8 +206,31 @@ func cleanupDir(dir string) error {
 		}
 	}
 	for _, fi := range fileInfos {
+		if utils.StringSliceContains(exclude, fi.Name()) {
+			continue
+		}
 		if err := os.RemoveAll(filepath.Join(dir, fi.Name())); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func cleanEtcSSH(rootDir string) error {
+	dir := filepath.Join(rootDir, "etc", "ssh")
+	fileInfos, err := ioutil.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+	for _, fi := range fileInfos {
+		if strings.HasPrefix(fi.Name(), "ssh_host_") {
+			if err := os.RemoveAll(filepath.Join(dir, fi.Name())); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -221,19 +250,36 @@ func cleanup(rootDir, stateDir string) error {
 		// which doesn't impact the final image output in any way
 		log.Printf("Non-fatal error unmounting tmpfs at /root: %v", err)
 	}
-	if err := os.RemoveAll(filepath.Join(rootDir, "mnt", "stateful_partition", "etc")); err != nil && !os.IsNotExist(err) {
+	// Files and directories to remove
+	for _, f := range []string{
+		filepath.Join(rootDir, "mnt", "stateful_partition", "etc"),
+		filepath.Join(rootDir, "etc", "docker", "key.json"),
+		filepath.Join(rootDir, "var", "lib", "systemd", "random-seed"),
+	} {
+		if err := os.RemoveAll(f); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	// Directories to remove contents of (but not the directory itself)
+	if err := cleanupDir(filepath.Join(rootDir, "var", "cache"), []string{"apt", "debconf"}); err != nil {
+		return err
+	}
+	if err := cleanupDir(filepath.Join(rootDir, "var", "lib", "systemd"), []string{"deb-systemd-helper-enabled"}); err != nil {
 		return err
 	}
 	for _, d := range []string{
-		filepath.Join(rootDir, "var", "cache"),
 		filepath.Join(rootDir, "var", "tmp"),
 		filepath.Join(rootDir, "var", "lib", "crash_reporter"),
 		filepath.Join(rootDir, "var", "lib", "metrics"),
-		filepath.Join(rootDir, "var", "lib", "systemd"),
 		filepath.Join(rootDir, "var", "lib", "update_engine"),
 		filepath.Join(rootDir, "var", "lib", "whitelist"),
+		filepath.Join(rootDir, "var", "lib", "cloud"),
+		filepath.Join(rootDir, "var", "log", "journal"),
+		filepath.Join(rootDir, "var", "log", "audit"),
+		filepath.Join(rootDir, "etc", "netplan"),
+		filepath.Join(rootDir, "tmp"),
 	} {
-		if err := cleanupDir(d); err != nil {
+		if err := cleanupDir(d, nil); err != nil {
 			return err
 		}
 	}
@@ -242,11 +288,15 @@ func cleanup(rootDir, stateDir string) error {
 	if err := zeroAllFiles(filepath.Join(rootDir, "var", "log")); err != nil {
 		return err
 	}
+	// /etc/ssh needs some special handling
+	if err := cleanEtcSSH(rootDir); err != nil {
+		return err
+	}
 	log.Println("Done cleaning up machine state")
 	return nil
 }
 
-func executeSteps(s *state) error {
+func executeSteps(ctx context.Context, s *state, deps stepDeps) error {
 	for i, step := range s.data.Config.Steps {
 		// In the case where executeSteps runs after a reboot, we need to skip
 		// through all the steps that have already been completed.
@@ -257,7 +307,7 @@ func executeSteps(s *state) error {
 		if err != nil {
 			return fmt.Errorf("error parsing step %d: %v", i, err)
 		}
-		if err := abstractStep.run(s); err != nil {
+		if err := abstractStep.run(ctx, s, &deps); err != nil {
 			return fmt.Errorf("error in step %d: %v", i, err)
 		}
 		// Persist our most recent completed step to disk, so we can resume after a reboot.
@@ -290,7 +340,7 @@ type Deps struct {
 	RootDir string
 }
 
-func run(deps Deps, runState *state) (err error) {
+func run(ctx context.Context, deps Deps, runState *state) (err error) {
 	systemd := &systemdClient{systemctl: deps.SystemctlCmd}
 	if err := repartitionBootDisk(deps, runState); err != nil {
 		return err
@@ -298,7 +348,8 @@ func run(deps Deps, runState *state) (err error) {
 	if err := setup(runState, deps.RootDir, systemd); err != nil {
 		return err
 	}
-	if err := executeSteps(runState); err != nil {
+	stepDeps := stepDeps{GCSClient: deps.GCSClient}
+	if err := executeSteps(ctx, runState, stepDeps); err != nil {
 		return err
 	}
 	if err := stopServices(systemd); err != nil {
@@ -320,7 +371,7 @@ func Run(ctx context.Context, deps Deps, stateDir string, c Config) error {
 	if err != nil {
 		return err
 	}
-	return run(deps, runState)
+	return run(ctx, deps, runState)
 }
 
 // Resume resumes provisioning from the state provided at stateDir.
@@ -330,5 +381,5 @@ func Resume(ctx context.Context, deps Deps, stateDir string) (err error) {
 	if err != nil {
 		return err
 	}
-	return run(deps, runState)
+	return run(ctx, deps, runState)
 }

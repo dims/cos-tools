@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	compute "google.golang.org/api/compute/v1"
 )
 

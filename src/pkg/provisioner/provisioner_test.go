@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 	"golang.org/x/sys/unix"
 )
 

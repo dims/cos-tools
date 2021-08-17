@@ -22,7 +22,7 @@ go_library(
         "file_system.go",
         "gzip.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/fs",
     visibility = ["//visibility:public"],
     deps = [
         "//src/pkg/utils",

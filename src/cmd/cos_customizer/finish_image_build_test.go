@@ -22,9 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"

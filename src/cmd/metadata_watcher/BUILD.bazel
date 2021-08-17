@@ -17,7 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "metadata_watcher_lib",
     srcs = ["main.go"],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/cmd/metadata_watcher",
+    importpath = "cos.googlesource.com/cos/tools.git/src/cmd/metadata_watcher",
     visibility = ["//visibility:private"],
     deps = ["@com_google_cloud_go//compute/metadata"],
 )

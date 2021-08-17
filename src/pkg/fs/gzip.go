@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 // GzipFile compresses the file at the input path and saves the result at the

@@ -22,7 +22,7 @@ go_library(
         "gcs.go",
         "time.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/fakes",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go_storage//:storage",

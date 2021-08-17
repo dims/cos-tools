@@ -371,6 +371,38 @@ mounted when the system boots.
 
 Note that this feature is supported by COS versions higher than milestone 73 (included).
 
+#### anthos-installer-install
+
+The `anthos-installer-install` build step installs the application binaries such as
+kubernetes, crictl and node-problem-detector on the builder VM based on the package
+spec in YAML format using the Anthos installer. Sample package spec is [here](testing/install_packages_test/pkgspec/kubernetes.yaml).
+This step takes one flag, `pkgspec-url`, path to the directory containing the pkgspec files.
+The pkgspec-url can point to the
+* Local directory
+* Archive file(.tar.gz) consisting of pkgspec files i.e. local or remote file in GCS(gs://),
+and http(http://)/https(https://) location.
+
+	The Anthos Installer is limited to the fact that it doesn’t check the compatibility or
+the dependencies of the input packages on COS. The Anthos Installer works on the assumption
+that the dependencies are installed on the OS or fully specified by the YAML file.
+
+An example `anthos-installer-install` with input, a local directory step looks
+like the following:
+
+    - name: 'gcr.io/cos-cloud/cos-customizer'
+      args: ['anthos-installer-install',
+             '-pkgspec-url=testing/install_packages_test/pkgspec']
+
+An example with PkgSpec in GCS bucket.
+
+     - name: 'gcr.io/cos-cloud/cos-customizer'
+       args: ['anthos-installer-install',
+              '-pkgspec-url=gs://test-bucket/pkgspec.tar.gz']
+
+The `anthos-installer-install` step can also be used to preload the containers.
+One such example is implemented in [preload-container.yaml](testing/install_packages_test/pkgspec/preload-container.yaml).
+It supports different loader options such as docker, containerd and crictl.
+
 #### disable-auto-update
 
 The `disable-auto-update` build step modifies the kernel commandline to disable

@@ -19,7 +19,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools"
 )
 
 // main generates binary file to extend the OEM partition.

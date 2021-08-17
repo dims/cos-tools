@@ -21,7 +21,7 @@ go_library(
         "resume.go",
         "run.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/cmd/provisioner",
+    importpath = "cos.googlesource.com/cos/tools.git/src/cmd/provisioner",
     visibility = ["//visibility:private"],
     deps = [
         "//src/pkg/provisioner",

@@ -30,8 +30,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 //go:embed _handle_disk_layout.bin

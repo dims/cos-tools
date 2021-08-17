@@ -15,8 +15,11 @@
 package provisioner
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+
+	"cloud.google.com/go/storage"
 )
 
 type StepConfig struct {
@@ -71,11 +74,30 @@ type Config struct {
 	//
 	// Type: SealOEM
 	// Args: This step takes no arguments.
+	//
+	// Type: InstallPackages
+	// Args:
+	// - BuildContext: the name of the build context the package spec is present.
+	// - PkgSpecURL: URL to the directory that has the package spec.
+	// PkgSpecURL can be a archive of the pkgspec files. It supports downloading of
+	// PkgSpec from http/https, GCS bucket or path to the local directory/archive.
+	// - AnthosInstallerDir: working directory path where the Anthos Installer is downloaded
+	// and installed to install the application packages.
+	// - AnthosInstallerVersion: the AnthosInstaller binary version to be used to install
+	// the packages.
+	// - AnthosInstallerReleaseBucket: the path to download the AnthosInstaller binary.
+
 	Steps []StepConfig
 }
 
+// stepDeps contains "step" dependencies
+type stepDeps struct {
+	// GCSClient is used to access Google Cloud Storage.
+	GCSClient *storage.Client
+}
+
 type step interface {
-	run(*state) error
+	run(context.Context, *state, *stepDeps) error
 }
 
 func parseStep(stepType string, stepArgs json.RawMessage) (step, error) {
@@ -98,6 +120,13 @@ func parseStep(stepType string, stepArgs json.RawMessage) (step, error) {
 		return &DisableAutoUpdateStep{}, nil
 	case "SealOEM":
 		return &SealOEMStep{}, nil
+	case "InstallPackages":
+		var s step
+		s = &InstallPackagesStep{}
+		if err := json.Unmarshal(stepArgs, s); err != nil {
+			return nil, err
+		}
+		return s, nil
 	default:
 		return nil, fmt.Errorf("unknown step type: %q", stepType)
 	}

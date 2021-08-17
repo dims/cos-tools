@@ -23,12 +23,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/gce"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/preloader"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/gce"
+	"cos.googlesource.com/cos/tools.git/src/pkg/preloader"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
 
 	"github.com/google/subcommands"
 )

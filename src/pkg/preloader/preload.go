@@ -31,10 +31,10 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	"cloud.google.com/go/storage"
 )

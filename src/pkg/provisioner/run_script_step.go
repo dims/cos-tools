@@ -15,13 +15,14 @@
 package provisioner
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 type RunScriptStep struct {
@@ -40,7 +41,7 @@ func (s *RunScriptStep) validate() error {
 	return nil
 }
 
-func (s *RunScriptStep) run(runState *state) error {
+func (s *RunScriptStep) run(ctx context.Context, runState *state, deps *stepDeps) error {
 	if err := s.validate(); err != nil {
 		return err
 	}

@@ -25,8 +25,9 @@ go_library(
         "run_script.go",
         "seal_oem.go",
         "start_image_build.go",
+        "install_packages.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/cmd/cos_customizer",
+    importpath = "cos.googlesource.com/cos/tools.git/src/cmd/cos_customizer",
     visibility = ["//visibility:public"],
     deps = [
         "//src/pkg/config",

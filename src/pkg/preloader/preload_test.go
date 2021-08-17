@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"

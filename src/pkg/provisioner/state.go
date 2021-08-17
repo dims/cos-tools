@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 var (

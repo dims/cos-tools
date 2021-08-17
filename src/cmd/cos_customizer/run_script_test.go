@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/subcommands"

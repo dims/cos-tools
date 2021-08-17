@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"

@@ -25,7 +25,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 )
 
 var (

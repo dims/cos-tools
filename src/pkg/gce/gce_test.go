@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 
 	compute "google.golang.org/api/compute/v1"
 )

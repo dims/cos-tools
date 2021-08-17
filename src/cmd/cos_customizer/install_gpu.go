@@ -27,10 +27,10 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/config"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"
@@ -39,7 +39,7 @@ import (
 
 const (
 	gpuScript          = "install_gpu.sh"
-	installerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20210319"
+	installerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20210715"
 )
 
 // TODO(b/121332360): Move most GPU functionality to cos-gpu-installer

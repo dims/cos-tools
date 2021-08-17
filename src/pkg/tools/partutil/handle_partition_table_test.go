@@ -17,7 +17,7 @@ package partutil
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil/partutiltest"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil/partutiltest"
 )
 
 // A file in tools/partutil/testdata is used as the simulation of a disk.

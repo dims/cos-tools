@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/subcommands"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 )
 
 // Resume implements subcommands.Command for the "resume" command.

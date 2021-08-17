@@ -23,7 +23,7 @@ go_library(
         "helpers.go",
         "move_partition.go",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil",
     visibility = ["//visibility:public"],
 )
 

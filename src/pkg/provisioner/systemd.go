@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/utils"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
 
 type systemdClient struct {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fakes"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

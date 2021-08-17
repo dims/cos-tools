@@ -17,7 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "gce",
     srcs = ["gce.go"],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/gce",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/gce",
     visibility = ["//visibility:public"],
     deps = [
         "//src/pkg/config",

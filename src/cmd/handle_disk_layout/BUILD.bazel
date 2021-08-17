@@ -17,7 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "handle_disk_layout_lib",
     srcs = ["handle_disk_layout_bin.go"],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/cmd/handle_disk_layout",
+    importpath = "cos.googlesource.com/cos/tools.git/src/cmd/handle_disk_layout",
     visibility = ["//visibility:private"],
     deps = ["//src/pkg/tools"],
 )

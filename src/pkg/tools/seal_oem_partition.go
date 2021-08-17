@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
 )
 
 // SealOEMPartition sets the hashtree of the OEM partition

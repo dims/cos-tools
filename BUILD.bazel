@@ -18,7 +18,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@package_bundle//file:packages.bzl", "packages")
 load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 
-# gazelle:prefix github.com/GoogleCloudPlatform/cos-customizer
+# gazelle:prefix cos.googlesource.com/cos/tools.git
 gazelle(name = "gazelle")
 
 exports_files(glob(["src/data/**"]))

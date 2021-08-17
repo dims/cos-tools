@@ -19,7 +19,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
 )
 
 // HandleDiskLayout changes the partitions on a COS disk.

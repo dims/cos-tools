@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/fs"
+	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
 
 	"golang.org/x/oauth2/google"
 
@@ -67,6 +67,7 @@ func main() {
 	subcommands.Register(new(SealOEM), "")
 	subcommands.Register(new(DisableAutoUpdate), "")
 	subcommands.Register(new(FinishImageBuild), "")
+	subcommands.Register(new(InstallPackage), "")
 	flag.Parse()
 	ctx := context.Background()
 	files := fs.DefaultFiles(*persistentDir)

@@ -44,7 +44,7 @@ go_library(
     embedsrcs = [
         ":cidata",
     ],
-    importpath = "github.com/GoogleCloudPlatform/cos-customizer/src/pkg/preloader",
+    importpath = "cos.googlesource.com/cos/tools.git/src/pkg/preloader",
     visibility = ["//visibility:public"],
     deps = [
         "//src/pkg/config",

@@ -24,7 +24,7 @@ import (
 
 	"github.com/google/subcommands"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/provisioner"
+	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 )
 
 const rebootMsg = "Reboot is required to continue provisioning. Please reboot the system and resume provisioning with the `resume` subcommand."

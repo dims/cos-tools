@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/GoogleCloudPlatform/cos-customizer/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
 )
 
 // DisableSystemdService disables the auto-update service.
