@@ -1,0 +1,5 @@
+- container_name: "cos-customizer"
+  build_commit: "0cf4ca8c145d80b133a54f21e9a932b815880861"
+  release_tags:
+    - "latest"
+    - "v20210823"
