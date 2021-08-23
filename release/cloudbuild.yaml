@@ -1,4 +1,4 @@
 steps:
 - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
   entrypoint: 'bazel'
-  args: ['run', ':release', $_BUILD_GCR, $_RELEASE_GCR]
+  args: ['run', 'release:release', $_BUILD_GCR, $_RELEASE_GCR]
