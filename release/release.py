@@ -25,7 +25,7 @@ def copy_container_image(src_bucket, dst_bucket, container_name, build_tag, rele
   dst_path = os.path.join(dst_bucket, container_name)
 
   for release_tag in release_tags:
-    subprocess.run(["gcloud", "container", "images", "add-tag", src_path + ":" + build_tag, dst_path + ":" + release_tag])
+    subprocess.run(["gcloud", "container", "images", "add-tag", src_path + ":" + build_tag, dst_path + ":" + release_tag, "-q"])
 
 def release(src_bucket, dst_bucket):
   with open('release/release-versions.yaml', 'r') as file:
@@ -44,7 +44,7 @@ def release(src_bucket, dst_bucket):
 
 def main():
   if len(sys.argv) != 3:
-    sys.Exit("sample use: ./release_script <source_gcr_path> <destination_gcr_path>")
+    sys.exit("sample use: ./release_script <source_gcr_path> <destination_gcr_path>")
 
   src_bucket = sys.argv[1]
   dst_bucket = sys.argv[2]
