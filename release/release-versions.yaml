@@ -3,8 +3,3 @@
   release_tags:
     - "latest"
     - "v20210823"
-- container_name: "toolbox"
-  build_commit: "bd43467bf5d41b6f2fef4bba393605b5491717cf"
-  release_tage:
-    - "latest"
-    - "v20210825"
