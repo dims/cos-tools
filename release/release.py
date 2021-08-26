@@ -27,29 +27,32 @@ def copy_container_image(src_bucket, dst_bucket, container_name, build_tag, rele
   for release_tag in release_tags:
     subprocess.run(["gcloud", "container", "images", "add-tag", src_path + ":" + build_tag, dst_path + ":" + release_tag, "-q"])
 
-def release(src_bucket, dst_bucket):
+def verify_and_release(src_bucket, dst_bucket, release):
   with open('release/release-versions.yaml', 'r') as file:
     try:
       release_config = yaml.safe_load(file)
       validate_config(release_config)
 
-      for release_container in release_config:
-        container_name = release_container["container_name"]
-        build_tag = release_container["build_commit"]
-        release_tags = release_container["release_tags"]
-        copy_container_image(src_bucket, dst_bucket, container_name, build_tag, release_tags)
+      if release:
+        for release_container in release_config:
+          container_name = release_container["container_name"]
+          build_tag = release_container["build_commit"]
+          release_tags = release_container["release_tags"]
+          copy_container_image(src_bucket, dst_bucket, container_name, build_tag, release_tags)
 
     except yaml.YAMLError as ex:
       raise Exception("Invalid YAML config: %s" % str(ex))
 
 def main():
-  if len(sys.argv) != 3:
+  if len(sys.argv) == 2 and sys.argv[1] == "--verify":
+    verify_and_release("", "", False)
+  elif len(sys.argv) == 3:
+    src_bucket = sys.argv[1]
+    dst_bucket = sys.argv[2]
+
+    verify_and_release(src_bucket, dst_bucket, True)
+  else:
     sys.exit("sample use: ./release_script <source_gcr_path> <destination_gcr_path>")
-
-  src_bucket = sys.argv[1]
-  dst_bucket = sys.argv[2]
-
-  release(src_bucket, dst_bucket)
 
 if __name__ == '__main__':
   main()
