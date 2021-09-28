@@ -380,6 +380,7 @@ func fetchSysctlToMap(path string, outputChan chan map[string]string, client *st
 		"kernel.random.uuid":               true,
 		"net.netfilter.nf_conntrack_count": true,
 		"kernel.osrelease":                 true,
+		"net.ipv4.tcp_fastopen_key":        true,
 	}
 	outMap := make(map[string]string)
 	defer func() { outputChan <- outMap }()
