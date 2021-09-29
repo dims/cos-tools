@@ -375,7 +375,7 @@ Note that this feature is supported by COS versions higher than milestone 73 (in
 
 The `anthos-installer-install` build step installs the application binaries such as
 kubernetes, crictl and node-problem-detector on the builder VM based on the package
-spec in YAML format using the Anthos installer. Sample package spec is [here](testing/install_packages_test/pkgspec/kubernetes.yaml).
+spec in YAML format using the Anthos installer. Sample package spec is [here](https://cos.googlesource.com/cos/tools/+/refs/heads/master/testing/install_packages_test/pkgspec/kubernetes.yaml).
 This step takes one flag, `pkgspec-url`, path to the directory containing the pkgspec files.
 The pkgspec-url can point to the
 * Local directory
@@ -400,7 +400,7 @@ An example with PkgSpec in GCS bucket.
               '-pkgspec-url=gs://test-bucket/pkgspec.tar.gz']
 
 The `anthos-installer-install` step can also be used to preload the containers.
-One such example is implemented in [preload-container.yaml](testing/install_packages_test/pkgspec/preload-container.yaml).
+One such example is implemented in [preload-container.yaml](https://cos.googlesource.com/cos/tools/+/refs/heads/master/testing/install_packages_test/pkgspec/preload-container.yaml).
 It supports different loader options such as docker, containerd and crictl.
 
 #### disable-auto-update
