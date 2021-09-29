@@ -21,7 +21,7 @@ LABEL maintainer="cos-containers@google.com"
 RUN apt-get update -qq && \
     apt-get install -y --no-install-recommends xz-utils python2.7-minimal \
     libc6-dev libpython2.7-stdlib kmod make curl ca-certificates libssl-dev \
-    gcc libelf-dev keyutils && \
+    gcc libelf-dev keyutils zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Download & install prebuild COS toolchain package, and prepare the environment for cross-compiling.
