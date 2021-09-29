@@ -16,3 +16,8 @@
   release_tags:
     - "latest"
     - "v20210929"
+- staging_container_name: "cos-gpu-installer"
+  release_container_name: "cos-gpu-installer"
+  build_commit: "ccc01fe43e2995664ed847dbefd6327860cb96ae"
+  release_tags:
+    - "v2.0.10"
