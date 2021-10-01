@@ -333,7 +333,9 @@ install_cross_toolchain_pkg() {
     tar xf "${pkg_name}" \
       --exclude='./usr/lib64/rustlib*' \
       --exclude='./lib/librustc*' \
-      --exclude='./usr/lib64/librustc*'
+      --exclude='./usr/lib64/librustc*' \
+      --exclude='./usr/lib64/libstd-*' \
+      --exclude='./usr/libstd-*' \
     rm "${pkg_name}"
     popd
   fi
