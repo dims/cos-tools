@@ -335,7 +335,7 @@ install_cross_toolchain_pkg() {
       --exclude='./lib/librustc*' \
       --exclude='./usr/lib64/librustc*' \
       --exclude='./usr/lib64/libstd-*' \
-      --exclude='./usr/libstd-*' \
+      --exclude='./lib/libstd-*'
     rm "${pkg_name}"
     popd
   fi
