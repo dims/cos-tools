@@ -1,18 +1,18 @@
-FROM golang:1.11 as gcr-build
-
-RUN go get -u github.com/GoogleCloudPlatform/docker-credential-gcr
-
 # Start from debian:buster-backports base.
 FROM debian:buster-backports
 
 # Prepare the image.
 ENV DEBIAN_FRONTEND noninteractive
 
-COPY --from=gcr-build /go/bin/docker-credential-gcr /usr/bin/
-
 # Google Cloud SDK pre requisites.
 RUN apt-get update && apt-get install -y -qq --no-install-recommends apt-transport-https \
     ca-certificates gnupg curl
+
+ARG TARGETARCH
+
+RUN cd $(mktemp -d) && curl -L -O "https://github.com/GoogleCloudPlatform/docker-credential-gcr/releases/download/v2.1.0/docker-credential-gcr_linux_$TARGETARCH-2.1.0.tar.gz" && \
+    tar xvf "docker-credential-gcr_linux_$TARGETARCH-2.1.0.tar.gz" && \
+    mv docker-credential-gcr /usr/bin/ && rm -r $(pwd)
 
 # Install the Google Cloud SDK.
 ENV HOME /
