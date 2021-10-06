@@ -210,8 +210,28 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 	return nil
 }
 
-func linkDriversLegacy(nvidiaDir string, needSigned bool) error {
+func linkDriversLegacy(toolchainDir, nvidiaDir string, needSigned bool) error {
 	log.Info("Linking drivers using legacy method...")
+	// The legacy linking method needs to use "/usr/bin/ld" as the linker to
+	// maintain bit-for-bit compatibility with driver signatures. The legacy
+	// linking method also finds the linker by searching the PATH for "ld". If
+	// bin/ld is present in the toolchain, rename it temporarily so the legacy
+	// linking method doesn't use it.
+	ld := filepath.Join(toolchainDir, "bin", "ld")
+	if _, err := os.Lstat(ld); !os.IsNotExist(err) {
+		dst := filepath.Join(toolchainDir, "bin", "ld.orig")
+		if err := unix.Rename(ld, dst); err != nil {
+			return fmt.Errorf("failed to rename %q to %q: %v", ld, dst, err)
+		}
+		defer func() {
+			if err := unix.Rename(dst, ld); err != nil {
+				// At this point, this error is non-fatal. It will become fatal when
+				// something tries to use bin/ld in the toolchain. At time of writing,
+				// nothing uses bin/ld after this point.
+				log.Warningf("Could not restore %q", ld)
+			}
+		}()
+	}
 	cmd := exec.Command(filepath.Join(nvidiaDir, "nvidia-installer"),
 		"--utility-prefix="+gpuInstallDirContainer,
 		"--opengl-prefix="+gpuInstallDirContainer,
@@ -274,7 +294,7 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, lega
 
 	// Link drivers.
 	if legacyLink {
-		if err := linkDriversLegacy(extractDir, needSigned); err != nil {
+		if err := linkDriversLegacy(toolchainDir, extractDir, needSigned); err != nil {
 			return fmt.Errorf("failed to link drivers: %v", err)
 		}
 	} else {

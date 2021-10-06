@@ -238,6 +238,14 @@ download_kernel_headers() {
     rm -r usr
     popd
   fi
+  local -r toolchain_kernel_headers="${TOOLCHAIN_PKG_DIR}/usr/src/linux-headers-$(uname -r)"
+  if [[ ! -d "${toolchain_kernel_headers}" ]]; then
+    info "Copying kernel headers to ${toolchain_kernel_headers}"
+    mkdir -p "${toolchain_kernel_headers}"
+    pushd "${toolchain_kernel_headers}"
+    cp -r "${KERNEL_SRC_HEADER}"/* .
+    popd
+  fi
 }
 
 # Gets default service account credentials of the VM which cos-gpu-installer runs in.
