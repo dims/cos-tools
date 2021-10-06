@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"flag"
 
@@ -26,7 +27,6 @@ const (
 	grepFound       = 0
 	hostRootPath    = "/root"
 	kernelSrcDir    = "/build/usr/src/linux"
-	kernelHeaderDir = "/build/usr/src/linux-headers"
 	toolchainPkgDir = "/build/cos-tools"
 )
 
@@ -88,8 +88,8 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	log.V(2).Infof("Running on COS build id %s", envReader.BuildNumber())
 
-	if releaseTrack := envReader.ReleaseTrack(); releaseTrack == "dev-channel" || releaseTrack == "beta-channel" {
-		c.logError(fmt.Errorf("GPU installation is not supported on dev & beta image for now; Please use LTS image."))
+	if releaseTrack := envReader.ReleaseTrack(); releaseTrack == "dev-channel" {
+		c.logError(fmt.Errorf("GPU installation is not supported on dev images for now; Please use LTS image."))
 		return subcommands.ExitFailure
 	}
 
@@ -164,6 +164,19 @@ func getDriverVersion(downloader *cos.GCSDownloader, argVersion string) (string,
 	return argVersion, nil
 }
 
+func remountExecutable(dir string) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create dir %q: %v", dir, err)
+	}
+	if err := syscall.Mount(dir, dir, "", syscall.MS_BIND, ""); err != nil {
+		return fmt.Errorf("failed to create bind mount at %q: %v", dir, err)
+	}
+	if err := syscall.Mount("", dir, "", syscall.MS_REMOUNT|syscall.MS_NOSUID|syscall.MS_NODEV|syscall.MS_RELATIME, ""); err != nil {
+		return fmt.Errorf("failed to remount %q: %v", dir, err)
+	}
+	return nil
+}
+
 func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.EnvReader, downloader *cos.GCSDownloader) error {
 	callback, err := installer.ConfigureDriverInstallationDirs(filepath.Join(hostRootPath, c.hostInstallDir), envReader.KernelRelease())
 	if err != nil {
@@ -189,12 +202,23 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 	if err := cos.SetCompilationEnv(downloader); err != nil {
 		return errors.Wrap(err, "failed to set compilation environment variables")
 	}
+	if err := remountExecutable(toolchainPkgDir); err != nil {
+		return fmt.Errorf("failed to remount %q as executable: %v", filepath.Dir(toolchainPkgDir), err)
+	}
 	if err := cos.InstallCrossToolchain(downloader, toolchainPkgDir); err != nil {
 		return errors.Wrap(err, "failed to install toolchain")
 	}
 
-	if err := installer.RunDriverInstaller(installerFile, !c.unsignedDriver); err != nil {
-		return errors.Wrap(err, "failed to run GPU driver installer")
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, false); err != nil {
+		if errors.Is(err, installer.ErrDriverLoad) {
+			// Drivers were linked, but couldn't load; try again with legacy linking
+			log.Info("Retrying driver installation with legacy linking")
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, true); err != nil {
+				return fmt.Errorf("failed to run GPU driver installer: %v", err)
+			}
+		} else {
+			return errors.Wrap(err, "failed to run GPU driver installer")
+		}
 	}
 	if err := cacher.Cache(); err != nil {
 		return errors.Wrap(err, "failed to cache installation")

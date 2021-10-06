@@ -115,23 +115,6 @@ func TestDownloadKernelSrc(t *testing.T) {
 	}
 }
 
-func TestInstallKernelHeaderPkg(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "testing")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	downloder := fakeDownloader{}
-	if err := InstallKernelHeaderPkg(&downloder, tmpDir); err != nil {
-		t.Fatalf("Failed to run InstallKernelHeaderPkg: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(tmpDir, "kernel-header")); err != nil {
-		t.Errorf("Failed to get kernel headers file: %v", err)
-	}
-}
-
 func TestSetCompilationEnv(t *testing.T) {
 	origEnvs := os.Environ()
 	defer func() {

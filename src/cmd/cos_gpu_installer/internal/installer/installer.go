@@ -2,12 +2,14 @@
 package installer
 
 import (
+	stderrors "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -18,6 +20,7 @@ import (
 
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -26,6 +29,12 @@ const (
 	latestGPUDriverFile           = "gpu_latest_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
+)
+
+var (
+	// ErrDriverLoad indicates that installed GPU drivers could not be loaded into
+	// the kernel.
+	ErrDriverLoad = stderrors.New("failed to load GPU drivers")
 )
 
 // VerifyDriverInstallation runs some commands to verify the driver installation.
@@ -116,19 +125,94 @@ func ConfigureDriverInstallationDirs(gpuInstallDirHost string, kernelRelease str
 	return ch, nil
 }
 
-// RunDriverInstaller runs GPU driver installer.
-func RunDriverInstaller(installerFilename string, needSigned bool) error {
-	log.Info("Running GPU driver installer")
-
-	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
-	extractDir := "/tmp/extract"
-	cmd := exec.Command("sh", installerFilename, "-x", "--target", extractDir)
-	cmd.Dir = gpuInstallDirContainer
-	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "failed to extract installer files")
+func extractPrecompiled(nvidiaDir string) error {
+	log.Info("Extracting precompiled artifacts...")
+	precompiledDir := filepath.Join(nvidiaDir, "kernel", "precompiled")
+	files, err := os.ReadDir(precompiledDir)
+	if err != nil {
+		return fmt.Errorf("failed to read %q: %v", precompiledDir, err)
 	}
+	var precompiledArchive string
+	if len(files) == 0 {
+		return stderrors.New("failed to find precompiled artifacts in this nvidia installer")
+	}
+	if len(files) == 1 {
+		precompiledArchive = filepath.Join(precompiledDir, files[0].Name())
+	}
+	if len(files) > 1 {
+		var fileNames []string
+		for _, f := range files {
+			fileNames = append(fileNames, f.Name())
+		}
+		sort.Strings(fileNames)
+		log.Warningf("Found multiple precompiled archives in this nvidia installer: %q", strings.Join(fileNames, ","))
+		log.Warningf("Using precompiled archive named %q", fileNames[len(fileNames)-1])
+		precompiledArchive = filepath.Join(precompiledDir, fileNames[len(fileNames)-1])
+	}
+	cmd := exec.Command(filepath.Join(nvidiaDir, "mkprecompiled"), "--unpack", precompiledArchive, "-o", precompiledDir)
+	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
+		return fmt.Errorf("failed to unpack precompiled artifacts: %v", err)
+	}
+	log.Info("Done extracting precompiled artifacts")
+	return nil
+}
 
-	cmd = exec.Command(filepath.Join(extractDir, "nvidia-installer"),
+func linkDrivers(toolchainDir, nvidiaDir string) error {
+	log.Info("Linking drivers...")
+	var kernelInfo unix.Utsname
+	if err := unix.Uname(&kernelInfo); err != nil {
+		return fmt.Errorf("failed to find kernel release info using uname: %v", err)
+	}
+	kernelRelease := strings.Trim(string(kernelInfo.Release[:]), "\x00")
+	// COS 85+ kernels use lld as their linker
+	linker := filepath.Join(toolchainDir, "bin", "ld.lld")
+	linkerScript := filepath.Join(toolchainDir, "usr", "src", "linux-headers-"+kernelRelease, "scripts", "module.lds")
+	if _, err := os.Stat(linkerScript); os.IsNotExist(err) {
+		// Fallback to module-common.lds, which is used in the 5.4 kernel
+		linkerScript = filepath.Join(toolchainDir, "usr", "src", "linux-headers-"+kernelRelease, "scripts", "module-common.lds")
+	}
+	nvidiaKernelDir := filepath.Join(nvidiaDir, "kernel")
+	// Link nvidia.ko
+	nvidiaObjs := []string{
+		filepath.Join(nvidiaKernelDir, "precompiled", "nv-linux.o"),
+		filepath.Join(nvidiaKernelDir, "nvidia", "nv-kernel.o_binary"),
+	}
+	args := append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "nvidia.ko")}, nvidiaObjs...)
+	cmd := exec.Command(linker, args...)
+	log.Infof("Running link command: %v", cmd.Args)
+	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
+		return fmt.Errorf("failed to link nvidia.ko: %v", err)
+	}
+	// Link nvidia-modeset.ko
+	modesetObjs := []string{
+		filepath.Join(nvidiaKernelDir, "precompiled", "nv-modeset-linux.o"),
+		filepath.Join(nvidiaKernelDir, "nvidia-modeset", "nv-modeset-kernel.o_binary"),
+	}
+	args = append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "nvidia-modeset.ko")}, modesetObjs...)
+	cmd = exec.Command(linker, args...)
+	log.Infof("Running link command: %v", cmd.Args)
+	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
+		return fmt.Errorf("failed to link nvidia-modeset.ko: %v", err)
+	}
+	// nvidia-uvm.ko is pre-linked; move to kernel dir
+	oldPath := filepath.Join(nvidiaKernelDir, "precompiled", "nvidia-uvm.ko")
+	newPath := filepath.Join(nvidiaKernelDir, "nvidia-uvm.ko")
+	if err := unix.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("failed to move %q to %q: %v", oldPath, newPath, err)
+	}
+	// nvidia-drm.ko is pre-linked; move to kernel dir
+	oldPath = filepath.Join(nvidiaKernelDir, "precompiled", "nvidia-drm.ko")
+	newPath = filepath.Join(nvidiaKernelDir, "nvidia-drm.ko")
+	if err := unix.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("failed to move %q to %q: %v", oldPath, newPath, err)
+	}
+	log.Info("Done linking drivers")
+	return nil
+}
+
+func linkDriversLegacy(nvidiaDir string, needSigned bool) error {
+	log.Info("Linking drivers using legacy method...")
+	cmd := exec.Command(filepath.Join(nvidiaDir, "nvidia-installer"),
 		"--utility-prefix="+gpuInstallDirContainer,
 		"--opengl-prefix="+gpuInstallDirContainer,
 		"--x-prefix="+gpuInstallDirContainer,
@@ -138,18 +222,73 @@ func RunDriverInstaller(installerFilename string, needSigned bool) error {
 		"--silent",
 		"--accept-license",
 	)
-
 	log.Infof("Installer arguments:\n%v", cmd.Args)
+	if err := utils.RunCommandAndLogOutput(cmd, needSigned); err != nil {
+		return fmt.Errorf("failed to run GPU driver installer: %v", err)
+	}
+	log.Info("Done linking drivers")
+	return nil
+}
 
-	if needSigned {
-		// Run installer to compile drivers. Expect the command to fail as the drivers are not signed yet.
-		utils.RunCommandAndLogOutput(cmd, true)
+func installUserLibs(nvidiaDir string) error {
+	log.Info("Installing userspace libraries...")
+	cmd := exec.Command(filepath.Join(nvidiaDir, "nvidia-installer"),
+		"--utility-prefix="+gpuInstallDirContainer,
+		"--opengl-prefix="+gpuInstallDirContainer,
+		"--x-prefix="+gpuInstallDirContainer,
+		"--install-libglvnd",
+		"--no-install-compat32-libs",
+		"--log-file-name="+filepath.Join(gpuInstallDirContainer, "nvidia-installer.log"),
+		"--silent",
+		"--accept-license",
+		"--no-kernel-module",
+	)
+	log.Infof("Installer arguments:\n%v", cmd.Args)
+	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
+		return fmt.Errorf("failed to run GPU driver installer: %v", err)
+	}
+	log.Info("Done installing userspace libraries")
+	return nil
+}
 
-		// sign GPU drivers.
-		kernelFiles, err := ioutil.ReadDir(filepath.Join(extractDir, "kernel"))
-		if err != nil {
-			return errors.Wrapf(err, "failed to list files in directory %s", filepath.Join(extractDir, "kernel"))
+// RunDriverInstaller runs GPU driver installer. Only works if the provided
+// installer includes precompiled drivers.
+func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, legacyLink bool) error {
+	log.Info("Running GPU driver installer")
+
+	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
+	extractDir := "/tmp/extract"
+	if err := os.RemoveAll(extractDir); err != nil {
+		return fmt.Errorf("failed to clean %q: %v", extractDir, err)
+	}
+	cmd := exec.Command("sh", installerFilename, "-x", "--target", extractDir)
+	cmd.Dir = gpuInstallDirContainer
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, "failed to extract installer files")
+	}
+
+	// Extract precompiled artifacts.
+	if err := extractPrecompiled(extractDir); err != nil {
+		return fmt.Errorf("failed to extract precompiled artifacts: %v", err)
+	}
+
+	// Link drivers.
+	if legacyLink {
+		if err := linkDriversLegacy(extractDir, needSigned); err != nil {
+			return fmt.Errorf("failed to link drivers: %v", err)
 		}
+	} else {
+		if err := linkDrivers(toolchainDir, extractDir); err != nil {
+			return fmt.Errorf("failed to link drivers: %v", err)
+		}
+	}
+
+	kernelFiles, err := ioutil.ReadDir(filepath.Join(extractDir, "kernel"))
+	if err != nil {
+		return errors.Wrapf(err, "failed to list files in directory %s", filepath.Join(extractDir, "kernel"))
+	}
+	if needSigned {
+		// sign GPU drivers.
 		for _, kernelFile := range kernelFiles {
 			if strings.HasSuffix(kernelFile.Name(), ".ko") {
 				module := kernelFile.Name()
@@ -162,23 +301,41 @@ func RunDriverInstaller(installerFilename string, needSigned bool) error {
 			}
 		}
 		// Copy public key.
-		if utils.CopyFile(signing.GetPublicKeyDer(), filepath.Join(gpuInstallDirContainer, "pubkey.der")); err != nil {
+		if err := utils.CopyFile(signing.GetPublicKeyDer(), filepath.Join(gpuInstallDirContainer, "pubkey.der")); err != nil {
 			return errors.Wrapf(err, "failed to copy file %s", signing.GetPublicKeyDer())
 		}
-		// Finally, load signed GPU drivers.
-		if err := loadGPUDrivers(needSigned); err != nil {
-			return errors.Wrap(err, "failed to load GPU drivers")
+	} else if !legacyLink {
+		// Copy drivers to the desired end directory. This is done as part of
+		// `modules.AppendSignature` in the above signing block, but we need to do
+		// it for unsigned modules as well. Legacy linking already does this copy
+		// in the unsigned case; we skip this block in the legacy link case to avoid
+		// redundancy.
+		for _, kernelFile := range kernelFiles {
+			if strings.HasSuffix(kernelFile.Name(), ".ko") {
+				module := kernelFile.Name()
+				src := filepath.Join(extractDir, "kernel", module)
+				dst := filepath.Join(gpuInstallDirContainer, "drivers", module)
+				if err := utils.CopyFile(src, dst); err != nil {
+					return fmt.Errorf("failed to copy kernel module %q: %v", module, err)
+				}
+			}
 		}
+	}
 
-		// Run installer again to only install user space libraries.
-		cmd = exec.Command(cmd.Path, cmd.Args[1:]...)
-		cmd.Args = append(cmd.Args, "--no-kernel-module")
-		if err := utils.RunCommandAndLogOutput(cmd, true); err != nil {
-			return errors.Wrap(err, "failed to run GPU driver installer")
+	// Load GPU drivers.
+	// The legacy linking method already does this in the unsigned case.
+	if needSigned || !legacyLink {
+		if err := loadGPUDrivers(needSigned); err != nil {
+			return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 		}
-	} else {
-		if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
-			return errors.Wrap(err, "failed to run GPU driver installer")
+	}
+
+	// Install libs.
+	// The legacy linking method already installs these libs in the unsigned
+	// case. This step is redundant in that case.
+	if needSigned || !legacyLink {
+		if err := installUserLibs(extractDir); err != nil {
+			return fmt.Errorf("failed to install userspace libraries: %v", err)
 		}
 	}
 

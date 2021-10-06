@@ -66,7 +66,7 @@ func SetCompilationEnv(downloader ArtifactsDownloader) error {
 	return nil
 }
 
-// InstallCrossToolchain installs COS toolchain to destination directory.
+// InstallCrossToolchain installs COS toolchain and kernel headers to destination directory.
 func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error {
 	log.Info("Installing the toolchain")
 
@@ -79,10 +79,20 @@ func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error
 		if err := downloader.DownloadToolchain(destDir); err != nil {
 			return errors.Wrap(err, "failed to download toolchain")
 		}
+		if err := downloader.DownloadKernelHeaders(destDir); err != nil {
+			return fmt.Errorf("failed to download kernel headers: %v", err)
+		}
 
+		log.Info("Unpacking toolchain...")
 		if err := exec.Command("tar", "xf", filepath.Join(destDir, toolchainArchive), "-C", destDir).Run(); err != nil {
 			return errors.Wrap(err, "failed to extract toolchain archive tarball")
 		}
+		log.Info("Done unpacking toolchain")
+		log.Info("Unpacking kernel headers...")
+		if err := exec.Command("tar", "xf", filepath.Join(destDir, kernelHeaders), "-C", destDir).Run(); err != nil {
+			return fmt.Errorf("failed to extract kernel headers: %v", err)
+		}
+		log.Info("Done unpacking kernel headers")
 	}
 
 	log.V(2).Info("Configuring environment variables for cross-compilation")
@@ -105,28 +115,6 @@ func InstallKernelSrcPkg(downloader ArtifactsDownloader, destDir string) error {
 
 	if err := correctKernelMagicVersionIfNeeded(destDir); err != nil {
 		return errors.Wrap(err, "failed to run correctKernelMagicVersionIfNeeded")
-	}
-
-	return nil
-}
-
-// InstallKernelHeaderPkg installs kernel header package to destination directory.
-func InstallKernelHeaderPkg(downloader ArtifactsDownloader, destDir string) error {
-	log.Info("Installing the kernel header package")
-
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return errors.Wrapf(err, "failed to create dir %s", destDir)
-	}
-	if empty, _ := utils.IsDirEmpty(destDir); !empty {
-		return nil
-	}
-
-	log.Info("Kernel headers not found locally, downloading")
-	if err := downloader.DownloadKernelHeaders(destDir); err != nil {
-		return errors.Wrap(err, "failed to download kernel headers")
-	}
-	if err := exec.Command("tar", "xf", filepath.Join(destDir, kernelHeaders), "-C", destDir).Run(); err != nil {
-		return errors.Wrap(err, "failed to extract kernel header tarball")
 	}
 
 	return nil
