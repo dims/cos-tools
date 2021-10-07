@@ -3,6 +3,7 @@ package commands
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -32,12 +33,13 @@ const (
 
 // InstallCommand is the subcommand to install GPU drivers.
 type InstallCommand struct {
-	driverVersion     string
-	hostInstallDir    string
-	unsignedDriver    bool
-	gcsDownloadBucket string
-	gcsDownloadPrefix string
-	debug             bool
+	driverVersion      string
+	hostInstallDir     string
+	unsignedDriver     bool
+	gcsDownloadBucket  string
+	gcsDownloadPrefix  string
+	nvidiaInstallerURL string
+	debug              bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -68,12 +70,28 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
 		"The GCS path prefix when downloading COS artifacts."+
 			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
+	f.StringVar(&c.nvidiaInstallerURL, "nvidia-installer-url", "",
+		"A URL to an nvidia-installer to use for driver installation. This flag is mutually exclusive with `-version`. This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 }
 
+func (c *InstallCommand) validateFlags() error {
+	if c.nvidiaInstallerURL != "" && c.driverVersion != "" {
+		return stderrors.New("-nvidia-installer-url and -version are both set; these flags are mutually exclusive")
+	}
+	if c.nvidiaInstallerURL != "" && c.unsignedDriver == false {
+		return stderrors.New("-nvidia-installer-url is set, and -allow-unsigned-driver is not; -nvidia-installer-url must be used with -allow-unsigned-driver")
+	}
+	return nil
+}
+
 // Execute implements subcommands.Command.Execute.
 func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+	if err := c.validateFlags(); err != nil {
+		c.logError(err)
+		return subcommands.ExitFailure
+	}
 	envReader, err := cos.NewEnvReader(hostRootPath)
 	if err != nil {
 		c.logError(errors.Wrapf(err, "failed to create envReader with host root path %s", hostRootPath))
@@ -105,12 +123,16 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
-	c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
-	if err != nil {
-		c.logError(errors.Wrap(err, "failed to get default driver version"))
-		return subcommands.ExitFailure
+	if c.nvidiaInstallerURL == "" {
+		c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
+		if err != nil {
+			c.logError(errors.Wrap(err, "failed to get default driver version"))
+			return subcommands.ExitFailure
+		}
+		log.Infof("Installing GPU driver version %s", c.driverVersion)
+	} else {
+		log.Infof("Installing GPU driver from %q", c.nvidiaInstallerURL)
 	}
-	log.Infof("Installing GPU driver version %s", c.driverVersion)
 
 	if c.unsignedDriver {
 		kernelCmdline, err := ioutil.ReadFile("/proc/cmdline")
@@ -127,22 +149,26 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		c.hostInstallDir = os.Getenv("NVIDIA_INSTALL_DIR_HOST")
 	}
 	hostInstallDir := filepath.Join(hostRootPath, c.hostInstallDir)
-	cacher := installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
-	if isCached, err := cacher.IsCached(); isCached && err == nil {
-		log.V(2).Info("Found cached version, NOT building the drivers.")
-		if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver); err != nil {
-			c.logError(errors.Wrap(err, "failed to configure cached installation"))
-			return subcommands.ExitFailure
+	var cacher *installer.Cacher
+	// We only want to cache drivers installed from official sources.
+	if c.nvidiaInstallerURL == "" {
+		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
+		if isCached, err := cacher.IsCached(); isCached && err == nil {
+			log.V(2).Info("Found cached version, NOT building the drivers.")
+			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver); err != nil {
+				c.logError(errors.Wrap(err, "failed to configure cached installation"))
+				return subcommands.ExitFailure
+			}
+			if err := installer.VerifyDriverInstallation(); err != nil {
+				c.logError(errors.Wrap(err, "failed to verify GPU driver installation"))
+				return subcommands.ExitFailure
+			}
+			if err := modules.UpdateHostLdCache(hostRootPath, filepath.Join(c.hostInstallDir, "lib64")); err != nil {
+				c.logError(errors.Wrap(err, "failed to update host ld cache"))
+				return subcommands.ExitFailure
+			}
+			return subcommands.ExitSuccess
 		}
-		if err := installer.VerifyDriverInstallation(); err != nil {
-			c.logError(errors.Wrap(err, "failed to verify GPU driver installation"))
-			return subcommands.ExitFailure
-		}
-		if err := modules.UpdateHostLdCache(hostRootPath, filepath.Join(c.hostInstallDir, "lib64")); err != nil {
-			c.logError(errors.Wrap(err, "failed to update host ld cache"))
-			return subcommands.ExitFailure
-		}
-		return subcommands.ExitSuccess
 	}
 
 	log.V(2).Info("Did not find cached version, installing the drivers...")
@@ -193,10 +219,18 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 
-	installerFile, err := installer.DownloadDriverInstaller(
-		c.driverVersion, envReader.Milestone(), envReader.BuildNumber())
-	if err != nil {
-		return errors.Wrap(err, "failed to download GPU driver installer")
+	var installerFile string
+	if c.nvidiaInstallerURL == "" {
+		installerFile, err = installer.DownloadDriverInstaller(
+			c.driverVersion, envReader.Milestone(), envReader.BuildNumber())
+		if err != nil {
+			return errors.Wrap(err, "failed to download GPU driver installer")
+		}
+	} else {
+		installerFile, err = installer.DownloadToInstallDir(c.nvidiaInstallerURL, "Unofficial GPU driver installer")
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := cos.SetCompilationEnv(downloader); err != nil {
@@ -220,8 +254,10 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 			return errors.Wrap(err, "failed to run GPU driver installer")
 		}
 	}
-	if err := cacher.Cache(); err != nil {
-		return errors.Wrap(err, "failed to cache installation")
+	if cacher != nil {
+		if err := cacher.Cache(); err != nil {
+			return errors.Wrap(err, "failed to cache installation")
+		}
 	}
 	if err := installer.VerifyDriverInstallation(); err != nil {
 		return errors.Wrap(err, "failed to verify installation")

@@ -73,6 +73,17 @@ func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned bool) error
 	return nil
 }
 
+// DownloadToInstallDir downloads data from the provided URL to the GPU
+// installation directory. It returns the basename of the locally written file.
+func DownloadToInstallDir(url, infoStr string) (string, error) {
+	outputPath := filepath.Join(gpuInstallDirContainer, path.Base(url))
+	if err := utils.DownloadContentFromURL(url, outputPath, infoStr); err != nil {
+		return "", fmt.Errorf("failed to download file with description %q from %q and install into %q: %v", infoStr, url, gpuInstallDirContainer, err)
+	}
+	return filepath.Base(outputPath), nil
+
+}
+
 // DownloadDriverInstaller downloads GPU driver installer given driver version and COS version.
 func DownloadDriverInstaller(driverVersion, cosMilestone, cosBuildNumber string) (string, error) {
 	log.Infof("Downloading GPU driver installer version %s", driverVersion)
@@ -80,11 +91,7 @@ func DownloadDriverInstaller(driverVersion, cosMilestone, cosBuildNumber string)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get driver installer download URL")
 	}
-	outputPath := filepath.Join(gpuInstallDirContainer, path.Base(downloadURL))
-	if err := utils.DownloadContentFromURL(downloadURL, outputPath, "GPU driver installer"); err != nil {
-		return "", errors.Wrapf(err, "failed to download GPU driver installer version %s", driverVersion)
-	}
-	return filepath.Base(outputPath), nil
+	return DownloadToInstallDir(downloadURL, "GPU driver installer")
 }
 
 // ConfigureDriverInstallationDirs configures GPU driver installation directories by creating mounts.
