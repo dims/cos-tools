@@ -18,6 +18,6 @@
     - "v20211006"
 - staging_container_name: "cos-gpu-installer"
   release_container_name: "cos-gpu-installer"
-  build_commit: "6763eb455becf72511f310e650dea4d51ec4d8f7"
+  build_commit: "ec6d04d679eff33a1da0a9d3d7f1cd4f4142a8f6"
   release_tags:
-    - "v2.0.11"
+    - "v2.0.12"
