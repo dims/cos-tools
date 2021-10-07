@@ -30,7 +30,7 @@ install_anthos_installer() {
 }
 
 install_packages() {
-	sudo ${BIN_DIR}/anthos_installer install -pkgspec-url=${PACKAGE_SPEC_DIR} -build-contextdir=${BUILD_CONTEXT_DIR}
+	${BIN_DIR}/anthos_installer install -pkgspec-url=${PACKAGE_SPEC_DIR} -build-contextdir=${BUILD_CONTEXT_DIR}
 	echo "Successfully installed the packages"
 }
 
