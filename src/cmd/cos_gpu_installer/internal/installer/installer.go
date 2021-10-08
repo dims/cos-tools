@@ -35,6 +35,8 @@ var (
 	// ErrDriverLoad indicates that installed GPU drivers could not be loaded into
 	// the kernel.
 	ErrDriverLoad = stderrors.New("failed to load GPU drivers")
+
+	errInstallerFailed = stderrors.New("failed to run GPU driver installer")
 )
 
 // VerifyDriverInstallation runs some commands to verify the driver installation.
@@ -217,7 +219,7 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 	return nil
 }
 
-func linkDriversLegacy(toolchainDir, nvidiaDir string, needSigned bool) error {
+func linkDriversLegacy(toolchainDir, nvidiaDir string) error {
 	log.Info("Linking drivers using legacy method...")
 	// The legacy linking method needs to use "/usr/bin/ld" as the linker to
 	// maintain bit-for-bit compatibility with driver signatures. The legacy
@@ -250,10 +252,11 @@ func linkDriversLegacy(toolchainDir, nvidiaDir string, needSigned bool) error {
 		"--accept-license",
 	)
 	log.Infof("Installer arguments:\n%v", cmd.Args)
-	if err := utils.RunCommandAndLogOutput(cmd, needSigned); err != nil {
-		return fmt.Errorf("failed to run GPU driver installer: %v", err)
-	}
+	err := utils.RunCommandAndLogOutput(cmd, false)
 	log.Info("Done linking drivers")
+	if err != nil {
+		return fmt.Errorf("%w: %v", errInstallerFailed, err)
+	}
 	return nil
 }
 
@@ -300,9 +303,20 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, lega
 	}
 
 	// Link drivers.
+	var legacyInstallerFailed bool
 	if legacyLink {
-		if err := linkDriversLegacy(toolchainDir, extractDir, needSigned); err != nil {
-			return fmt.Errorf("failed to link drivers: %v", err)
+		if err := linkDriversLegacy(toolchainDir, extractDir); err != nil {
+			if stderrors.Is(err, errInstallerFailed) {
+				// This case is expected when module signature enforcement is enabled.
+				// Since the installer terminated early, we need to re-run it after
+				// signing modules.
+				//
+				// If we don't sign modules (i.e. needSigned is false), then we'll see
+				// an error when we load the modules, and that will be fatal.
+				legacyInstallerFailed = true
+			} else {
+				return fmt.Errorf("failed to link drivers: %v", err)
+			}
 		}
 	} else {
 		if err := linkDrivers(toolchainDir, extractDir); err != nil {
@@ -335,7 +349,8 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, lega
 		// Copy drivers to the desired end directory. This is done as part of
 		// `modules.AppendSignature` in the above signing block, but we need to do
 		// it for unsigned modules as well. Legacy linking already does this copy
-		// in the unsigned case; we skip this block in the legacy link case to avoid
+		// in the unsigned case (we expect that legacy linking also does this when
+		// the installer fails); we skip this block in the legacy link case to avoid
 		// redundancy.
 		for _, kernelFile := range kernelFiles {
 			if strings.HasSuffix(kernelFile.Name(), ".ko") {
@@ -350,17 +365,18 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, lega
 	}
 
 	// Load GPU drivers.
-	// The legacy linking method already does this in the unsigned case.
-	if needSigned || !legacyLink {
+	// The legacy linking method does this when the installer doesn't fail (i.e.
+	// module signature verification isn't enforced).
+	if (legacyLink && legacyInstallerFailed) || !legacyLink {
 		if err := loadGPUDrivers(needSigned); err != nil {
 			return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 		}
 	}
 
 	// Install libs.
-	// The legacy linking method already installs these libs in the unsigned
-	// case. This step is redundant in that case.
-	if needSigned || !legacyLink {
+	// The legacy linking method does this when the installer doesn't fail (i.e.
+	// module signature verification isn't enforced).
+	if (legacyLink && legacyInstallerFailed) || !legacyLink {
 		if err := installUserLibs(extractDir); err != nil {
 			return fmt.Errorf("failed to install userspace libraries: %v", err)
 		}
