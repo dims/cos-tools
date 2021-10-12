@@ -29,6 +29,7 @@ const (
 	latestGPUDriverFile           = "gpu_latest_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
+	signedURLKey                  = "Expires"
 )
 
 var (
@@ -78,7 +79,7 @@ func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned bool) error
 // DownloadToInstallDir downloads data from the provided URL to the GPU
 // installation directory. It returns the basename of the locally written file.
 func DownloadToInstallDir(url, infoStr string) (string, error) {
-	outputPath := filepath.Join(gpuInstallDirContainer, path.Base(url))
+	outputPath := filepath.Join(gpuInstallDirContainer, strings.Split(path.Base(url), "?"+signedURLKey+"=")[0])
 	if err := utils.DownloadContentFromURL(url, outputPath, infoStr); err != nil {
 		return "", fmt.Errorf("failed to download file with description %q from %q and install into %q: %v", infoStr, url, gpuInstallDirContainer, err)
 	}
