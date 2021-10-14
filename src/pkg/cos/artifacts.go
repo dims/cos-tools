@@ -6,7 +6,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
+	"cloud.google.com/go/compute/metadata"
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"
 
@@ -15,6 +17,8 @@ import (
 
 const (
 	cosToolsGCS      = "cos-tools"
+	cosToolsGCSAsia  = "cos-tools-asia"
+	cosToolsGCSEU    = "cos-tools-eu"
 	chromiumOSSDKGCS = "chromiumos-sdk"
 	kernelInfo       = "kernel_info"
 	kernelSrcArchive = "kernel-src.tar.gz"
@@ -24,6 +28,16 @@ const (
 	toolchainEnv     = "toolchain_env"
 	crosKernelRepo   = "https://chromium.googlesource.com/chromiumos/third_party/kernel"
 )
+
+// Map VM zone prefix to specific cos-tools bucket for geo-redundancy.
+var cosToolsPrefixMap = map[string]string{
+	"us":           cosToolsGCS,
+	"northamerica": cosToolsGCS,
+	"southamerica": cosToolsGCS,
+	"europe":       cosToolsGCSEU,
+	"asia":         cosToolsGCSAsia,
+	"australia":    cosToolsGCSAsia,
+}
 
 // ArtifactsDownloader defines the interface to download COS artifacts.
 type ArtifactsDownloader interface {
@@ -44,9 +58,23 @@ type GCSDownloader struct {
 
 // NewGCSDownloader creates a GCSDownloader instance.
 func NewGCSDownloader(e *EnvReader, bucket, prefix string) *GCSDownloader {
-	// Use cos-tools as the default GCS bucket.
+	// If bucket is not set, use cos-tools, cos-tools-asia or cos-tools-eu
+	// according to the zone the VM is running in for geo-redundancy.
+	// If cannot fetch zone from metadata or get an unknown zone prefix,
+	// use cos-tools as the default GCS bucket.
 	if bucket == "" {
-		bucket = cosToolsGCS
+		zone, err := metadata.Zone()
+		if err != nil {
+			log.Warningf("failed to get zone from metadata, will use 'gs://cos-tools' as artifact bucket, err: %v", err)
+			bucket = cosToolsGCS
+		} else {
+			zonePrefix := strings.Split(zone, "-")[0]
+			if geoBucket, found := cosToolsPrefixMap[zonePrefix]; found {
+				bucket = geoBucket
+			} else {
+				bucket = cosToolsGCS
+			}
+		}
 	}
 	// Use build number as the default GCS download prefix.
 	if prefix == "" {

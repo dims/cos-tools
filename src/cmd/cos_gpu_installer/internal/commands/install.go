@@ -64,9 +64,10 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"Whether to allow load unsigned GPU drivers. "+
 			"If this flag is set to true, module signing security features must be disabled on the host for driver installation to succeed. "+
 			"This flag is only for debugging.")
-	f.StringVar(&c.gcsDownloadBucket, "gcs-download-bucket", "cos-tools",
+	f.StringVar(&c.gcsDownloadBucket, "gcs-download-bucket", "",
 		"The GCS bucket to download COS artifacts from. "+
-			"For example, the default value is 'cos-tools' which is the public COS artifacts bucket.")
+			"The default bucket is one of 'cos-tools', 'cos-tools-asia' and 'cos-tools-eu' based on where the VM is running. "+
+			"Those are the public COS artifacts buckets.")
 	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
 		"The GCS path prefix when downloading COS artifacts."+
 			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
