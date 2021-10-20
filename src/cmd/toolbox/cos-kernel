@@ -28,8 +28,6 @@ BUILD_ID=""
 readonly COS_OS_RELEASE="/media/root/etc/os-release"
 readonly COS_IMAGE_PROJECT="cos-cloud"
 
-# Public GCS bucket of COS to fetch files from.
-readonly COS_GCS_BUCKET="gs://cos-tools"
 
 # For each file to fetch, we have the following properties:
 #
@@ -175,6 +173,7 @@ EOF
 
 
 main() {
+	get_cos_tools_bucket
 	check_arch
 
 	local options
@@ -205,6 +204,42 @@ main() {
 	"build")	subcmd_build;;
 	"remove")	subcmd_remove;;
 	*)		fatal internal error processing "${SUBCOMMAND}"
+	esac
+}
+
+
+#######################################
+# Choose the public GCS bucket of COS to fetch files from
+# "cos-tools", "cos-tools-eu" and "cos-tools-asia"
+# based on where the VM is running.
+# Arguments:
+#   None
+# Globals:
+#   COS_GCS_BUCKET
+#######################################
+get_cos_tools_bucket() {
+	# Get the zone the VM is running in.
+	# Example output: projects/438692578867/zones/us-west2-a
+	# If not running on GCE, use "gs://cos-tools" by default.
+	metadata_zone="$(curl -H Metadata-Flavor:Google http://metadata/computeMetadata/v1/instance/zone)" || {
+		readonly COS_GCS_BUCKET="gs://cos-tools"
+		return
+	}
+	zone="$( echo $metadata_zone | rev | cut -d '/' -f 1 | rev )"
+	prefix="$( echo $zone | cut -d '-' -f 1 )"
+	case $prefix in
+		"us" | "northamerica" | "southamerica")
+			readonly COS_GCS_BUCKET="gs://cos-tools"
+			;;
+		"europe")
+			readonly COS_GCS_BUCKET="gs://cos-tools-eu"
+			;;
+		"asia" | "australia")
+			readonly COS_GCS_BUCKET="gs://cos-tools-asia"
+			;;
+		*)
+			readonly COS_GCS_BUCKET="gs://cos-tools"
+			;;
 	esac
 }
 
