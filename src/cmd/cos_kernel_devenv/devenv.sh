@@ -28,7 +28,6 @@ BUILD_ID=""
 MODE=""
 
 CROS_TC_VERSION="2021.06.26.094653"
-CROS_TC_DATE="2021/06"
 CROS_TC_DOWNLOAD_GCS="https://storage.googleapis.com/chromiumos-sdk/"
 
 # Can be overridden by the command-line argument
@@ -224,7 +223,8 @@ install_build_kernel_headers() {
 install_generic_cross_toolchain() {
   info "Downloading and installing a toolchain"
   # Download toolchain_env if present
-  local -r tc_download_url="${CROS_TC_DOWNLOAD_GCS}${CROS_TC_DATE}/${TOOLCHAIN_ARCH}-cros-linux-gnu-${CROS_TC_VERSION}.tar.xz"
+  local -r tc_date="$(echo ${CROS_TC_VERSION} | sed  -E 's/\.(..).*/\/\1/')"
+  local -r tc_download_url="${CROS_TC_DOWNLOAD_GCS}${tc_date}/${TOOLCHAIN_ARCH}-cros-linux-gnu-${CROS_TC_VERSION}.tar.xz"
 
   # Install toolchain pkg
   install_cross_toolchain_pkg "${tc_download_url}"
@@ -286,13 +286,14 @@ module_build() {
 usage() {
   echo "Usage: $0 [-k | -m] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
   echo "    [-B <build> | -b <board> -R <release> | -G <GCS_bucket>]"
+  echo "    [-t <toolchain_version>]"
   exit $RETCODE_ERROR
 }
 
 main() {
   local build_target="shell"
   local custom_bucket=""
-  while getopts "A:B:C:G:R:b:km" o; do
+  while getopts "A:B:C:G:R:b:kmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -302,6 +303,7 @@ main() {
       b) BOARD=${OPTARG} ;;
       k) build_target="kernel" ;;
       m) build_target="module" ;;
+      t) CROS_TC_VERSION="${OPTARG}" ;;
       *) usage ;;
     esac
   done
