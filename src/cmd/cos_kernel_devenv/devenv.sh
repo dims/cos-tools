@@ -7,7 +7,6 @@ set -o pipefail
 ROOT_MOUNT_DIR="${ROOT_MOUNT_DIR:-/root}"
 RETRY_COUNT=${RETRY_COUNT:-5}
 
-readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
 readonly COS_CI_DOWNLOAD_GCS="gs://cos-infra-prod-artifacts-official"
 readonly CHROMIUMOS_SDK_GCS="https://storage.googleapis.com/chromiumos-sdk"
 readonly TOOLCHAIN_URL_FILENAME="toolchain_path"
@@ -54,6 +53,41 @@ warn() {
 
 error() {
   _log "ERROR   " "$*"
+}
+
+#######################################
+# Choose the public GCS bucket of COS to fetch files from
+# "cos-tools", "cos-tools-eu" and "cos-tools-asia"
+# based on where the VM is running.
+# Arguments:
+#   None
+# Globals:
+#   COS_DOWNLOAD_GCS
+#######################################
+get_cos_tools_bucket() {
+	# Get the zone the VM is running in.
+	# Example output: projects/438692578867/zones/us-west2-a
+	# If not running on GCE, use "cos-tools" by default.
+	metadata_zone="$(curl -H Metadata-Flavor:Google http://metadata/computeMetadata/v1/instance/zone)" || {
+		readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+		return
+	}
+	zone="$( echo $metadata_zone | rev | cut -d '/' -f 1 | rev )"
+	prefix="$( echo $zone | cut -d '-' -f 1 )"
+	case $prefix in
+		"us" | "northamerica" | "southamerica")
+			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+			;;
+		"europe")
+			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools-eu"
+			;;
+		"asia" | "australia")
+			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools-asia"
+			;;
+		*)
+			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+			;;
+	esac
 }
 
 load_etc_os_release() {
@@ -293,6 +327,7 @@ usage() {
 main() {
   local build_target="shell"
   local custom_bucket=""
+  get_cos_tools_bucket
   while getopts "A:B:C:G:R:b:kmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
