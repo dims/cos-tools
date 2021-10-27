@@ -351,7 +351,7 @@ main() {
 
   if [[ -z "$MODE" ]]; then
     MODE="cross"
-    BUILD_DIR="/build/${TOOLCHAIN_ARCH}-cros"
+    BUILD_DIR="/build/cros-${CROS_TC_VERSION}-${TOOLCHAIN_ARCH}"
   fi
   echo "Mode: $MODE"
 
