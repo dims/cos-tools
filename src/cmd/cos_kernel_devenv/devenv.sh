@@ -19,6 +19,7 @@ readonly RETCODE_ERROR=1
 RELEASE_ID=""  # Loaded from host during execution
 BUILD_DIR="" # based on RELEASE_ID
 KERNEL_CONFIG="defconfig"
+BUILD_DEBUG_PACKAGE="false"
 
 BOARD=""
 BUILD_ID=""
@@ -284,7 +285,6 @@ set_compilation_env() {
   export HOSTCXX="x86_64-pc-linux-gnu-clang++"
   export LD="${TOOLCHAIN_ARCH}-cros-linux-gnu-ld.lld"
   export HOSTLD="x86_64-pc-linux-gnu-ld.lld"
-  # export BINUTILS="${BUILD_DIR}/usr/x86_64-pc-linux-gnu/x86_64-cros-linux-gnu/binutils-bin/2.27.0"
   export OBJCOPY=llvm-objcopy
   export STRIP=llvm-strip
   export KERNEL_ARCH
@@ -294,7 +294,6 @@ set_compilation_env() {
     local -r headers_dir=$(ls -d ${BUILD_DIR}/${KERNEL_HEADERS_DIR}/usr/src/linux-headers*)
     export KHEADERS="${headers_dir}"
   fi
-  # env ARCH=x86_64 make -j47 ARCH=x86_64 CC="${CC}" CXX="${CXX}" LD="${LD}" BINUTILS="${BINUTILS}" LD="${LD}" targz-pkg
 }
 
 kmake() {
@@ -307,9 +306,50 @@ kmake() {
 export -f kmake
 
 kernel_build() {
-  kmake mrproper
+  local -r tmproot_dir="$(mktemp -d)"
+  local image_target
+
+  case "${KERNEL_ARCH}" in
+    x86)   image_target="bzImage" ;;
+    arm64) image_target="Image" ;;
+    *)
+      echo "Unknown kernel architecture: ${KERNEL_ARCH}"
+      exit $RETCODE_ERROR
+      ;;
+  esac
+
+  kmake "$@" mrproper
   kmake "$@" "${KERNEL_CONFIG}"
-  kmake "$@" tarxz-pkg
+  local -r version=$(kmake "$@" kernelrelease)
+  kmake "$@" "${image_target}" modules
+  INSTALL_MOD_PATH="${tmproot_dir}" kmake "$@" modules_install
+
+  mkdir -p "${tmproot_dir}/boot/"
+  cp -v -- .config "${tmproot_dir}/boot/config-${version}"
+  cp -v -- "arch/${KERNEL_ARCH}/boot/${image_target}" "${tmproot_dir}/boot/vmlinuz-${version}"
+
+  for module in $(find "$tmproot_dir/lib/modules/" -name "*.ko" -printf '%P\n'); do
+    module="lib/modules/$module"
+    mkdir -p "$(dirname "$tmproot_dir/usr/lib/debug/$module")"
+    # only keep debug symbols in the debug file
+    $OBJCOPY --only-keep-debug "$tmproot_dir/$module" "$tmproot_dir/usr/lib/debug/$module"
+    # strip original module from debug symbols
+    $OBJCOPY --strip-debug "$tmproot_dir/$module"
+    # then add a link to those
+    $OBJCOPY --add-gnu-debuglink="$tmproot_dir/usr/lib/debug/$module" "$tmproot_dir/$module"
+  done
+
+  if [[ "${BUILD_DEBUG_PACKAGE}" = "true" ]]; then
+    cp -v -- vmlinux "${tmproot_dir}/usr/lib/debug/lib/modules/${version}/"
+    # Some other tools expect other locations
+    mkdir -p "$tmproot_dir/usr/lib/debug/boot/"
+    ln -s "../lib/modules/$version/vmlinux" "$tmproot_dir/usr/lib/debug/boot/vmlinux-$version"
+    ln -s "lib/modules/$version/vmlinux" "$tmproot_dir/usr/lib/debug/vmlinux-$version"
+    tar -c -J -f "cos-kernel-debug-${version}-${KERNEL_ARCH}.txz" -C "${tmproot_dir}/usr/lib" debug/
+  fi
+
+  tar -c -J -f "cos-kernel-${version}-${KERNEL_ARCH}.txz" -C "${tmproot_dir}" boot/ lib/
+  rm -rf "${tmproot_dir}"
 }
 
 module_build() {
@@ -318,7 +358,7 @@ module_build() {
 }
 
 usage() {
-  echo "Usage: $0 [-k | -m] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
+  echo "Usage: $0 [-k | -m] [-d] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
   echo "    [-B <build> | -b <board> -R <release> | -G <GCS_bucket>]"
   echo "    [-t <toolchain_version>]"
   exit $RETCODE_ERROR
@@ -328,7 +368,7 @@ main() {
   local build_target="shell"
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:R:b:kmt:" o; do
+  while getopts "A:B:C:G:R:b:dkmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -336,6 +376,7 @@ main() {
       G) custom_bucket=${OPTARG} ;;
       R) RELEASE_ID=${OPTARG} ;;
       b) BOARD=${OPTARG} ;;
+      d) BUILD_DEBUG_PACKAGE="true" ;;
       k) build_target="kernel" ;;
       m) build_target="module" ;;
       t) CROS_TC_VERSION="${OPTARG}" ;;
