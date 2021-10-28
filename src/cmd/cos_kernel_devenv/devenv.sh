@@ -20,6 +20,7 @@ RELEASE_ID=""  # Loaded from host during execution
 BUILD_DIR="" # based on RELEASE_ID
 KERNEL_CONFIG="defconfig"
 BUILD_DEBUG_PACKAGE="false"
+CLEAN_BEFORE_BUILD="false"
 
 BOARD=""
 BUILD_ID=""
@@ -318,7 +319,9 @@ kernel_build() {
       ;;
   esac
 
-  kmake "$@" mrproper
+  if [[ "${CLEAN_BEFORE_BUILD}" = "true" ]]; then
+    kmake "$@" mrproper
+  fi
   kmake "$@" "${KERNEL_CONFIG}"
   local -r version=$(kmake "$@" kernelrelease)
   kmake "$@" "${image_target}" modules
@@ -358,7 +361,7 @@ module_build() {
 }
 
 usage() {
-  echo "Usage: $0 [-k | -m] [-d] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
+  echo "Usage: $0 [-k | -m] [-cd] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
   echo "    [-B <build> | -b <board> -R <release> | -G <GCS_bucket>]"
   echo "    [-t <toolchain_version>]"
   exit $RETCODE_ERROR
@@ -368,7 +371,7 @@ main() {
   local build_target="shell"
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:R:b:dkmt:" o; do
+  while getopts "A:B:C:G:R:b:cdkmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -376,6 +379,7 @@ main() {
       G) custom_bucket=${OPTARG} ;;
       R) RELEASE_ID=${OPTARG} ;;
       b) BOARD=${OPTARG} ;;
+      c) CLEAN_BEFORE_BUILD="true" ;;
       d) BUILD_DEBUG_PACKAGE="true" ;;
       k) build_target="kernel" ;;
       m) build_target="module" ;;
