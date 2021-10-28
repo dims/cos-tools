@@ -368,10 +368,10 @@ usage() {
 }
 
 main() {
-  local build_target="shell"
+  local build_target=""
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:R:b:cdkmt:" o; do
+  while getopts "A:B:C:G:R:b:cdikmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -381,6 +381,7 @@ main() {
       b) BOARD=${OPTARG} ;;
       c) CLEAN_BEFORE_BUILD="true" ;;
       d) BUILD_DEBUG_PACKAGE="true" ;;
+      i) build_target="shell" ;;
       k) build_target="kernel" ;;
       m) build_target="module" ;;
       t) CROS_TC_VERSION="${OPTARG}" ;;
@@ -460,10 +461,11 @@ main() {
   case "${build_target}" in
     kernel) kernel_build -j"$(nproc)" ;;
     module) module_build -j"$(nproc)" ;;
-    *)
+    shell)
       echo "Starting interactive shell for the kernel devenv"
       /bin/bash
       ;;
+    *) kmake -j"$(nproc)" "$@" ;;
   esac
 }
 
