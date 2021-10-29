@@ -361,9 +361,38 @@ module_build() {
 }
 
 usage() {
-  echo "Usage: $0 [-k | -m] [-cd] [-A <x86|arm64>] [-B <build>] [-C <config>]" 1>&2
-  echo "    [-B <build> | -b <board> -R <release> | -G <GCS_bucket>]"
-  echo "    [-t <toolchain_version>]"
+cat 1>&2 <<__EOUSAGE__
+Usage: $0 [-k | -m | -i] [-cd] [-A <x86|arm64>] [-C <kernelconfig>]" 1>&2
+    [-B <build> -b <board> | -R <release> | -G <bucket>]
+    [-t <toolchain_version>] [VAR=value ...] [target ...]
+
+Options:
+  -A <arch>     target architecture. Valid values are x86 and arm64.
+  -B <build>    seed the toolchain from the COS build <build>.
+                Example: R93-16623.0.0 Requires -b option.
+  -C <config>   kernel config target. Example: lakitu_defconfig
+  -G <bucket>   seed the toolchain and kernel headers from the custom
+                GCS bucket <bucket>. Directory structure needs to conform
+                to the COS standard. 
+  -R <release>  seed the toolchain and kernel headers from the
+                specified official COS release. Example: 16442.0.0
+  -b <board>    specify board for -B argument. Example: lakitu
+  -c            perform mrproper step when building a kernel package.
+                Should be used only with -k option.
+  -d            create a pakcage with debug symbols for the respective
+                kernel package. Should be used only with -k option.
+  -h            show this message.
+  -i            invoke interactive shell with kernel development
+                environment initialized.
+  -k            build a kernel package for sources mapped from the host
+                to the current working directory.
+  -m            build an out-of-tree module for sources mapped from
+                the host to the current working directory.
+                This mode requires either -R or -B/b options.
+  -t            seed the toolchain from the Chromium OS upstream.
+                Example: 2021.06.26.094653
+__EOUSAGE__
+   
   exit $RETCODE_ERROR
 }
 
@@ -371,7 +400,7 @@ main() {
   local build_target=""
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:R:b:cdikmt:" o; do
+  while getopts "A:B:C:G:R:b:cdhikmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -381,6 +410,7 @@ main() {
       b) BOARD=${OPTARG} ;;
       c) CLEAN_BEFORE_BUILD="true" ;;
       d) BUILD_DEBUG_PACKAGE="true" ;;
+      h) usage ;;
       i) build_target="shell" ;;
       k) build_target="kernel" ;;
       m) build_target="module" ;;
