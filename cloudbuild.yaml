@@ -21,6 +21,8 @@ steps:
         if [[ $? -ne 0 ]]; then
           echo "$d failed" | tee -a ${failure_file}
           cat ${logfile}
+        else
+          echo "$d finished"
         fi
       ) &
     done
