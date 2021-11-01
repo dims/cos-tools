@@ -19,42 +19,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
-
-func tarFile(src, dst string) error {
-	dirPath := filepath.Dir(src)
-	baseName := filepath.Base(src)
-	cmd := exec.Command("tar", "cf", dst, "-C", dirPath, baseName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func tarDir(root, dst string) error {
-	args := []string{"cf", dst, "-C", root}
-	inputFiles, err := filepath.Glob(filepath.Join(root, "*"))
-	if err != nil {
-		return err
-	}
-	var relInputFiles []string
-	for _, path := range inputFiles {
-		relPath, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		relInputFiles = append(relInputFiles, relPath)
-	}
-	if relInputFiles == nil {
-		relInputFiles = []string{"."}
-	}
-	args = append(args, relInputFiles...)
-	cmd := exec.Command("tar", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
 
 // CreateBuildContextArchive creates a tar archive of the given build context.
 func CreateBuildContextArchive(src, dst string) error {
@@ -70,9 +36,9 @@ func CreateBuildContextArchive(src, dst string) error {
 	}
 	switch {
 	case info.IsDir():
-		return tarDir(src, dst)
+		return TarDir(src, dst)
 	case info.Mode().IsRegular():
-		return tarFile(src, dst)
+		return TarFile(src, dst)
 	default:
 		return fmt.Errorf("input path %s is neither a directory nor a regular file", src)
 	}

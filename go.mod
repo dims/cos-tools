@@ -5,7 +5,8 @@ go 1.16
 require (
 	cloud.google.com/go v0.81.0
 	cloud.google.com/go/logging v1.4.2
-	cloud.google.com/go/storage v1.13.0
+	cloud.google.com/go/storage v1.14.0
+	github.com/GoogleCloudPlatform/compute-image-tools/daisy v0.0.0-20211102200636-e7e49ca6dac0 // indirect
 	github.com/andygrunwald/go-gerrit v0.0.0-20201231163137-46815e48bfe0
 	github.com/beevik/etree v1.1.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b

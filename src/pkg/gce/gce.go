@@ -35,6 +35,7 @@ import (
 const (
 	defaultOperationTimeout = time.Duration(600) * time.Second
 	defaultRetryInterval    = time.Duration(5) * time.Second
+	gcsURLPrefix            = "https://storage.googleapis.com"
 )
 
 type timePkg struct {
@@ -150,6 +151,23 @@ func ImageExists(svc *compute.Service, project, name string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// CreateImage creates an image with imageName with the source-url from gcs storage
+func CreateImage(svc *compute.Service, sourceURL, imageName, imageProject string) error {
+	gcsImageURL := fmt.Sprintf("%s/%s", gcsURLPrefix, sourceURL)
+	image := &compute.Image{
+		Name: imageName,
+		RawDisk: &compute.ImageRawDisk{
+			Source: gcsImageURL,
+		},
+	}
+	createImageOp, err := svc.Images.Insert(imageProject, image).Do()
+	if err != nil {
+		return err
+	}
+	deadline := time.Now().Add(defaultOperationTimeout)
+	return waitForOp(svc, imageProject, createImageOp, deadline, realTime)
 }
 
 type decodedImageName struct {

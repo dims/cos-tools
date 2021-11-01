@@ -31,9 +31,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -370,6 +369,24 @@ func CheckClose(closer io.Closer, errMsgOnClose string, err *error) {
 			fullErr = fmt.Errorf("%s: %v", errMsgOnClose, closeErr)
 		} else {
 			fullErr = closeErr
+		}
+		if *err == nil {
+			*err = fullErr
+		} else {
+			log.Println(fullErr)
+		}
+	}
+}
+
+// RemoveDir removes the directory at inputPath and checks its error. Useful for checking the
+// errors on deferred remove().
+func RemoveDir(inputPath string, errMsgOnRemove string, err *error) {
+	if removeErr := os.RemoveAll(inputPath); removeErr != nil {
+		var fullErr error
+		if errMsgOnRemove != "" {
+			fullErr = fmt.Errorf("%s: %v", errMsgOnRemove, fullErr)
+		} else {
+			fullErr = removeErr
 		}
 		if *err == nil {
 			*err = fullErr
