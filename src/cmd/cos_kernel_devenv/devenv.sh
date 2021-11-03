@@ -70,7 +70,7 @@ get_cos_tools_bucket() {
 	# Get the zone the VM is running in.
 	# Example output: projects/438692578867/zones/us-west2-a
 	# If not running on GCE, use "cos-tools" by default.
-	metadata_zone="$(curl -H Metadata-Flavor:Google http://metadata/computeMetadata/v1/instance/zone)" || {
+	metadata_zone="$(curl -s -H Metadata-Flavor:Google http://metadata/computeMetadata/v1/instance/zone)" || {
 		readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
 		return
 	}
