@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	anthosInstallerVersion       = "anthos_installer-linux-amd64-v0.0.1-900dd93.tar.gz"
+	anthosInstallerVersion       = "anthos_installer-linux-amd64-v0.0.1-22964ef.tar.gz"
 	anthosInstallerReleaseBucket = "cos-anthos-builds-us"
 )
 
