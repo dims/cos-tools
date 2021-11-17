@@ -84,9 +84,52 @@ export -f cos_kmake
 ```
 
 At this point you should be able to run `cos_kmake -h` and get a list of
-available command-line options.
+available command-line options:
+
+```
+Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86|arm64>] [-C <kernelconfig>]
+    [-B <build> -b <board> | -R <release> | -G <bucket>]
+    [-t <toolchain_version>] [VAR=value ...] [target ...]
+
+Options:
+  -A <arch>     target architecture. Valid values are x86 and arm64.
+  -B <build>    seed the toolchain from the COS build <build>.
+                Example: R93-16623.0.0 Requires -b option.
+  -C <config>   kernel config target. Example: lakitu_defconfig
+  -G <bucket>   seed the toolchain and kernel headers from the custom
+                GCS bucket <bucket>. Directory structure needs to conform
+                to the COS standard. 
+  -H            create a package with kernel headers for the respective
+                kernel package. Should be used only with -k option.
+  -R <release>  seed the toolchain and kernel headers from the
+                specified official COS release. Example: 16442.0.0
+  -b <board>    specify board for -B argument. Example: lakitu
+  -c            perform mrproper step when building a kernel package.
+                Should be used only with -k option.
+  -d            create a pakcage with debug symbols for the respective
+                kernel package. Should be used only with -k option.
+  -h            show this message.
+  -i            invoke interactive shell with kernel development
+                environment initialized.
+  -k            build a kernel package for sources mapped from the host
+                to the current working directory.
+  -m            build an out-of-tree module for sources mapped from
+                the host to the current working directory.
+                This mode requires either -R or -B/b options.
+  -t            seed the toolchain from the Chromium OS upstream.
+                Example: 2021.06.26.094653
+```
 
 ### Building the COS Kernel
+
+#### Getting the Source Code
+
+`cos_kmake` should be used at the top-level of the checked out kernel source tree:
+
+```
+$ git clone -b cos-5.10 https://cos.googlesource.com/third_party/kernel cos-kernel
+$ cd cos-kernel
+```
 
 #### Pass-through make
 
