@@ -20,6 +20,7 @@ RELEASE_ID=""  # Loaded from host during execution
 BUILD_DIR="" # based on RELEASE_ID
 KERNEL_CONFIG="defconfig"
 BUILD_DEBUG_PACKAGE="false"
+BUILD_HEADERS_PACKAGE="false"
 CLEAN_BEFORE_BUILD="false"
 
 BOARD=""
@@ -306,6 +307,32 @@ kmake() {
 }
 export -f kmake
 
+
+tar_kernel_headers() {
+  local -r version=$(kmake "$@" kernelrelease)
+  local -r tmpdir="$(mktemp -d)"
+  (
+    find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl
+    find arch/*/include include scripts -type f -o -type l
+    find "arch/${KERNEL_ARCH}" -name module.lds -o -name Kbuild.platforms -o -name Platform
+    find "arch/${KERNEL_ARCH}" -name include -o -name scripts -type d | while IFS='' read -r line; do
+      find "${line}" -type f
+    done
+  ) > "${tmpdir}/hdrsrcfiles"
+
+  find "arch/${KERNEL_ARCH}/include" Module.symvers include scripts -type f > "${tmpdir}/hdrobjfiles"
+  local -r destdir="${tmpdir}/headers_tmp/usr/src/linux-headers-${version}"
+  mkdir -p "${destdir}"
+  tar -c -f - -T "${tmpdir}/hdrsrcfiles" | tar -xf - -C "${destdir}"
+  tar -c -f - -T "${tmpdir}/hdrobjfiles" | tar -xf - -C "${destdir}"
+  rm "${tmpdir}/hdrsrcfiles" "${tmpdir}/hdrobjfiles"
+
+  cp .config "${destdir}/.config"
+
+  tar -C "${tmpdir}/headers_tmp" -c -z -f "cos-kernel-headers-${version}-${KERNEL_ARCH}.tgz" .
+  rm -rf "${tmpdir}"
+}
+
 kernel_build() {
   local -r tmproot_dir="$(mktemp -d)"
   local image_target
@@ -353,6 +380,10 @@ kernel_build() {
 
   tar -c -J -f "cos-kernel-${version}-${KERNEL_ARCH}.txz" -C "${tmproot_dir}" boot/ lib/
   rm -rf "${tmproot_dir}"
+
+  if [[ "${BUILD_HEADERS_PACKAGE}" = "true" ]]; then
+    tar_kernel_headers
+  fi
 }
 
 module_build() {
@@ -362,7 +393,7 @@ module_build() {
 
 usage() {
 cat 1>&2 <<__EOUSAGE__
-Usage: $0 [-k | -m | -i] [-cd] [-A <x86|arm64>] [-C <kernelconfig>]" 1>&2
+Usage: $0 [-k | -m | -i] [-cdH] [-A <x86|arm64>] [-C <kernelconfig>]" 1>&2
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
@@ -373,13 +404,15 @@ Options:
   -C <config>   kernel config target. Example: lakitu_defconfig
   -G <bucket>   seed the toolchain and kernel headers from the custom
                 GCS bucket <bucket>. Directory structure needs to conform
-                to the COS standard. 
+                to the COS standard.
+  -H            create a package with kernel headers for the respective
+                kernel package. Should be used only with -k option.
   -R <release>  seed the toolchain and kernel headers from the
                 specified official COS release. Example: 16442.0.0
   -b <board>    specify board for -B argument. Example: lakitu
   -c            perform mrproper step when building a kernel package.
                 Should be used only with -k option.
-  -d            create a pakcage with debug symbols for the respective
+  -d            create a package with debug symbols for the respective
                 kernel package. Should be used only with -k option.
   -h            show this message.
   -i            invoke interactive shell with kernel development
@@ -392,7 +425,7 @@ Options:
   -t            seed the toolchain from the Chromium OS upstream.
                 Example: 2021.06.26.094653
 __EOUSAGE__
-   
+
   exit $RETCODE_ERROR
 }
 
@@ -400,12 +433,13 @@ main() {
   local build_target=""
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:R:b:cdhikmt:" o; do
+  while getopts "A:B:C:G:HR:b:cdhikmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
       C) KERNEL_CONFIG=${OPTARG} ;;
       G) custom_bucket=${OPTARG} ;;
+      H) BUILD_HEADERS_PACKAGE="true" ;;
       R) RELEASE_ID=${OPTARG} ;;
       b) BOARD=${OPTARG} ;;
       c) CLEAN_BEFORE_BUILD="true" ;;
