@@ -87,7 +87,8 @@ At this point you should be able to run `cos_kmake -h` and get a list of
 available command-line options:
 
 ```
-Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86|arm64>] [-C <kernelconfig>]
+Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86|arm64>]
+    [-C <kernelconfig>] [-O  <objdir>]
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
@@ -101,6 +102,8 @@ Options:
                 to the COS standard. 
   -H            create a package with kernel headers for the respective
                 kernel package. Should be used only with -k option.
+  -O <objdir>   value for KBUILD_OUTPUT to separate obj files from
+                sources
   -R <release>  seed the toolchain and kernel headers from the
                 specified official COS release. Example: 16442.0.0
   -b <board>    specify board for -B argument. Example: lakitu

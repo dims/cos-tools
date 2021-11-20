@@ -40,6 +40,9 @@ KERNEL_ARCH="x86"
 CC=""
 CXX=""
 
+# Use out-of-tree build for full kernel build
+KBUILD_OUTPUT="."
+
 _log() {
   local -r prefix="$1"
   shift
@@ -299,17 +302,21 @@ set_compilation_env() {
 }
 
 kmake() {
+  local output_dir_arg=""
+  if [[ "${KBUILD_OUTPUT}" != "." ]]; then
+    output_dir_arg="KBUILD_OUTPUT=${KBUILD_OUTPUT}"
+  fi
   env ARCH=${KERNEL_ARCH} make ARCH=${KERNEL_ARCH} \
     CC="${CC}" CXX="${CXX}" LD="${LD}" \
     STRIP="${STRIP}" OBJCOPY="${OBJCOPY}" \
     HOSTCC="${HOSTCC}" HOSTCXX="${HOSTCXX}" HOSTLD="${HOSTLD}" \
+    "${output_dir_arg}" \
     "$@"
 }
 export -f kmake
 
-
 tar_kernel_headers() {
-  local -r version=$(kmake "$@" kernelrelease)
+  local -r version=$(kmake "$@" -s kernelrelease)
   local -r tmpdir="$(mktemp -d)"
   (
     find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl
@@ -320,14 +327,28 @@ tar_kernel_headers() {
     done
   ) > "${tmpdir}/hdrsrcfiles"
 
-  find "arch/${KERNEL_ARCH}/include" Module.symvers include scripts -type f > "${tmpdir}/hdrobjfiles"
+  pushd "${KBUILD_OUTPUT}"
+  (
+    if [[ -d tools/objtool ]]; then
+      find tools/objtool -type f -executable
+    fi
+    find "arch/${KERNEL_ARCH}/include" Module.symvers System.map \
+      include scripts .config \
+      -type f ! -name "*.cmd"  ! -name "*.o"
+  ) > "${tmpdir}/hdrobjfiles"
+  popd
+
   local -r destdir="${tmpdir}/headers_tmp/usr/src/linux-headers-${version}"
   mkdir -p "${destdir}"
+  mkdir -p "${destdir}/build"
   tar -c -f - -T "${tmpdir}/hdrsrcfiles" | tar -xf - -C "${destdir}"
-  tar -c -f - -T "${tmpdir}/hdrobjfiles" | tar -xf - -C "${destdir}"
-  rm "${tmpdir}/hdrsrcfiles" "${tmpdir}/hdrobjfiles"
+  # separate generated files and main sources for now
+  # this is to prevent breakage in linux-info.eclass that
+  # rely on src and build being separated
+  tar -c -f - -C ${KBUILD_OUTPUT} -T "${tmpdir}/hdrobjfiles" | tar -xf - -C "${destdir}/build"
+  echo "include ../Makefile" > "${destdir}/build/Makefile"
 
-  cp .config "${destdir}/.config"
+  rm "${tmpdir}/hdrsrcfiles" "${tmpdir}/hdrobjfiles"
 
   tar -C "${tmpdir}/headers_tmp" -c -z -f "cos-kernel-headers-${version}-${KERNEL_ARCH}.tgz" .
   rm -rf "${tmpdir}"
@@ -350,13 +371,13 @@ kernel_build() {
     kmake "$@" mrproper
   fi
   kmake "$@" "${KERNEL_CONFIG}"
-  local -r version=$(kmake "$@" kernelrelease)
+  local -r version=$(kmake "$@" -s kernelrelease)
   kmake "$@" "${image_target}" modules
   INSTALL_MOD_PATH="${tmproot_dir}" kmake "$@" modules_install
 
   mkdir -p "${tmproot_dir}/boot/"
-  cp -v -- .config "${tmproot_dir}/boot/config-${version}"
-  cp -v -- "arch/${KERNEL_ARCH}/boot/${image_target}" "${tmproot_dir}/boot/vmlinuz-${version}"
+  cp -v -- "${KBUILD_OUTPUT}/.config" "${tmproot_dir}/boot/config-${version}"
+  cp -v -- "${KBUILD_OUTPUT}/arch/${KERNEL_ARCH}/boot/${image_target}" "${tmproot_dir}/boot/vmlinuz-${version}"
 
   for module in $(find "$tmproot_dir/lib/modules/" -name "*.ko" -printf '%P\n'); do
     module="lib/modules/$module"
@@ -370,7 +391,7 @@ kernel_build() {
   done
 
   if [[ "${BUILD_DEBUG_PACKAGE}" = "true" ]]; then
-    cp -v -- vmlinux "${tmproot_dir}/usr/lib/debug/lib/modules/${version}/"
+    cp -v -- "${KBUILD_OUTPUT}/vmlinux" "${tmproot_dir}/usr/lib/debug/lib/modules/${version}/"
     # Some other tools expect other locations
     mkdir -p "$tmproot_dir/usr/lib/debug/boot/"
     ln -s "../lib/modules/$version/vmlinux" "$tmproot_dir/usr/lib/debug/boot/vmlinux-$version"
@@ -393,7 +414,8 @@ module_build() {
 
 usage() {
 cat 1>&2 <<__EOUSAGE__
-Usage: $0 [-k | -m | -i] [-cdH] [-A <x86|arm64>] [-C <kernelconfig>]" 1>&2
+Usage: $0 [-k | -m | -i] [-cdH] [-A <x86|arm64>]
+    [-C <kernelconfig>] [-O  <objdir>]
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
@@ -407,6 +429,8 @@ Options:
                 to the COS standard.
   -H            create a package with kernel headers for the respective
                 kernel package. Should be used only with -k option.
+  -O <objdir>   value for KBUILD_OUTPUT to separate obj files from
+                sources
   -R <release>  seed the toolchain and kernel headers from the
                 specified official COS release. Example: 16442.0.0
   -b <board>    specify board for -B argument. Example: lakitu
@@ -433,13 +457,14 @@ main() {
   local build_target=""
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:HR:b:cdhikmt:" o; do
+  while getopts "A:B:C:G:HO:R:b:cdhikmt:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
       C) KERNEL_CONFIG=${OPTARG} ;;
       G) custom_bucket=${OPTARG} ;;
       H) BUILD_HEADERS_PACKAGE="true" ;;
+      O) KBUILD_OUTPUT=${OPTARG} ;;
       R) RELEASE_ID=${OPTARG} ;;
       b) BOARD=${OPTARG} ;;
       c) CLEAN_BEFORE_BUILD="true" ;;
