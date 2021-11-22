@@ -302,7 +302,7 @@ set_compilation_env() {
 }
 
 kmake() {
-  local output_dir_arg=""
+  local output_dir_arg="KBUILD_OUTPUT="
   if [[ "${KBUILD_OUTPUT}" != "." ]]; then
     output_dir_arg="KBUILD_OUTPUT=${KBUILD_OUTPUT}"
   fi
