@@ -408,7 +408,9 @@ kernel_build() {
 }
 
 module_build() {
-  kmake -C "${KHEADERS}" M="$(pwd)" "$@" clean
+  if [[ "${CLEAN_BEFORE_BUILD}" = "true" ]]; then
+    kmake -C "${KHEADERS}" M="$(pwd)" "$@" clean
+  fi
   kmake -C "${KHEADERS}" M="$(pwd)" "$@" modules
 }
 
@@ -434,8 +436,9 @@ Options:
   -R <release>  seed the toolchain and kernel headers from the
                 specified official COS release. Example: 16442.0.0
   -b <board>    specify board for -B argument. Example: lakitu
-  -c            perform mrproper step when building a kernel package.
-                Should be used only with -k option.
+  -c            perform "mrproper" step when building a kernel package or
+                "clean" step when building a module.
+                Should be used only with -k and -m option.
   -d            create a package with debug symbols for the respective
                 kernel package. Should be used only with -k option.
   -h            show this message.
