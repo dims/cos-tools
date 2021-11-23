@@ -100,7 +100,7 @@ func (converter *Converter) ConvertOVAToGCE(ctx context.Context, inputURL, image
 		return err
 	}
 
-	cosGCETar := "cos_gce.tar.gz"
+	cosGCETar := fmt.Sprintf("%s_gce.tar.gz", imageName)
 	cosTarURL := fmt.Sprintf("gs://%s/%s", gcsBucket, cosGCETar)
 
 	glog.Info("Uploading tar.gz file to a remote GCS location...")
@@ -129,7 +129,7 @@ func (converter *Converter) ConvertOVAFromGCE(ctx context.Context, sourceImage, 
 	}
 	defer utils.RemoveDir(tempWorkDir, "error on removing the temporary working directory", nil)
 
-	tempExportedImageName := "cos-exported-image.tar.gz"
+	tempExportedImageName := fmt.Sprintf("%s-exported-image.tar.gz", sourceImage)
 	tempExportImageURL := fmt.Sprintf("gs://%s/%s", gcsBucket, tempExportedImageName)
 
 	glog.Info("Exporting image in tar.gz format to a temporary GCS location")
