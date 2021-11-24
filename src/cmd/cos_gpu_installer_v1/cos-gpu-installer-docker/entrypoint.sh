@@ -317,7 +317,7 @@ get_cross_toolchain_pkg() {
 # Download, extracts and install the toolchain package
 install_cross_toolchain_pkg() {
   info "$TOOLCHAIN_PKG_DIR: $(ls -A "${TOOLCHAIN_PKG_DIR}")"
-  if [[ -n "$(ls -A "${TOOLCHAIN_PKG_DIR}")" ]]; then
+  if [[ -n "$(ls -A "${TOOLCHAIN_PKG_DIR}/bin")" ]]; then
     info "Found existing toolchain package. Skipping download and installation"
     if mountpoint -q "${TOOLCHAIN_PKG_DIR}"; then
       info "${TOOLCHAIN_PKG_DIR} is a mountpoint; remounting as exec"
