@@ -94,13 +94,13 @@ func (converter *Converter) ConvertOVAToGCE(ctx context.Context, inputURL, image
 		return err
 	}
 
+	cosGCETar := fmt.Sprintf("%s_gce.tar.gz", imageName)
+
 	glog.Info("Compressing disk.raw to tar.gz...")
-	if err = fs.TarFile(tempRawImage, filepath.Join(tempWorkDir,
-		"cos_gce.tar.gz")); err != nil {
+	if err = fs.TarFile(tempRawImage, filepath.Join(tempWorkDir, cosGCETar)); err != nil {
 		return err
 	}
 
-	cosGCETar := fmt.Sprintf("%s_gce.tar.gz", imageName)
 	cosTarURL := fmt.Sprintf("gs://%s/%s", gcsBucket, cosGCETar)
 
 	glog.Info("Uploading tar.gz file to a remote GCS location...")
