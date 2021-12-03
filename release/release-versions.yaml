@@ -21,3 +21,9 @@
   build_commit: "f79432cc2708a80849460cec9ebb665618ab445b"
   release_tags:
     - "v2.0.15"
+- staging_container_name: "cos-ova-converter"
+  release_container_name: "cos-ova-converter"
+  build_commit: "2d81698f7cf6ff33fa78fe5fe0254e113712a021"
+  release_tags:
+  - "latest"
+  - "1.0.0"
