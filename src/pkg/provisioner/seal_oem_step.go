@@ -16,7 +16,6 @@ package provisioner
 
 import (
 	"context"
-	_ "embed"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,16 +24,13 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/tools"
 )
 
-//go:embed _veritysetup.img
-var veritysetupImg []byte
-
 type SealOEMStep struct{}
 
 func (s *SealOEMStep) run(ctx context.Context, runState *state, deps *stepDeps) error {
 	log.Println("Sealing the OEM partition with dm-verity")
 	veritysetupImgPath := filepath.Join(runState.dir, "veritysetup.img")
 	if _, err := os.Stat(veritysetupImgPath); os.IsNotExist(err) {
-		if err := ioutil.WriteFile(veritysetupImgPath, veritysetupImg, 0644); err != nil {
+		if err := ioutil.WriteFile(veritysetupImgPath, deps.VeritySetupImage, 0644); err != nil {
 			return err
 		}
 	}

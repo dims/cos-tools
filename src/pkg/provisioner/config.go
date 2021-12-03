@@ -94,6 +94,9 @@ type Config struct {
 type stepDeps struct {
 	// GCSClient is used to access Google Cloud Storage.
 	GCSClient *storage.Client
+	// VeritySetupImage is an embedded Docker image that contains the
+	// "veritysetup" tool.
+	VeritySetupImage []byte
 }
 
 type step interface {

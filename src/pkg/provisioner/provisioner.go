@@ -19,7 +19,6 @@ package provisioner
 import (
 	"bufio"
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -33,9 +32,6 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	"golang.org/x/sys/unix"
 )
-
-//go:embed docker-credential-gcr
-var dockerCredentialGCR []byte
 
 // ErrRebootRequired indicates that a reboot is necessary for provisioning to
 // continue.
@@ -103,12 +99,12 @@ func mountOptions(rootDir, mountPoint string) (uintptr, error) {
 	return parsedOptions, nil
 }
 
-func setup(runState *state, rootDir string, systemd *systemdClient) error {
+func setup(runState *state, deps Deps, systemd *systemdClient) error {
 	log.Println("Setting up environment...")
 	if err := systemd.stop("update-engine.service"); err != nil {
 		return err
 	}
-	if err := mountFunc("tmpfs", filepath.Join(rootDir, "root"), "tmpfs", 0, ""); err != nil {
+	if err := mountFunc("tmpfs", filepath.Join(deps.RootDir, "root"), "tmpfs", 0, ""); err != nil {
 		return fmt.Errorf("error mounting tmpfs at /root: %v", err)
 	}
 	binPath := filepath.Join(runState.dir, "bin")
@@ -119,7 +115,7 @@ func setup(runState *state, rootDir string, systemd *systemdClient) error {
 		}
 	}
 	if _, err := os.Stat(dockerCredentialGCRPath); os.IsNotExist(err) {
-		if err := ioutil.WriteFile(dockerCredentialGCRPath, dockerCredentialGCR, 0744); err != nil {
+		if err := ioutil.WriteFile(dockerCredentialGCRPath, deps.DockerCredentialGCR, 0744); err != nil {
 			return err
 		}
 	}
@@ -133,7 +129,7 @@ func setup(runState *state, rootDir string, systemd *systemdClient) error {
 	if err := mountFunc(binPath, binPath, "ext4", unix.MS_BIND, ""); err != nil {
 		return fmt.Errorf("error bind mounting %q: %v", dockerCredentialGCRPath, err)
 	}
-	opts, err := mountOptions(rootDir, binPath)
+	opts, err := mountOptions(deps.RootDir, binPath)
 	if err != nil {
 		return err
 	}
@@ -338,6 +334,15 @@ type Deps struct {
 	// RootDir is the path to the root file system. Should be "/" in all real
 	// runtime situations.
 	RootDir string
+	// DockerCredentialGCR is an embedded docker-credential-gcr program to use as a Docker
+	// credential helper.
+	DockerCredentialGCR []byte
+	// VeritySetupImage is an embedded Docker image that contains the
+	// "veritysetup" tool.
+	VeritySetupImage []byte
+	// HandleDiskLayoutBin is an embedded program for reformatting a COS disk
+	// image.
+	HandleDiskLayoutBin []byte
 }
 
 func run(ctx context.Context, deps Deps, runState *state) (err error) {
@@ -345,10 +350,13 @@ func run(ctx context.Context, deps Deps, runState *state) (err error) {
 	if err := repartitionBootDisk(deps, runState); err != nil {
 		return err
 	}
-	if err := setup(runState, deps.RootDir, systemd); err != nil {
+	if err := setup(runState, deps, systemd); err != nil {
 		return err
 	}
-	stepDeps := stepDeps{GCSClient: deps.GCSClient}
+	stepDeps := stepDeps{
+		GCSClient:        deps.GCSClient,
+		VeritySetupImage: deps.VeritySetupImage,
+	}
 	if err := executeSteps(ctx, runState, stepDeps); err != nil {
 		return err
 	}

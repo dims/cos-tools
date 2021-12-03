@@ -27,6 +27,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const trueExecutable = "#!/bin/bash\ntrue"
+
 func testDataDir(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs("testdata")
@@ -68,9 +70,12 @@ func TestStateExists(t *testing.T) {
 		t.Fatal(err)
 	}
 	deps := Deps{
-		GCSClient:    nil,
-		TarCmd:       "",
-		SystemctlCmd: "",
+		GCSClient:           nil,
+		TarCmd:              "",
+		SystemctlCmd:        "",
+		DockerCredentialGCR: []byte(trueExecutable),
+		VeritySetupImage:    []byte(trueExecutable),
+		HandleDiskLayoutBin: []byte(trueExecutable),
 	}
 	config := Config{}
 	if err := Run(ctx, deps, dir, config); err != errStateAlreadyExists {
@@ -109,10 +114,13 @@ func TestRunInvalidArgs(t *testing.T) {
 			defer os.RemoveAll(tempDir)
 			gcs := fakes.GCSForTest(t)
 			deps := Deps{
-				GCSClient:    gcs.Client,
-				TarCmd:       "tar",
-				SystemctlCmd: "/bin/true",
-				RootDir:      tempDir,
+				GCSClient:           gcs.Client,
+				TarCmd:              "tar",
+				SystemctlCmd:        "/bin/true",
+				RootDir:             tempDir,
+				DockerCredentialGCR: []byte(trueExecutable),
+				VeritySetupImage:    []byte(trueExecutable),
+				HandleDiskLayoutBin: []byte(trueExecutable),
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {
@@ -181,10 +189,13 @@ func TestRunFailure(t *testing.T) {
 				gcs.Objects[name] = data
 			}
 			deps := Deps{
-				GCSClient:    gcs.Client,
-				TarCmd:       "tar",
-				SystemctlCmd: "/bin/true",
-				RootDir:      tempDir,
+				GCSClient:           gcs.Client,
+				TarCmd:              "tar",
+				SystemctlCmd:        "/bin/true",
+				RootDir:             tempDir,
+				DockerCredentialGCR: []byte(trueExecutable),
+				VeritySetupImage:    []byte(trueExecutable),
+				HandleDiskLayoutBin: []byte(trueExecutable),
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {
@@ -261,10 +272,13 @@ func TestRunSuccess(t *testing.T) {
 				gcs.Objects[name] = data
 			}
 			deps := Deps{
-				GCSClient:    gcs.Client,
-				TarCmd:       "tar",
-				SystemctlCmd: "/bin/true",
-				RootDir:      tempDir,
+				GCSClient:           gcs.Client,
+				TarCmd:              "tar",
+				SystemctlCmd:        "/bin/true",
+				RootDir:             tempDir,
+				DockerCredentialGCR: []byte(trueExecutable),
+				VeritySetupImage:    []byte(trueExecutable),
+				HandleDiskLayoutBin: []byte(trueExecutable),
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {

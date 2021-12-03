@@ -15,7 +15,6 @@
 package provisioner
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -33,9 +32,6 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 )
-
-//go:embed _handle_disk_layout.bin
-var handleDiskLayoutBin []byte
 
 func switchRoot(deps Deps, runState *state) (err error) {
 	if !runState.data.Config.BootDisk.ReclaimSDA3 {
@@ -105,7 +101,7 @@ func setupOnShutdownUnit(deps Deps, runState *state) (err error) {
 	if err := mountFunc("", filepath.Join(deps.RootDir, "tmp"), "", unix.MS_REMOUNT|unix.MS_NOSUID|unix.MS_NODEV, ""); err != nil {
 		return fmt.Errorf("error remounting /tmp as exec: %v", err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(deps.RootDir, "tmp", "handle_disk_layout.bin"), handleDiskLayoutBin, 0744); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(deps.RootDir, "tmp", "handle_disk_layout.bin"), deps.HandleDiskLayoutBin, 0744); err != nil {
 		return err
 	}
 	data := fmt.Sprintf(`[Unit]

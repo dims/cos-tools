@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"log"
 	"os"
@@ -27,6 +28,15 @@ import (
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 )
+
+//go:embed _handle_disk_layout.bin
+var handleDiskLayoutBin []byte
+
+//go:embed _veritysetup.img
+var veritySetupImage []byte
+
+//go:embed docker-credential-gcr
+var dockerCredentialGCR []byte
 
 var (
 	stateDir = flag.String("state-dir", "/var/lib/.cos-customizer", "Absolute path to the directory to use for provisioner state. "+
@@ -48,14 +58,17 @@ func main() {
 		os.Exit(int(subcommands.ExitFailure))
 	}
 	deps := provisioner.Deps{
-		GCSClient:    gcsClient,
-		TarCmd:       "tar",
-		SystemctlCmd: "systemctl",
-		RootdevCmd:   "rootdev",
-		CgptCmd:      "cgpt",
-		Resize2fsCmd: "resize2fs",
-		E2fsckCmd:    "e2fsck",
-		RootDir:      "/",
+		GCSClient:           gcsClient,
+		TarCmd:              "tar",
+		SystemctlCmd:        "systemctl",
+		RootdevCmd:          "rootdev",
+		CgptCmd:             "cgpt",
+		Resize2fsCmd:        "resize2fs",
+		E2fsckCmd:           "e2fsck",
+		RootDir:             "/",
+		DockerCredentialGCR: dockerCredentialGCR,
+		VeritySetupImage:    veritySetupImage,
+		HandleDiskLayoutBin: handleDiskLayoutBin,
 	}
 	var exitCode int
 	ret := subcommands.Execute(ctx, deps, &exitCode)
