@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -270,6 +271,17 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 		return nil, err
 	}
 	var args []string
+	if buildSpec.GCEEndpoint != "" {
+		// Adding the "projects/" suffix is a Daisy-specific quirk.
+		u, err := url.Parse(buildSpec.GCEEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %q: %v", buildSpec.GCEEndpoint, err)
+		}
+		u.Path = path.Join(u.Path, "projects")
+		// We add a trailing "/" here because Daisy needs it, and u.String() trims
+		// it.
+		args = append(args, "-compute_endpoint_override="+u.String()+"/")
+	}
 	if provConfig.BootDisk.OEMSize == "" && buildSpec.DiskSize > 10 && !provConfig.BootDisk.ReclaimSDA3 {
 		// If the oem-size is set, or need to reclaim sda3,
 		// create the disk with default size,

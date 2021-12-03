@@ -21,6 +21,7 @@ import (
 	"log"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/config"
@@ -301,6 +302,10 @@ func (f *FinishImageBuild) Execute(ctx context.Context, flags *flag.FlagSet, arg
 	if err != nil {
 		log.Println(err)
 		return subcommands.ExitFailure
+	}
+	// Set non-default GCE endpoints in the buildConfig.
+	if !strings.Contains(svc.BasePath, "compute.googleapis.com/compute/v1") {
+		buildConfig.GCEEndpoint = svc.BasePath
 	}
 	if err := validateOEM(buildConfig, provConfig); err != nil {
 		log.Println(err)

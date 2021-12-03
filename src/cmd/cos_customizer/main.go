@@ -35,6 +35,8 @@ import (
 var persistentDir = flag.String("local-state-workdir", ".cos-customizer-workdir",
 	"Name of the directory in $HOME to use for storing local state.")
 
+var computeEndpoint = flag.String("compute-endpoint", "", "If set, used as the endpoint for the GCE API.")
+
 func clients(ctx context.Context, anonymousCreds bool) (*compute.Service, *storage.Client, error) {
 	var httpClient *http.Client
 	var err error
@@ -46,7 +48,11 @@ func clients(ctx context.Context, anonymousCreds bool) (*compute.Service, *stora
 			return nil, nil, err
 		}
 	}
-	svc, err := compute.New(httpClient)
+	computeOpts := []option.ClientOption{option.WithHTTPClient(httpClient)}
+	if *computeEndpoint != "" {
+		computeOpts = append(computeOpts, option.WithEndpoint(*computeEndpoint))
+	}
+	svc, err := compute.NewService(ctx, computeOpts...)
 	if err != nil {
 		return nil, nil, err
 	}
