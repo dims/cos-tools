@@ -21,7 +21,7 @@ load("@io_bazel_rules_go//extras:embed_data.bzl", "go_embed_data")
 # package source.
 genrule(
     name = "handle_disk_layout.bin",
-    srcs = ["//src/cmd/handle_disk_layout:handle_disk_layout_bin"],
+    srcs = ["//src/cmd/handle_disk_layout:handle_disk_layout_bin_amd64"],
     outs = ["_handle_disk_layout.bin"],
     cmd = "cp $< $@",
 )

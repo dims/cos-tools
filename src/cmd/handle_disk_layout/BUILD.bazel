@@ -23,7 +23,17 @@ go_library(
 )
 
 go_binary(
-    name = "handle_disk_layout_bin",
+    name = "handle_disk_layout_bin_amd64",
     embed = [":handle_disk_layout_lib"],
+    goos = "linux",
+    goarch = "amd64",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "handle_disk_layout_bin_arm64",
+    embed = [":handle_disk_layout_lib"],
+    goos = "linux",
+    goarch = "arm64",
     visibility = ["//visibility:public"],
 )
