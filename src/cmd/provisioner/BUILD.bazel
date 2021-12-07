@@ -35,7 +35,7 @@ genrule(
 
 genrule(
     name = "docker_credential_gcr",
-    srcs = ["@com_github_googlecloudplatform_docker_credential_gcr//:docker-credential-gcr"],
+    srcs = ["@com_github_googlecloudplatform_docker_credential_gcr//:docker-credential-gcr_amd64"],
     outs = ["docker-credential-gcr"],
     cmd = "cp $< $@",
 )

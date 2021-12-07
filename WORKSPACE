@@ -73,6 +73,10 @@ git_repository(
     commit = "6093d30b51d725877bc6971aa6700153c1a364f1",
     remote = "https://github.com/GoogleCloudPlatform/docker-credential-gcr",
     shallow_since = "1613169008 -0800",
+    patches = [
+        "//src/third_party/docker_credential_gcr:0001-Add-explicit-targets-for-amd64-and-arm64.patch",
+    ],
+    patch_args = ["-p1"],
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")

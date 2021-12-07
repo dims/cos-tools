@@ -1,0 +1,40 @@
+From 8a0f755c61b768621f180074ae96bae0911daefb Mon Sep 17 00:00:00 2001
+From: Robert Kolchmeyer <rkolchmeyer@google.com>
+Date: Mon, 6 Dec 2021 11:34:34 -0800
+Subject: [PATCH] Add explicit targets for amd64 and arm64.
+
+cos-customizer needs both in the same build, so bazel's --platforms flag
+doesn't work for us.
+---
+ BUILD | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/BUILD b/BUILD
+index a0e0629..e43e017 100644
+--- a/BUILD
++++ b/BUILD
+@@ -33,3 +33,21 @@ go_binary(
+     pure = "on",
+     visibility = ["//visibility:public"],
+ )
++
++go_binary(
++    name = "docker-credential-gcr_amd64",
++    embed = [":go_default_library"],
++    pure = "on",
++    goos = "linux",
++    goarch = "amd64",
++    visibility = ["//visibility:public"],
++)
++
++go_binary(
++    name = "docker-credential-gcr_arm64",
++    embed = [":go_default_library"],
++    pure = "on",
++    goos = "linux",
++    goarch = "arm64",
++    visibility = ["//visibility:public"],
++)
+-- 
+2.34.1.400.ga245620fadb-goog
+
