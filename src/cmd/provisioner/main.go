@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	_ "embed"
 	"flag"
 	"log"
 	"os"
@@ -28,15 +27,6 @@ import (
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 )
-
-//go:embed _handle_disk_layout.bin
-var handleDiskLayoutBin []byte
-
-//go:embed _veritysetup.img
-var veritySetupImage []byte
-
-//go:embed docker-credential-gcr
-var dockerCredentialGCR []byte
 
 var (
 	stateDir = flag.String("state-dir", "/var/lib/.cos-customizer", "Absolute path to the directory to use for provisioner state. "+

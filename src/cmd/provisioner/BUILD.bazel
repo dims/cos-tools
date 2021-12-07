@@ -20,23 +20,44 @@ load("@io_bazel_rules_go//extras:embed_data.bzl", "go_embed_data")
 # use a "no-op" genrule to place this binary in the same directory as the
 # package source.
 genrule(
-    name = "handle_disk_layout.bin",
+    name = "handle_disk_layout_amd64.bin",
     srcs = ["//src/cmd/handle_disk_layout:handle_disk_layout_bin_amd64"],
-    outs = ["_handle_disk_layout.bin"],
+    outs = ["_handle_disk_layout_amd64.bin"],
     cmd = "cp $< $@",
 )
 
 genrule(
-    name = "veritysetup.img",
+    name = "handle_disk_layout_arm64.bin",
+    srcs = ["//src/cmd/handle_disk_layout:handle_disk_layout_bin_arm64"],
+    outs = ["_handle_disk_layout_arm64.bin"],
+    cmd = "cp $< $@",
+)
+
+genrule(
+    name = "veritysetup_amd64.img",
     srcs = ["//:veritysetup_amd64.tar"],
-    outs = ["_veritysetup.img"],
+    outs = ["_veritysetup_amd64.img"],
     cmd = "cp $< $@",
 )
 
 genrule(
-    name = "docker_credential_gcr",
+    name = "veritysetup_arm64.img",
+    srcs = ["//:veritysetup_arm64.tar"],
+    outs = ["_veritysetup_arm64.img"],
+    cmd = "cp $< $@",
+)
+
+genrule(
+    name = "docker_credential_gcr_amd64",
     srcs = ["@com_github_googlecloudplatform_docker_credential_gcr//:docker-credential-gcr_amd64"],
-    outs = ["docker-credential-gcr"],
+    outs = ["docker-credential-gcr_amd64"],
+    cmd = "cp $< $@",
+)
+
+genrule(
+    name = "docker_credential_gcr_arm64",
+    srcs = ["@com_github_googlecloudplatform_docker_credential_gcr//:docker-credential-gcr_arm64"],
+    outs = ["docker-credential-gcr_arm64"],
     cmd = "cp $< $@",
 )
 
@@ -46,12 +67,21 @@ go_library(
         "main.go",
         "resume.go",
         "run.go",
+        "embeds_linux_amd64.go",
+        "embeds_linux_arm64.go",
     ],
-    embedsrcs = [
-        ":handle_disk_layout.bin",
-        ":veritysetup.img",
-        ":docker_credential_gcr",
-    ],
+    embedsrcs = select({
+        "@io_bazel_rules_go//go/toolchain:amd64": [
+            ":handle_disk_layout_amd64.bin",
+            ":veritysetup_amd64.img",
+            ":docker_credential_gcr_amd64",
+        ],
+        "@io_bazel_rules_go//go/toolchain:arm64": [
+            ":handle_disk_layout_arm64.bin",
+            ":veritysetup_arm64.img",
+            ":docker_credential_gcr_arm64",
+        ],
+    }),
     importpath = "cos.googlesource.com/cos/tools.git/src/cmd/provisioner",
     visibility = ["//visibility:private"],
     deps = [
@@ -62,7 +92,17 @@ go_library(
 )
 
 go_binary(
-    name = "provisioner",
+    name = "provisioner_amd64",
     embed = [":provisioner_lib"],
+    goos = "linux",
+    goarch = "amd64",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "provisioner_arm64",
+    embed = [":provisioner_lib"],
+    goos = "linux",
+    goarch = "arm64",
     visibility = ["//visibility:public"],
 )

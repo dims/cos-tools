@@ -18,7 +18,7 @@ genrule(
     name = "cidata",
     srcs = [
         "//:src/data/startup.yaml",
-        "//src/cmd/provisioner",
+        "//src/cmd/provisioner:provisioner_amd64",
         "//src/cmd/metadata_watcher:metadata_watcher_amd64",
     ],
     outs = ["cidata.img"],
@@ -27,7 +27,7 @@ $(location @dosfstools//:mkfs.fat) -n CIDATA -S 512 -s 8 -C $@ 65536;\
 touch meta-data;\
 $(location @mtools//:mcopy) -i $@ $(location //:src/data/startup.yaml) ::/user-data;\
 $(location @mtools//:mcopy) -i $@ meta-data ::/meta-data;\
-$(location @mtools//:mcopy) -i $@ $(location //src/cmd/provisioner:provisioner) ::/provisioner;\
+$(location @mtools//:mcopy) -i $@ $(location //src/cmd/provisioner:provisioner_amd64) ::/provisioner;\
 $(location @mtools//:mcopy) -i $@ $(location //src/cmd/metadata_watcher:metadata_watcher_amd64) ::/metadata_watcher;",
     tools = [
         "@dosfstools//:mkfs.fat",
