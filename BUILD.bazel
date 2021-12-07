@@ -15,7 +15,8 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("@package_bundle//file:packages.bzl", "packages")
+load("@package_bundle_amd64//file:packages.bzl", packages_amd64 = "packages")
+load("@package_bundle_arm64//file:packages.bzl", packages_arm64 = "packages")
 load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
 
 # gazelle:prefix cos.googlesource.com/cos/tools.git
@@ -36,27 +37,54 @@ genrule(
 )
 
 container_image(
-    name = "veritysetup",
+    name = "veritysetup_amd64",
     debs = [
-        packages["coreutils"],
-        packages["tar"],
-        packages["libacl1"],
-        packages["libattr1"],
-        packages["libc6"],
-        packages["libselinux1"],
-        packages["libpcre3"],
-        packages["cryptsetup-bin"],
-        packages["libcryptsetup4"],
-        packages["libpopt0"],
-        packages["libuuid1"],
-        packages["libdevmapper1.02.1"],
-        packages["libgcrypt20"],
-        packages["libargon2-0"],
-        packages["libjson-c3"],
-        packages["libudev1"],
-        packages["libpthread-stubs0-dev"],
-        packages["libm17n-0"],
-        packages["libgpg-error0"],
+        packages_amd64["coreutils"],
+        packages_amd64["tar"],
+        packages_amd64["libacl1"],
+        packages_amd64["libattr1"],
+        packages_amd64["libc6"],
+        packages_amd64["libselinux1"],
+        packages_amd64["libpcre3"],
+        packages_amd64["cryptsetup-bin"],
+        packages_amd64["libcryptsetup4"],
+        packages_amd64["libpopt0"],
+        packages_amd64["libuuid1"],
+        packages_amd64["libdevmapper1.02.1"],
+        packages_amd64["libgcrypt20"],
+        packages_amd64["libargon2-0"],
+        packages_amd64["libjson-c3"],
+        packages_amd64["libudev1"],
+        packages_amd64["libpthread-stubs0-dev"],
+        packages_amd64["libm17n-0"],
+        packages_amd64["libgpg-error0"],
+    ],
+    repository = "veritysetup",
+    visibility = ["//visibility:public"],
+)
+
+container_image(
+    name = "veritysetup_arm64",
+    debs = [
+        packages_arm64["coreutils"],
+        packages_arm64["tar"],
+        packages_arm64["libacl1"],
+        packages_arm64["libattr1"],
+        packages_arm64["libc6"],
+        packages_arm64["libselinux1"],
+        packages_arm64["libpcre3"],
+        packages_arm64["cryptsetup-bin"],
+        packages_arm64["libcryptsetup4"],
+        packages_arm64["libpopt0"],
+        packages_arm64["libuuid1"],
+        packages_arm64["libdevmapper1.02.1"],
+        packages_arm64["libgcrypt20"],
+        packages_arm64["libargon2-0"],
+        packages_arm64["libjson-c3"],
+        packages_arm64["libudev1"],
+        packages_arm64["libpthread-stubs0-dev"],
+        packages_arm64["libm17n-0"],
+        packages_arm64["libgpg-error0"],
     ],
     repository = "veritysetup",
     visibility = ["//visibility:public"],
@@ -73,14 +101,14 @@ container_image(
     base = "@daisy//image",
     data_path = ".",
     debs = [
-        packages["coreutils"],
-        packages["tar"],
-        packages["libacl1"],
-        packages["libattr1"],
-        packages["libc6"],
-        packages["libselinux1"],
-        packages["libpcre3"],
-        packages["mtools"],
+        packages_amd64["coreutils"],
+        packages_amd64["tar"],
+        packages_amd64["libacl1"],
+        packages_amd64["libattr1"],
+        packages_amd64["libc6"],
+        packages_amd64["libselinux1"],
+        packages_amd64["libpcre3"],
+        packages_amd64["mtools"],
     ],
     files = [
         ":tmp_dir",

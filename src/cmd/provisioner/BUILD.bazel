@@ -28,7 +28,7 @@ genrule(
 
 genrule(
     name = "veritysetup.img",
-    srcs = ["//:veritysetup.tar"],
+    srcs = ["//:veritysetup_amd64.tar"],
     outs = ["_veritysetup.img"],
     cmd = "cp $< $@",
 )

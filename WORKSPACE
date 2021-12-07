@@ -145,7 +145,7 @@ load(
 )
 
 dpkg_src(
-    name = "debian_stretch",
+    name = "debian_stretch_amd64",
     arch = "amd64",
     distro = "stretch",
     sha256 = "79a66cd92ba9096fce679e15d0b5feb9effcf618b0a6d065eb32684dbffd0311",
@@ -153,8 +153,17 @@ dpkg_src(
     url = "http://snapshot.debian.org/archive",
 )
 
+dpkg_src(
+    name = "debian_stretch_arm64",
+    arch = "arm64",
+    distro = "stretch",
+    sha256 = "ec05c9109c0a6aef4509091b9ccf10939583e56b7ce53be9d8ef38ec5e0ce9d2",
+    snapshot = "20190328T105444Z",
+    url = "http://snapshot.debian.org/archive",
+)
+
 dpkg_list(
-    name = "package_bundle",
+    name = "package_bundle_amd64",
     packages = [
         "coreutils",
         "libacl1",
@@ -178,7 +187,36 @@ dpkg_list(
         "mtools",
     ],
     sources = [
-        "@debian_stretch//file:Packages.json",
+        "@debian_stretch_amd64//file:Packages.json",
+    ],
+)
+
+dpkg_list(
+    name = "package_bundle_arm64",
+    packages = [
+        "coreutils",
+        "libacl1",
+        "libattr1",
+        "libc6",
+        "libpcre3",
+        "libselinux1",
+        "tar",
+        "cryptsetup-bin",
+        "libcryptsetup4",
+        "libpopt0",
+        "libuuid1",
+        "libdevmapper1.02.1",
+        "libgcrypt20",
+        "libargon2-0",
+        "libjson-c3",
+        "libudev1",
+        "libpthread-stubs0-dev",
+        "libm17n-0",
+        "libgpg-error0",
+        "mtools",
+    ],
+    sources = [
+        "@debian_stretch_arm64//file:Packages.json",
     ],
 )
 
