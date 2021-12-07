@@ -38,6 +38,7 @@ genrule(
 
 container_image(
     name = "veritysetup_amd64",
+    architecture = "amd64",
     debs = [
         packages_amd64["coreutils"],
         packages_amd64["tar"],
@@ -65,6 +66,7 @@ container_image(
 
 container_image(
     name = "veritysetup_arm64",
+    architecture = "arm64",
     debs = [
         packages_arm64["coreutils"],
         packages_arm64["tar"],

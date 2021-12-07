@@ -31,6 +31,23 @@ write_files:
       return "${PIPESTATUS[0]}"
     }
 
+    # To make sure that ARCH gets set properly, this function cannot run in a
+    # subshell.
+    set_arch() {
+      case "$(uname -m)" in
+        x86_64)
+          ARCH=amd64
+          ;;
+        aarch64)
+          ARCH=arm64
+          ;;
+        *)
+          ARCH="$(uname -m)"
+          ;;
+      esac
+      status echo "Set ARCH to ${ARCH}"
+    }
+
     run_provisioner() {
       status $@ && ret=$? || ret=$?
       if [[ "${ret}" != 0 ]]; then
@@ -55,7 +72,7 @@ write_files:
         # time to capture the serial logs. Once Daisy is done capturing the
         # serial logs, it will add the "DaisyEnd" metadata key. Let's wait for
         # that key to appear (and shutdown anyway after 5 minutes).
-        /mnt/disks/cidata/metadata_watcher DaisyEnd
+        /mnt/disks/cidata/metadata_watcher_${ARCH} DaisyEnd
         umount /mnt/disks/cidata
         rm -r /mnt/disks || :
         shutdown -h now
@@ -65,17 +82,18 @@ write_files:
 
     main() {
       status history -c
+      set_arch
       status mkdir -p /mnt/disks/cidata
       status mount /dev/disk/by-label/CIDATA /mnt/disks/cidata
       if [[ ! -d /var/lib/.cos-customizer ]]; then
-        run_provisioner /mnt/disks/cidata/provisioner run --config=/mnt/disks/cidata/config.json
+        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} run --config=/mnt/disks/cidata/config.json
       else
-        run_provisioner /mnt/disks/cidata/provisioner resume
+        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} resume
       fi
     }
 
     main
-- path: /etc/systemd/system/customizer.service
+- path: /etc/systemd/system/customizer@.service
   permissions: 0644
   content: |
     [Unit]
@@ -88,12 +106,17 @@ write_files:
     RemainAfterExit=yes
     User=root
     ExecStart=/bin/bash /tmp/startup.sh
-    ExecStopPost=/bin/bash -c 'rm /etc/systemd/system/customizer.service'
+    ExecStopPost=/bin/bash -c 'rm /etc/systemd/system/customizer@.service'
     StandardOutput=tty
     StandardError=tty
-    TTYPath=/dev/ttyS2
+    TTYPath=%I
 
 runcmd:
 - echo "Starting startup service..."
 - systemctl daemon-reload
-- systemctl --no-block start customizer.service
+- |
+  if [[ "$(uname -m)" == "aarch64" ]]; then
+    systemctl --no-block start customizer@-dev-ttyAMA2.service
+  else
+    systemctl --no-block start customizer@-dev-ttyS2.service
+  fi

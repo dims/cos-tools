@@ -33,6 +33,8 @@ steps:
 options:
   machineType: 'N1_HIGHCPU_8'
   substitutionOption: 'MUST_MATCH'
+# 25 minute timeout; concurrent arm64/amd64 builds take time
+timeout: '1500s'
 images:
 - 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}'
 - 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:latest'

@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -78,7 +79,7 @@ func loadVeritysetupImage(imgPath string) (string, error) {
 			"input: imgPath=%q, error msg: (%v)", imgPath, err)
 	}
 	var idBuf bytes.Buffer
-	cmd = exec.Command("sudo", "docker", "images", "veritysetup:veritysetup", "-q")
+	cmd = exec.Command("sudo", "docker", "images", "veritysetup:veritysetup_"+runtime.GOARCH, "-q")
 	cmd.Stdout = &idBuf
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
