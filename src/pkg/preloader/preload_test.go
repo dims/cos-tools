@@ -344,6 +344,13 @@ func TestDaisyArgs(t *testing.T) {
 			want:        []string{"-zone", "zone"},
 		},
 		{
+			testName:    "MachineType",
+			inputImage:  config.NewImage("", ""),
+			outputImage: config.NewImage("", ""),
+			buildConfig: &config.Build{MachineType: "n1-standard-1", GCSBucket: "bucket", GCSDir: "dir"},
+			want:        []string{"-var:machine_type", "n1-standard-1"},
+		},
+		{
 			testName:    "Timeout",
 			inputImage:  config.NewImage("", ""),
 			outputImage: config.NewImage("", ""),

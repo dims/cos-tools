@@ -41,6 +41,7 @@ type FinishImageBuild struct {
 	imageProject   string
 	zone           string
 	project        string
+	machineType    string
 	imageName      string
 	imageSuffix    string
 	imageFamily    string
@@ -86,6 +87,7 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 		"the deleted state).")
 	flags.StringVar(&f.zone, "zone", "", "Zone to make GCE resources in.")
 	flags.StringVar(&f.project, "project", "", "Project to make GCE resources in.")
+	flags.StringVar(&f.machineType, "machine-type", "n1-standard-1", "Machine type to use during the build.")
 	if f.labels == nil {
 		f.labels = newMapVar()
 	}
@@ -153,6 +155,7 @@ func (f *FinishImageBuild) loadConfigs(files *fs.Files) (*config.Image, *config.
 	}
 	buildConfig.Project = f.project
 	buildConfig.Zone = f.zone
+	buildConfig.MachineType = f.machineType
 	buildConfig.DiskSize = f.diskSize
 	buildConfig.Timeout = f.timeout.String()
 	provConfig := &provisioner.Config{}

@@ -259,6 +259,11 @@ created during the image build process will be properly cleaned up. If the
 overall Cloud Build workflow timeout expires, the task will be cancelled without
 any opportunity to clean up resources.
 
+`-machine-type`: The machine type to use for the COS Customizer preload VM.
+Defaults to `n1-standard-1`. Useful for optimizing costs. Note that this is
+separate from the Cloud Build machine type option, which sets the machine type
+of the Cloud Build VM, which is different from the COS Customizer preload VM.
+
 An example `finish-image-build` step looks like the following:
 
     - name: 'gcr.io/cos-cloud/cos-customizer'

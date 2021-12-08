@@ -7,7 +7,8 @@
     "output_image_project": {"Required": true, "Description": "Project of output image."},
     "cidata_img": {"Required": true, "Description": "Path to CIDATA vfat image containing cloud-init user-data and the provisioner program. Must be in .tar.gz format."},
     "disk_size_gb": {"Value": "10", "Description": "The disk size to use for preloading."},
-    "host_maintenance": {"Value": "MIGRATE", "Description": "VM behavior when there is maintenance."}
+    "host_maintenance": {"Value": "MIGRATE", "Description": "VM behavior when there is maintenance."},
+    "machine_type": {"Required": true, "Description": "Machine type of the preload VM."}
   },
   "Sources": {
     "cloud-config": "/data/startup.yaml",
@@ -50,6 +51,7 @@
         {
           "Name": "preload-vm",
           "Disks": [{"Source": "boot-disk"}, {"Source": "cidata-disk"}],
+          "MachineType": "${machine_type}",
           "guestAccelerators": {{.Accelerators}},
           "scheduling": {
             "onHostMaintenance": "${host_maintenance}"

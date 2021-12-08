@@ -66,6 +66,7 @@ type Build struct {
 	GCSDir      string
 	Project     string
 	Zone        string
+	MachineType string
 	DiskSize    int
 	GPUType     string
 	Timeout     string
