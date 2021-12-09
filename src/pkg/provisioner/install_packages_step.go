@@ -29,6 +29,7 @@ import (
 type InstallPackagesStep struct {
 	BuildContext                 string
 	PkgSpecURL                   string
+	TopWorkDir                   string
 	AnthosInstallerDir           string
 	AnthosInstallerVersion       string
 	AnthosInstallerReleaseBucket string
@@ -62,6 +63,7 @@ func (ip *InstallPackagesStep) runInstaller(buildContext string) (err error) {
 	}
 	if err := t.Execute(f, &InstallPackagesStep{
 		PkgSpecURL:             utils.QuoteForShell(pkgSpecURL),
+		TopWorkDir:             utils.QuoteForShell(ip.TopWorkDir),
 		AnthosInstallerDir:     utils.QuoteForShell(ip.AnthosInstallerDir),
 		AnthosInstallerVersion: utils.QuoteForShell(ip.AnthosInstallerVersion),
 	}); err != nil {

@@ -35,6 +35,7 @@ const (
 // pkg-spec by the anthos-installer.
 type InstallPackage struct {
 	PkgSpecURL string
+	TopWorkDir string
 }
 
 // Name implements subcommands.Command.Name.
@@ -56,6 +57,7 @@ func (ip *InstallPackage) Usage() string {
 // SetFlags implements subcommands.Command.SetFlags.
 func (ip *InstallPackage) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&ip.PkgSpecURL, "pkgspec-url", "", "URL path that points to the package spec.")
+	f.StringVar(&ip.TopWorkDir, "top-workdir", "", "Path to the top working directory, used to hold package spec and package tarballs.")
 }
 
 // Execute implements subcommands.Command.Execute. It configures the current image build process to
@@ -84,6 +86,7 @@ func (ip *InstallPackage) Execute(ctx context.Context, f *flag.FlagSet, args ...
 	buf, err := json.Marshal(&provisioner.InstallPackagesStep{
 		BuildContext:                 "user",
 		PkgSpecURL:                   ip.PkgSpecURL,
+		TopWorkDir:                   ip.TopWorkDir,
 		AnthosInstallerReleaseBucket: anthosInstallerReleaseBucket,
 		AnthosInstallerVersion:       anthosInstallerVersion,
 	})

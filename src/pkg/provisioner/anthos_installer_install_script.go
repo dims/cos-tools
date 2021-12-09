@@ -23,6 +23,7 @@ export ANTHOS_INSTALLER_DIR={{.AnthosInstallerDir}}
 export ANTHOS_INSTALLER_VERSION={{.AnthosInstallerVersion}}
 export BUILD_CONTEXT_DIR={{.BuildContext}}
 export BIN_DIR={{.AnthosInstallerDir}}/bin
+export TOP_WORKDIR={{.TopWorkDir}}
 
 install_anthos_installer() {
 	tar -xvf ${ANTHOS_INSTALLER_DIR}/${ANTHOS_INSTALLER_VERSION} -C ${ANTHOS_INSTALLER_DIR}
@@ -30,7 +31,10 @@ install_anthos_installer() {
 }
 
 install_packages() {
-	${BIN_DIR}/anthos_installer install -pkgspec-url=${PACKAGE_SPEC_DIR} -build-contextdir=${BUILD_CONTEXT_DIR}
+	echo "${TOP_WORKDIR}"
+	${BIN_DIR}/anthos_installer install -pkgspec-url=${PACKAGE_SPEC_DIR} \
+			-build-contextdir=${BUILD_CONTEXT_DIR} \
+			-top-workdir=${TOP_WORKDIR}
 	echo "Successfully installed the packages"
 }
 
