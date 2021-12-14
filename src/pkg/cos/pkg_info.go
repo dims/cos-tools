@@ -8,46 +8,37 @@ import (
 
 const packageInfoDefaultJSONFile = "/etc/cos-package-info.json"
 
-// Package represents a COS package.
+// Package represents a COS package. For example, this schema is used in
+// the cos-package-info.json file.
 type Package struct {
-	Category      string
-	Name          string
-	Version       string
-	EbuildVersion string
-}
-
-// PackageInfo contains information about the packages of a COS instance.
-type PackageInfo struct {
-	InstalledPackages []Package
-	BuildTimePackages []Package
-}
-
-type packageJSON struct {
 	Category      string `json:"category"`
 	Name          string `json:"name"`
 	Version       string `json:"version"`
 	EbuildVersion string `json:"ebuild_version"`
 }
 
-type packageInfoJSON struct {
-	InstalledPackages []packageJSON `json:"installedPackages"`
-	BuildTimePackages []packageJSON `json:"buildTimePackages"`
+// PackageInfo contains information about the packages of a COS instance.
+// For example, this schema is used in the cos-package-info.json file.
+type PackageInfo struct {
+	InstalledPackages []Package `json:"installedPackages"`
+	BuildTimePackages []Package `json:"buildTimePackages"`
 }
 
-// PackageInfoExists returns whether COS package information exists.
+// PackageInfoExists returns whether COS package information exists on the
+// local OS.
 func PackageInfoExists() bool {
 	info, err := os.Stat(packageInfoDefaultJSONFile)
 	return !os.IsNotExist(err) && !info.IsDir()
 }
 
-// GetPackageInfo loads the package information from this COS system and returns
+// GetPackageInfo loads the package information from the local OS and returns
 // it.
 func GetPackageInfo() (PackageInfo, error) {
 	return GetPackageInfoFromFile(packageInfoDefaultJSONFile)
 }
 
 // GetPackageInfoFromFile loads the package information from the specified file
-// and returns it.
+// on the local OS and returns it.
 func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 	var packageInfo PackageInfo
 
@@ -62,32 +53,9 @@ func GetPackageInfoFromFile(filename string) (PackageInfo, error) {
 		return packageInfo, err
 	}
 
-	var piJSON packageInfoJSON
-	if err = json.Unmarshal(b, &piJSON); err != nil {
+	var pi PackageInfo
+	if err = json.Unmarshal(b, &pi); err != nil {
 		return packageInfo, err
 	}
-
-	packageInfo.InstalledPackages = make([]Package, len(piJSON.InstalledPackages))
-	for i := range piJSON.InstalledPackages {
-		pJSON := &piJSON.InstalledPackages[i]
-		p := &packageInfo.InstalledPackages[i]
-
-		p.Category = pJSON.Category
-		p.Name = pJSON.Name
-		p.Version = pJSON.Version
-		p.EbuildVersion = pJSON.EbuildVersion
-	}
-
-	packageInfo.BuildTimePackages = make([]Package, len(piJSON.BuildTimePackages))
-	for i := range piJSON.BuildTimePackages {
-		pJSON := &piJSON.BuildTimePackages[i]
-		p := &packageInfo.BuildTimePackages[i]
-
-		p.Category = pJSON.Category
-		p.Name = pJSON.Name
-		p.Version = pJSON.Version
-		p.EbuildVersion = pJSON.EbuildVersion
-	}
-
-	return packageInfo, nil
+	return pi, nil
 }
