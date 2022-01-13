@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -125,10 +126,21 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
 	if c.nvidiaInstallerURL == "" {
+		versionInput := c.driverVersion
+		milestone, err := strconv.Atoi(envReader.Milestone())
+		if err != nil {
+			c.logError(errors.Wrap(err, "failed to parse milestone number"))
+			return subcommands.ExitFailure
+		}
 		c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
 		if err != nil {
-			c.logError(errors.Wrap(err, "failed to get default driver version"))
-			return subcommands.ExitFailure
+			if versionInput == "latest" && milestone < 93 {
+				c.logError(errors.Wrap(err, "'--version=latest' is only supported on COS M93 and onwards, please unset this flag"))
+				return subcommands.ExitFailure
+			} else {
+				c.logError(errors.Wrap(err, "failed to get default driver version"))
+				return subcommands.ExitFailure
+			}
 		}
 		log.Infof("Installing GPU driver version %s", c.driverVersion)
 	} else {
