@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	espPartition = "/dev/sda12"
-	utsFilepath  = "include/generated/utsrelease.h"
+	espPartition      = "/dev/sda12"
+	utsFilepath       = "include/generated/utsrelease.h"
+	toolchainBinPath  = "bin"
+	kernelHeadersPath = "usr/src/linux-headers*"
 )
 
 var (
@@ -73,21 +75,36 @@ func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return errors.Wrapf(err, "failed to create dir %s", destDir)
 	}
+	foundToolchain, foundKernelHeaders := false, false
 	if empty, _ := utils.IsDirEmpty(destDir); !empty {
-		log.Info("Found existing toolchain. Skipping download and installation")
+		if _, err := os.Stat(filepath.Join(destDir, toolchainBinPath)); err == nil {
+			foundToolchain = true
+		}
+		if dirs, err := filepath.Glob(filepath.Join(destDir, kernelHeadersPath)); err == nil && len(dirs) > 0 {
+			foundKernelHeaders = true
+		}
+	}
+
+	if foundToolchain {
+		log.Info("Found existing toolchain. Skipping download and installation.")
 	} else {
 		if err := downloader.DownloadToolchain(destDir); err != nil {
 			return errors.Wrap(err, "failed to download toolchain")
 		}
-		if err := downloader.DownloadKernelHeaders(destDir); err != nil {
-			return fmt.Errorf("failed to download kernel headers: %v", err)
-		}
-
 		log.Info("Unpacking toolchain...")
 		if err := exec.Command("tar", "xf", filepath.Join(destDir, toolchainArchive), "-C", destDir).Run(); err != nil {
 			return errors.Wrap(err, "failed to extract toolchain archive tarball")
 		}
 		log.Info("Done unpacking toolchain")
+	}
+
+	if foundKernelHeaders {
+		log.Info("Found existing kernel headers. Skipping download and installation.")
+
+	} else {
+		if err := downloader.DownloadKernelHeaders(destDir); err != nil {
+			return fmt.Errorf("failed to download kernel headers: %v", err)
+		}
 		log.Info("Unpacking kernel headers...")
 		if err := exec.Command("tar", "xf", filepath.Join(destDir, kernelHeaders), "-C", destDir).Run(); err != nil {
 			return fmt.Errorf("failed to extract kernel headers: %v", err)
