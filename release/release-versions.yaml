@@ -18,9 +18,9 @@
     - "v20211201"
 - staging_container_name: "cos-gpu-installer"
   release_container_name: "cos-gpu-installer"
-  build_commit: "6dbf1d56a7e8c27eebd76327099a38d2ac1a7a05"
+  build_commit: "22b2b5d28b96e96a92ef57730c5ca29d399642ed"
   release_tags:
-    - "v2.0.16"
+    - "v2.0.17"
 - staging_container_name: "cos-ova-converter"
   release_container_name: "cos-ova-converter"
   build_commit: "2d81698f7cf6ff33fa78fe5fe0254e113712a021"
