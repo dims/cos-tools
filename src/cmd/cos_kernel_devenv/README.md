@@ -95,7 +95,10 @@ Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86|arm64>]
 Options:
   -A <arch>     target architecture. Valid values are x86 and arm64.
   -B <build>    seed the toolchain from the COS build <build>.
-                Example: R93-16623.0.0 Requires -b option.
+                Example: R93-16623.0.0. Instead of the actual
+                build number developer can specify the branch name
+                to use the latest build off that branch.
+                Example: main-R93, release-R89. Requires -b option.
   -C <config>   kernel config target. Example: lakitu_defconfig
   -G <bucket>   seed the toolchain and kernel headers from the custom
                 GCS bucket <bucket>. Directory structure needs to conform

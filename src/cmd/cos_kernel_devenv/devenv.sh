@@ -424,7 +424,10 @@ Usage: $0 [-k | -m | -i] [-cdH] [-A <x86|arm64>]
 Options:
   -A <arch>     target architecture. Valid values are x86 and arm64.
   -B <build>    seed the toolchain from the COS build <build>.
-                Example: R93-16623.0.0 Requires -b option.
+                Example: R93-16623.0.0. Instead of the actual
+                build number developer can specify the branch name
+                to use the latest build off that branch.
+                Example: main-R93, release-R89. Requires -b option.
   -C <config>   kernel config target. Example: lakitu_defconfig
   -G <bucket>   seed the toolchain and kernel headers from the custom
                 GCS bucket <bucket>. Directory structure needs to conform
@@ -509,6 +512,21 @@ main() {
     MODE="release"
     BUILD_DIR="/build/${TOOLCHAIN_ARCH}-${RELEASE_ID}"
     echo "** COS release: $RELEASE_ID"
+  fi
+
+  if [[ -n "$BUILD_ID" ]]; then
+    if ! [[ $BUILD_ID =~ R[0-9]+-[0-9.]+ ]]; then
+      BRANCH="${BUILD_ID}"
+      echo "** Obtaining the latest build # for branch ${BRANCH}..."
+      readonly latest="${COS_CI_DOWNLOAD_GCS}/${BOARD}-release/LATEST-${BUILD_ID}"
+      BUILD_ID=$(gsutil -q cat "${latest}" || true)
+      if [[ -n "$BUILD_ID" ]]; then
+        echo "** Latest build for branch ${BRANCH} is ${BUILD_ID}"
+      else
+        echo "** Failed to find latest build for branch ${BRANCH}"
+        exit 1
+      fi
+    fi
   fi
 
   if [[ -z "$MODE" && -n "$BOARD" && -n "$BUILD_ID" ]]; then
