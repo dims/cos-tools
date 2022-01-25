@@ -1,26 +1,11 @@
 # Start from ubuntu
-FROM ubuntu:latest
+FROM ubuntu:impish
 
 RUN apt-get update
 
 ARG DEBIAN_FRONTEND=noninteractive
-# This is required because of https://github.com/crash-utility/crash/issues/74
-RUN apt update && BUILD_DEPS="binutils binutils-dev bison gawk \
-    flex zlib1g-dev libncurses5-dev liblzo2-dev libsnappy-dev \
-    make wget git" \
-    && apt-get install -y --ignore-missing $BUILD_DEPS \
-    && git clone -b 7.2.9 https://github.com/crash-utility/crash.git /tmp/crash \
-    && git config --global user.email "foo@bar.local" \
-    && git config --global user.name "Foo Bar" \
-    && git -C /tmp/crash cherry-pick a5531b2 71e159c \
-    && make -C /tmp/crash extensions lzo snappy \
-    && mkdir -p /usr/lib/crash/extensions/ \
-    && cp -f /tmp/crash/crash /usr/bin \
-    && cp -f /tmp/crash/extensions/*.so /usr/lib/crash/extensions/ \
-    && strip /usr/bin/crash /usr/lib/crash/extensions/*.so \
-    && rm -rf /tmp/crash \
-    && apt-get purge -y --auto-remove $BUILD_DEPS
-RUN apt-get install -y -qq --no-install-recommends gdb xz-utils python curl vim \
+
+RUN apt-get install -y -qq --no-install-recommends crash gdb xz-utils curl vim \
       liblzo2-2 libsnappy1v5 zlib1g libncurses5 binutils apt-transport-https ca-certificates gnupg
 
 # Installs gsutil, following:
