@@ -87,13 +87,13 @@ At this point you should be able to run `cos_kmake -h` and get a list of
 available command-line options:
 
 ```
-Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86|arm64>]
+Usage: /devenv.sh [-k | -m | -i] [-Hcd] [-A <x86_64|arm64>]
     [-C <kernelconfig>] [-O  <objdir>]
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
 Options:
-  -A <arch>     target architecture. Valid values are x86 and arm64.
+  -A <arch>     target architecture. Valid values are x86_64 and arm64.
   -B <build>    seed the toolchain from the COS build <build>.
                 Example: R93-16623.0.0. Instead of the actual
                 build number developer can specify the branch name
@@ -150,9 +150,9 @@ cos_kmake lakitu_defconfig
 cos_kmake bzImage modules
 ```
 
-`cos-kernel-devenv` supports two target arcitectgures: `x86` and `arm64` that
+`cos-kernel-devenv` supports two target arcitectgures: `x86_64` and `arm64` that
 can be set for an invocation by passing `-A <arch>` argument to the command.
-Unless specified the `x86` target is the default one.
+Unless specified the `x86_64` target is the default one.
 
 To build ARM64 kernel and modules you can use the following sequence of commands:
 
@@ -162,7 +162,7 @@ cos_kmake -A arm64 lakitu_defconfig
 cos_kmake -A arm64 Image modules
 ```
 
-All examples below build binaries for `x86` architecture but can be converted to
+All examples below build binaries for `x86_64` architecture but can be converted to
 `arm64` by adding `-A arm64` command-line switch.
 
 #### Building Kernel Packages

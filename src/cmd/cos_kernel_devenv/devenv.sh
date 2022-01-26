@@ -34,7 +34,7 @@ CROS_TC_DOWNLOAD_GCS="https://storage.googleapis.com/chromiumos-sdk/"
 
 # Can be overridden by the command-line argument
 TOOLCHAIN_ARCH="x86_64"
-KERNEL_ARCH="x86"
+KERNEL_ARCH="x86_64"
 
 # CC and CXX will be set by set_compilation_env
 CC=""
@@ -359,7 +359,7 @@ kernel_build() {
   local image_target
 
   case "${KERNEL_ARCH}" in
-    x86)   image_target="bzImage" ;;
+    x86_64)   image_target="bzImage" ;;
     arm64) image_target="Image" ;;
     *)
       echo "Unknown kernel architecture: ${KERNEL_ARCH}"
@@ -416,13 +416,13 @@ module_build() {
 
 usage() {
 cat 1>&2 <<__EOUSAGE__
-Usage: $0 [-k | -m | -i] [-cdH] [-A <x86|arm64>]
+Usage: $0 [-k | -m | -i] [-cdH] [-A <x86_64|arm64>]
     [-C <kernelconfig>] [-O  <objdir>]
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
 Options:
-  -A <arch>     target architecture. Valid values are x86 and arm64.
+  -A <arch>     target architecture. Valid values are x86_64 and arm64.
   -B <build>    seed the toolchain from the COS build <build>.
                 Example: R93-16623.0.0. Instead of the actual
                 build number developer can specify the branch name
@@ -488,12 +488,12 @@ main() {
   if [[ ! -z "${BOARD}" ]]; then
     case "${BOARD}" in
       lakitu-arm64) KERNEL_ARCH=arm64 ;;
-      *) KERNEL_ARCH=x86 ;;
+      *) KERNEL_ARCH=x86_64 ;;
     esac
   fi
 
   case "${KERNEL_ARCH}" in
-    x86)
+    x86_64)
       TOOLCHAIN_ARCH=x86_64
       ;;
     arm64)
