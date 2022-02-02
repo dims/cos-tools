@@ -263,7 +263,7 @@ func (i *InstallGPU) Execute(ctx context.Context, f *flag.FlagSet, args ...inter
 	if !ok {
 		log.Panic("InstallGPU expects two arguments; *fs.Files and ServiceClients")
 	}
-	_, gcsClient, err := serviceClients(ctx, true)
+	_, gcsClient, err := serviceClients(ctx, false)
 	if err != nil {
 		log.Println(err)
 		return subcommands.ExitFailure
