@@ -13,18 +13,18 @@ Currently, the COS Customizer is intended to be run as part of a
 sequence of Google Cloud Build build steps. No other usage mode is currently
 supported.
 
-*   [Accessing the cos-customizer container image](#accessing-the-cos-customizer-container-image)
+*   [Accessing the cos-customizer container image](#accessing-the-cos_customizer-container-image)
 *   [Quick Start](#quick-start)
     *   [Minimal example](#minimal-example)
 *   [Build Steps](#build-steps)
     *   [Required build steps](#required-build-steps)
-        *   [The start-image-build step](#the-start-image-build-step)
-        *   [The finish-image-build step](#the-finish-image-build-step)
+        *   [The start-image-build step](#the-start_image_build-step)
+        *   [The finish-image-build step](#the-finish_image_build-step)
     *   [Optional build steps](#optional-build-steps)
-        *   [run-script](#run-script)
-        *   [install-gpu](#install-gpu)
-        *   [seal-oem](#seal-oem)
-        *   [disable-auto-update](#disable-auto-update)
+        *   [run-script](#run_script)
+        *   [install-gpu](#install_gpu)
+        *   [seal-oem](#seal_oem)
+        *   [disable-auto-update](#disable_auto_update)
 
 ## Accessing the cos-customizer container image
 
