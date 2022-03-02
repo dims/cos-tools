@@ -59,6 +59,9 @@ INSTALLER_FILE=""
 # Preload driver independent components. Set in parse_opt()
 PRELOAD="${PRELOAD:-false}"
 
+# Precompile a driver. Set in parse_opt()
+PRECOMPILE="${PRECOMPILE:-false}"
+
 source gpu_installer_url_lib.sh
 
 _log() {
@@ -444,11 +447,23 @@ run_nvidia_installer() {
     installer_args+=("--kernel-source-path=${KERNEL_SRC_HEADER}")
   fi
 
-  local -r dir_to_extract="/tmp/extract"
-  # Extract files to a fixed path first to make sure md5sum of generated gpu
-  # drivers are consistent.
-  sh "${INSTALLER_FILE}" -x --target "${dir_to_extract}"
-  "${dir_to_extract}/nvidia-installer" "${installer_args[@]}"
+  if [[ "${PRECOMPILE}" == "true" ]]; then
+    installer_args+=("--kernel-name=$(uname -r)")
+    installer_args+=("--add-this-kernel")
+    # Cannot precompile the driver with the extracted binray.
+    # It's OK that the .ko file can be different every time we install
+    # the driver, because we only need to install the driver once to get
+    # the precompiled driver. After that, the .ko files compressed in
+    # the precompiled driver will be signed and used.
+    sh "${INSTALLER_FILE}" "${installer_args[@]}"
+    info "Precompiled driver: $(ls *-custom.run)"
+  else
+    local -r dir_to_extract="/tmp/extract"
+    # Extract files to a fixed path first to make sure md5sum of generated gpu
+    # drivers are consistent.
+    sh "${INSTALLER_FILE}" -x --target "${dir_to_extract}"
+    "${dir_to_extract}/nvidia-installer" "${installer_args[@]}"
+  fi
 
   popd
 }
@@ -490,7 +505,7 @@ usage() {
 }
 
 parse_opt() {
-  while getopts ":ph" opt; do
+  while getopts ":phc" opt; do
   case ${opt} in
     p)
       PRELOAD="true"
@@ -498,6 +513,9 @@ parse_opt() {
     h)
       usage
       exit 0
+      ;;
+    c)
+      PRECOMPILE="true"
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -511,6 +529,7 @@ parse_opt() {
 main() {
   parse_opt "$@"
   info "PRELOAD: ${PRELOAD}"
+  info "PRECOMPILE: ${PRECOMPILE}"
   load_etc_os_release
   set_cos_download_gcs
   if [[ "$PRELOAD" == "true" ]]; then
@@ -537,10 +556,14 @@ main() {
       configure_nvidia_installation_dirs
       run_nvidia_installer
       update_cached_version
-      verify_nvidia_installation
-      info "Finished installing the drivers."
+      if [[ ${PRECOMPILE} != "true" ]]; then
+        verify_nvidia_installation
+        info "Finished installing the drivers."
+      fi
     fi
-    update_host_ld_cache
+    if [[ ${PRECOMPILE} != "true" ]]; then
+      update_host_ld_cache
+    fi
   fi
 }
 
