@@ -41,6 +41,7 @@ type InstallCommand struct {
 	gcsDownloadPrefix  string
 	nvidiaInstallerURL string
 	debug              bool
+	test               bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -64,7 +65,7 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&c.unsignedDriver, "allow-unsigned-driver", false,
 		"Whether to allow load unsigned GPU drivers. "+
 			"If this flag is set to true, module signing security features must be disabled on the host for driver installation to succeed. "+
-			"This flag is only for debugging.")
+			"This flag is only for debugging and testing.")
 	f.StringVar(&c.gcsDownloadBucket, "gcs-download-bucket", "",
 		"The GCS bucket to download COS artifacts from. "+
 			"The default bucket is one of 'cos-tools', 'cos-tools-asia' and 'cos-tools-eu' based on where the VM is running. "+
@@ -76,14 +77,16 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"A URL to an nvidia-installer to use for driver installation. This flag is mutually exclusive with `-version`. This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
+	f.BoolVar(&c.test, "test", false,
+		"Enable test mode.")
 }
 
 func (c *InstallCommand) validateFlags() error {
 	if c.nvidiaInstallerURL != "" && c.driverVersion != "" {
 		return stderrors.New("-nvidia-installer-url and -version are both set; these flags are mutually exclusive")
 	}
-	if c.nvidiaInstallerURL != "" && c.unsignedDriver == false {
-		return stderrors.New("-nvidia-installer-url is set, and -allow-unsigned-driver is not; -nvidia-installer-url must be used with -allow-unsigned-driver")
+	if c.nvidiaInstallerURL != "" && c.unsignedDriver == false && c.test == false {
+		return stderrors.New("-nvidia-installer-url is set, and -allow-unsigned-driver is not; -nvidia-installer-url must be used with -allow-unsigned-driver if not in test mode")
 	}
 	return nil
 }
