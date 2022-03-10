@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/cos"
+	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 	log "github.com/golang/glog"
 	"github.com/pkg/errors"
 )
@@ -33,10 +34,38 @@ func DownloadDriverSignatures(downloader cos.ExtensionsDownloader, driverVersion
 		return errors.Wrapf(err, "failed to download driver signature for version %s", driverVersion)
 	}
 
-	tarballPath := filepath.Join(gpuDriverSigningDir, driverVersion+".signature.tar.gz")
+	if err := decompressSignature(driverVersion + ".signature.tar.gz"); err != nil {
+		return errors.Wrapf(err, "failed to decompress driver signature for version %s.", driverVersion)
+	}
+
+	return nil
+}
+
+// DownloadDriverSignaturesFromURL downloads GPU driver signatures from a provided URL.
+func DownloadDriverSignaturesFromURL(signatureURL string) error {
+	if err := os.MkdirAll(gpuDriverSigningDir, 0755); err != nil {
+		return errors.Wrapf(err, "failed to create signing dir %s", gpuDriverSigningDir)
+	}
+
+	log.Infof("Downloading driver signature from URL: %s", signatureURL)
+	signatureName := filepath.Base(signatureURL)
+	outputPath := filepath.Join(gpuDriverSigningDir, signatureName)
+	if err := utils.DownloadContentFromURL(signatureURL, outputPath, "driver signature"); err != nil {
+		return errors.Wrapf(err, "failed to download driver signature from URL %s.", signatureURL)
+	}
+
+	if err := decompressSignature(signatureName); err != nil {
+		return errors.Wrapf(err, "failed to decompress driver signature: %s.", signatureName)
+	}
+
+	return nil
+}
+
+func decompressSignature(signatureName string) error {
+	tarballPath := filepath.Join(gpuDriverSigningDir, signatureName)
 	log.Infof("Decompressing signature %s", tarballPath)
 	if err := extractSignatures(tarballPath, gpuDriverSigningDir); err != nil {
-		return errors.Wrapf(err, "failed to extract driver signatures for version %s", driverVersion)
+		return errors.Wrapf(err, "failed to extract driver signatures %s", signatureName)
 	}
 
 	// Create a dummy private key. We don't need private key to sign the driver
@@ -48,7 +77,6 @@ func DownloadDriverSignatures(downloader cos.ExtensionsDownloader, driverVersion
 	if err := f.Close(); err != nil {
 		return errors.Wrapf(err, "failed to close dummy key file in %s", filepath.Join(gpuDriverSigningDir, gpuDriverDummyKey))
 	}
-
 	return nil
 }
 

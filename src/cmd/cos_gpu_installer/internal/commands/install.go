@@ -40,6 +40,7 @@ type InstallCommand struct {
 	gcsDownloadBucket  string
 	gcsDownloadPrefix  string
 	nvidiaInstallerURL string
+	signatureURL       string
 	debug              bool
 	test               bool
 }
@@ -74,11 +75,15 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"The GCS path prefix when downloading COS artifacts."+
 			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
 	f.StringVar(&c.nvidiaInstallerURL, "nvidia-installer-url", "",
-		"A URL to an nvidia-installer to use for driver installation. This flag is mutually exclusive with `-version`. This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging.")
+		"A URL to an nvidia-installer to use for driver installation. This flag is mutually exclusive with `-version`. "+
+			"This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging and testing.")
+	f.StringVar(&c.signatureURL, "signature-url", "",
+		"A URL to the driver signature. This flag can only be used together with `-test` and `-nvidia-installer-url` for for debugging and testing.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 	f.BoolVar(&c.test, "test", false,
-		"Enable test mode.")
+		"Enable test mode. "+
+			"In test mode, `-nvidia-installer-url` can be used without `-allow-unsigned-driver`.")
 }
 
 func (c *InstallCommand) validateFlags() error {
@@ -87,6 +92,9 @@ func (c *InstallCommand) validateFlags() error {
 	}
 	if c.nvidiaInstallerURL != "" && c.unsignedDriver == false && c.test == false {
 		return stderrors.New("-nvidia-installer-url is set, and -allow-unsigned-driver is not; -nvidia-installer-url must be used with -allow-unsigned-driver if not in test mode")
+	}
+	if c.signatureURL != "" && (c.nvidiaInstallerURL == "" || c.test == false) {
+		return stderrors.New("-signature-url must be used with -nvidia-installer-url and -test")
 	}
 	return nil
 }
@@ -227,7 +235,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 	defer func() { callback <- 0 }()
 
 	if !c.unsignedDriver {
-		if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
+		if c.signatureURL != "" {
+			if err := signing.DownloadDriverSignaturesFromURL(c.signatureURL); err != nil {
+				return errors.Wrap(err, "failed to download driver signature")
+			}
+		} else if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
 			if strings.Contains(err.Error(), "404 Not Found") {
 				return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
 			}
