@@ -43,6 +43,7 @@ type InstallCommand struct {
 	signatureURL       string
 	debug              bool
 	test               bool
+	prepareBuildTools  bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -84,6 +85,8 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&c.test, "test", false,
 		"Enable test mode. "+
 			"In test mode, `-nvidia-installer-url` can be used without `-allow-unsigned-driver`.")
+	f.BoolVar(&c.prepareBuildTools, "prepare-build-tools", false, "Whether to populate the build tools cache, i.e. to download and install the toolchain and the kernel headers. Drivers are NOT installed when this flag is set and running with this flag does not require GPU attached to the instance.")
+
 }
 
 func (c *InstallCommand) validateFlags() error {
@@ -124,15 +127,17 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitFailure
 	}
 
-	var isGpuConfigured bool
-	if isGpuConfigured, err = c.isGpuConfigured(); err != nil {
-		c.logError(errors.Wrapf(err, "failed to check if GPU is configured"))
-		return subcommands.ExitFailure
-	}
+	if !c.prepareBuildTools {
+		var isGpuConfigured bool
+		if isGpuConfigured, err = c.isGpuConfigured(); err != nil {
+			c.logError(errors.Wrapf(err, "failed to check if GPU is configured"))
+			return subcommands.ExitFailure
+		}
 
-	if !isGpuConfigured {
-		c.logError(fmt.Errorf("Please have GPU device configured"))
-		return subcommands.ExitFailure
+		if !isGpuConfigured {
+			c.logError(fmt.Errorf("Please have GPU device configured"))
+			return subcommands.ExitFailure
+		}
 	}
 
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
@@ -269,6 +274,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 	}
 	if err := cos.InstallCrossToolchain(downloader, toolchainPkgDir); err != nil {
 		return errors.Wrap(err, "failed to install toolchain")
+	}
+
+	// Skip driver installation if we are only populating build tools cache
+	if c.prepareBuildTools {
+		return nil
 	}
 
 	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, false); err != nil {
