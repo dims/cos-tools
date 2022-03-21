@@ -24,4 +24,3 @@ var veritySetupImage []byte
 
 //go:embed docker-credential-gcr_arm64
 var dockerCredentialGCR []byte
-

@@ -351,6 +351,20 @@ func TestDaisyArgs(t *testing.T) {
 			want:        []string{"-var:machine_type", "n1-standard-1"},
 		},
 		{
+			testName:    "Network",
+			inputImage:  config.NewImage("", ""),
+			outputImage: config.NewImage("", ""),
+			buildConfig: &config.Build{Network: "global/networks/vpc", GCSBucket: "bucket", GCSDir: "dir"},
+			want:        []string{"-var:network", "global/networks/vpc"},
+		},
+		{
+			testName:    "Subnet",
+			inputImage:  config.NewImage("", ""),
+			outputImage: config.NewImage("", ""),
+			buildConfig: &config.Build{Subnet: "regions/us-west1/subnetworks/auto-vpc-subnet-us-west1", GCSBucket: "bucket", GCSDir: "dir"},
+			want:        []string{"-var:subnet", "regions/us-west1/subnetworks/auto-vpc-subnet-us-west1"},
+		},
+		{
 			testName:    "Timeout",
 			inputImage:  config.NewImage("", ""),
 			outputImage: config.NewImage("", ""),

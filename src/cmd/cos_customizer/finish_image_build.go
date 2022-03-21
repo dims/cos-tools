@@ -45,6 +45,8 @@ type FinishImageBuild struct {
 	imageName      string
 	imageSuffix    string
 	imageFamily    string
+	network        string
+	subnet         string
 	deprecateOld   bool
 	oldImageTTLSec int
 	labels         *mapVar
@@ -88,6 +90,14 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.StringVar(&f.zone, "zone", "", "Zone to make GCE resources in.")
 	flags.StringVar(&f.project, "project", "", "Project to make GCE resources in.")
 	flags.StringVar(&f.machineType, "machine-type", "n1-standard-1", "Machine type to use during the build.")
+	flags.StringVar(&f.network, "network", "", "Network to use"+
+		" during the build. The network must have access to Google Cloud Storage."+
+		" If not specified, the network named default is used."+
+		" If -subnet is also specified subnet must be a subnetwork of network specified by -network.")
+	flags.StringVar(&f.subnet, "subnet", "", "SubNetwork to use"+
+		" during the build. If not provided, default subnet would be used."+
+		" If the network is in auto subnet mode, the subnetwork is optional. "+
+		" If the network is in custom subnet mode, then this field should be specified. Zone should be specified if this field is specified.")
 	if f.labels == nil {
 		f.labels = newMapVar()
 	}
@@ -157,6 +167,8 @@ func (f *FinishImageBuild) loadConfigs(files *fs.Files) (*config.Image, *config.
 	buildConfig.Zone = f.zone
 	buildConfig.MachineType = f.machineType
 	buildConfig.DiskSize = f.diskSize
+	buildConfig.Network = f.network
+	buildConfig.Subnet = f.subnet
 	buildConfig.Timeout = f.timeout.String()
 	provConfig := &provisioner.Config{}
 	if err := config.LoadFromFile(files.ProvConfig, provConfig); err != nil {

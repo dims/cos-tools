@@ -264,6 +264,17 @@ Defaults to `n1-standard-1`. Useful for optimizing costs. Note that this is
 separate from the Cloud Build machine type option, which sets the machine type
 of the Cloud Build VM, which is different from the COS Customizer preload VM.
 
+-`network`: The network/VPC to use for the COS Customizer preload VM.
+The network must have access to Google Cloud Storage. Defaults to
+default network `global/networks/default`.  If -subnet is also specified subnet 
+must be a subnetwork of network specified by -network.
+
+-`subnet`: The subnet to use for the COS Customizer preload VM. Defaults to
+default network `global/networks/default`. If the network is in auto subnet mode,
+the subnetwork is optional. If the network is in custom subnet mode, then this
+field should be specified. Zone should be specified if this field is specified.
+
+
 An example `finish-image-build` step looks like the following:
 
     - name: 'gcr.io/cos-cloud/cos-customizer'
@@ -272,6 +283,18 @@ An example `finish-image-build` step looks like the following:
              '-project=$PROJECT_ID',
              '-image-name=my-custom-image',
              '-image-project=$PROJECT_ID']
+
+An example `finish-image-build` step with `network` and `subnet` looks like the following:
+
+    - name: 'gcr.io/cos-cloud/cos-customizer'
+      args: ['finish-image-build',
+             '-zone=us-west1-b',
+             '-project=$PROJECT_ID',
+             '-network=global/networks/auto-vpc',
+             '-subnet=regions/us-west1/subnetworks/auto-vpc-subnet-us-west1',
+             '-image-name=my-custom-image',
+             '-image-project=$PROJECT_ID']
+
 
 ### Optional build steps
 

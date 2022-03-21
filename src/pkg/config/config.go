@@ -72,6 +72,8 @@ type Build struct {
 	Timeout     string
 	GCSFiles    []string
 	GCEEndpoint string
+	Network     string
+	Subnet      string
 }
 
 // SaveConfigToFile clears the target config file and then saves the new config
