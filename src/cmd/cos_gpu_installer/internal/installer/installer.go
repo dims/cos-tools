@@ -60,7 +60,7 @@ func VerifyDriverInstallation() error {
 }
 
 // ConfigureCachedInstalltion updates ldconfig and installs the cached GPU driver kernel modules.
-func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned bool) error {
+func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned, test bool) error {
 	log.V(2).Info("Configuring cached driver installation")
 
 	if err := createHostDirBindMount(gpuInstallDirHost, gpuInstallDirContainer); err != nil {
@@ -69,7 +69,7 @@ func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned bool) error
 	if err := updateContainerLdCache(); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
-	if err := loadGPUDrivers(needSigned); err != nil {
+	if err := loadGPUDrivers(needSigned, test); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
 
@@ -284,7 +284,7 @@ func installUserLibs(nvidiaDir string) error {
 
 // RunDriverInstaller runs GPU driver installer. Only works if the provided
 // installer includes precompiled drivers.
-func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, legacyLink bool) error {
+func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, test, legacyLink bool) error {
 	log.Info("Running GPU driver installer")
 
 	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
@@ -369,7 +369,7 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, lega
 	// The legacy linking method does this when the installer doesn't fail (i.e.
 	// module signature verification isn't enforced).
 	if (legacyLink && legacyInstallerFailed) || !legacyLink {
-		if err := loadGPUDrivers(needSigned); err != nil {
+		if err := loadGPUDrivers(needSigned, test); err != nil {
 			return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 		}
 	}
@@ -495,8 +495,9 @@ func createOverlayFS(lowerDir, upperDir, workDir string) error {
 	return nil
 }
 
-func loadGPUDrivers(needSigned bool) error {
-	if needSigned {
+func loadGPUDrivers(needSigned, test bool) error {
+	// Don't need to load public key in test mode. Platform key is used.
+	if needSigned && !test {
 		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der")); err != nil {
 			return errors.Wrap(err, "failed to load public key")
 		}

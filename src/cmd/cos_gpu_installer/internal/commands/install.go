@@ -122,7 +122,8 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	log.V(2).Infof("Running on COS build id %s", envReader.BuildNumber())
 
-	if releaseTrack := envReader.ReleaseTrack(); releaseTrack == "dev-channel" {
+	// All prerelease builds are in dev-channel. For testing we don't need to check release track.
+	if releaseTrack := envReader.ReleaseTrack(); !c.test && releaseTrack == "dev-channel" {
 		c.logError(fmt.Errorf("GPU installation is not supported on dev images for now; Please use LTS image."))
 		return subcommands.ExitFailure
 	}
@@ -184,7 +185,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 		if isCached, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
-			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver); err != nil {
+			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
 				return subcommands.ExitFailure
 			}
@@ -281,11 +282,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		return nil
 	}
 
-	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, false); err != nil {
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, c.test, false); err != nil {
 		if errors.Is(err, installer.ErrDriverLoad) {
 			// Drivers were linked, but couldn't load; try again with legacy linking
-			log.Info("Retrying driver installation with legacy linking")
-			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, true); err != nil {
+			log.Infof("Failed to load kernel module, err: %v. Retrying driver installation with legacy linking", err)
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, c.test, true); err != nil {
 				return fmt.Errorf("failed to run GPU driver installer: %v", err)
 			}
 		} else {
