@@ -14,7 +14,7 @@
 #
 # Dockerfile for the COS GPU Installer container.
 
-FROM debian:9
+FROM debian:bookworm
 LABEL maintainer="cos-containers@google.com"
 
 # Install minimal tools needed to build kernel modules.

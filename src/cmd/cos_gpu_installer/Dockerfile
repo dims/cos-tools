@@ -6,7 +6,7 @@ ARG TARGETARCH
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o cos-gpu-installer main.go
 
 # Dockerfile for the COS GPU Installer container.
-FROM debian:9
+FROM debian:bookworm
 LABEL maintainer="cos-containers@google.com"
 
 COPY --from=cos-gpu-installer-go-builder /work/src/cmd/cos_gpu_installer/cos-gpu-installer /cos-gpu-installer
