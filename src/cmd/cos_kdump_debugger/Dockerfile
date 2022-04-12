@@ -1,5 +1,5 @@
-# Start from ubuntu
-FROM ubuntu:impish
+# Start from debian
+FROM debian:bookworm
 
 RUN apt-get update
 
