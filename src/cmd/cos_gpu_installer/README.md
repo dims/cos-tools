@@ -24,14 +24,6 @@ To see all available flags, run the following command:
 /usr/bin/docker run --rm "gcr.io/cos-cloud/cos-gpu-installer:v2" help
 ```
 
-## Build and Release
-Run the following script to build a cos\_gpu\_installer container image through
-Google Cloud Build and save the image to GCR:
-
-```
-src/cmd/cos_gpu_installer/release/build_and_release.sh <GCR-project> <image-tag>
-```
-
 ## Test
 
 ### Source code
