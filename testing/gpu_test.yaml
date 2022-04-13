@@ -41,6 +41,12 @@ steps:
                   --async --format='value(ID)' ."
                 "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
                   --substitutions=_DRIVER_VERSION=460.32.03,_INPUT_IMAGE=cos-89-16108-403-42\
+                  --async --format='value(ID)' ."
+                "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=450.172.01,_INPUT_IMAGE=cos-93-16623-171-1\
+                  --async --format='value(ID)' ."
+                "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
+                  --substitutions=_DRIVER_VERSION=470.82.01,_INPUT_IMAGE=cos-97-16919-29-2\
                   --async --format='value(ID)' .")
     build_ids=()
     exit_code=0
