@@ -15,13 +15,13 @@ COS VM, run the following command to start a cos\_gpu\_installer container:
     --pid=host \
     --volume /dev:/dev \
     --volume /:/root \
-    "gcr.io/cos-cloud/cos-gpu-installer:v2" install
+    "gcr.io/cos-cloud/cos-gpu-installer:<tag>" install "-host-dir=/var/lib/nvidia"
 ```
 
 To see all available flags, run the following command:
 
 ```
-/usr/bin/docker run --rm "gcr.io/cos-cloud/cos-gpu-installer:v2" help
+/usr/bin/docker run --rm "gcr.io/cos-cloud/cos-gpu-installer:<tag>" help
 ```
 
 ## Test
