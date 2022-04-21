@@ -27,11 +27,11 @@ import (
 )
 
 const (
-	anthosInstallerVersion       = "anthos_installer-linux-amd64-v0.0.1-ecea8c6.tar.gz"
+	anthosInstallerVersion       = "anthos_installer-linux-amd64-v0.0.1-bb7e04e.tar.gz"
 	anthosInstallerReleaseBucket = "cos-anthos-builds-us"
 )
 
-// InstallPackage installs the packages based on thes
+// InstallPackage installs the packages based on the
 // pkg-spec by the anthos-installer.
 type InstallPackage struct {
 	PkgSpecURL string
