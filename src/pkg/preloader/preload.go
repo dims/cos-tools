@@ -308,6 +308,8 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 		ciDataFile,
 		"-var:machine_type",
 		buildSpec.MachineType,
+		"-var:disk_type",
+		buildSpec.DiskType,
 		"-var:host_maintenance",
 		hostMaintenance,
 		"-var:network",

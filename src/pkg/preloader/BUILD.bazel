@@ -62,6 +62,7 @@ go_library(
 
 go_test(
     name = "preloader_test",
+    size = "large",
     srcs = [
         "gcs_test.go",
         "preload_test.go",

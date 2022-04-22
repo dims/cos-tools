@@ -223,6 +223,9 @@ be formatted as `projects/{project}/global/licenses/{license}`. Example:
 image labels present on the source image. The labels specified by the `-labels`
 flag take precedence over labels assigned with this flag.
 
+`-disk-type`: The disk type for the preload VM to use when creating the image.
+Defaults to `pd-standard`.
+
 `-disk-size-gb`: The disk size in GB to use when creating the image.
 This value should never be smaller than 10 (the default size of a COS image).
 If `-oem-size` is set,  the lower limit of `-disk-size-gb` is as shown in the 

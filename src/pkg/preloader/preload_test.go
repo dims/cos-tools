@@ -316,6 +316,13 @@ func TestDaisyArgs(t *testing.T) {
 			want:        []string{"-var:cidata_img"},
 		},
 		{
+			testName:    "DiskType",
+			inputImage:  config.NewImage("", ""),
+			outputImage: config.NewImage("", ""),
+			buildConfig: &config.Build{DiskType: "pd-ssd", GCSBucket: "bucket", GCSDir: "dir"},
+			want:        []string{"-var:disk_type", "pd-ssd"},
+		},
+		{
 			testName:    "DiskSize",
 			inputImage:  config.NewImage("", ""),
 			outputImage: config.NewImage("", ""),

@@ -67,6 +67,7 @@ type Build struct {
 	Project     string
 	Zone        string
 	MachineType string
+	DiskType    string
 	DiskSize    int
 	GPUType     string
 	Timeout     string

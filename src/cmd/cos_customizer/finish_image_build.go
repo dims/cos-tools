@@ -54,6 +54,7 @@ type FinishImageBuild struct {
 	inheritLabels  bool
 	oemSize        string
 	oemFSSize4K    uint64
+	diskType       string
 	diskSize       int
 	timeout        time.Duration
 }
@@ -114,6 +115,7 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.StringVar(&f.oemSize, "oem-size", "", "Size of the new OEM partition, "+
 		"can be a number with unit like 10G, 10M, 10K or 10B, "+
 		"or without unit indicating the number of 512B sectors.")
+	flags.StringVar(&f.diskType, "disk-type", "pd-standard", "The disk type to use when creating the image.")
 	flags.IntVar(&f.diskSize, "disk-size-gb", 0, "The disk size to use when creating the image in GB. Value of '0' "+
 		"indicates the default size.")
 	flags.DurationVar(&f.timeout, "timeout", time.Hour, "Timeout value of the image build process. Must be formatted "+
@@ -166,6 +168,7 @@ func (f *FinishImageBuild) loadConfigs(files *fs.Files) (*config.Image, *config.
 	buildConfig.Project = f.project
 	buildConfig.Zone = f.zone
 	buildConfig.MachineType = f.machineType
+	buildConfig.DiskType = f.diskType
 	buildConfig.DiskSize = f.diskSize
 	buildConfig.Network = f.network
 	buildConfig.Subnet = f.subnet
