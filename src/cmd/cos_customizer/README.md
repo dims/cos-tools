@@ -32,7 +32,7 @@ The container image is available at `gcr.io/cos-cloud/cos-customizer`.
 Alternatively, it can be built from source using [Bazel](https://bazel.build/).
 To build COS customizer and load the image into Docker, run:
 
-    $ bazel run :cos_customizer -- --norun
+    $ bazel run //:cos_customizer -- --norun
 
 The COS Customizer docker image will then be available in Docker as
 `bazel:cos_customizer`.

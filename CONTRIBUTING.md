@@ -38,6 +38,26 @@ git clone https://cos.googlesource.com/cos/tools && (cd tools && f=`git rev-pars
 The last command not only clones the repository but also adds a git pre-commit
 hook that will be explained below in "Making changes".
 
+### Unit Testing
+
+Install `bazel` and `mtools`, and ensure `python` is an executable in your
+`$PATH`, pointing to a Python 3 binary. The full suite of unit tests can be
+initiated with
+
+```
+bazel test ...
+```
+
+### Integration Testing
+
+Ensure your Google Cloud project has ~10 K80 GPUs in us-west1; the
+`run_tests.sh` script will launch dozens of simultaneous builds in Cloud Build
+under the given project:
+
+```
+./run_tests.sh -p <GCP project name>
+```
+
 ## Making changes
 
 The typical git workflow applies here. You can use `git checkout -b` to create a

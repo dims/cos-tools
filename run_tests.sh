@@ -22,7 +22,8 @@ PROJECT=""
 usage() {
   cat <<'EOF'
 Usage: ./run_tests.sh [OPTION]
-run_tests.sh runs cos-customizer integration tests.
+run_tests.sh runs cos-customizer integration tests (20+ concurrent builds in
+Cloud Build). Minimum quota requirements include ~10 K80s in us-west1.
 
 -p,--project=<project_name>    GCP project to run tests in. Required.
 EOF
