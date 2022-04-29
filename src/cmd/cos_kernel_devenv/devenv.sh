@@ -318,11 +318,21 @@ export -f kmake
 tar_kernel_headers() {
   local -r version=$(kmake "$@" -s kernelrelease)
   local -r tmpdir="$(mktemp -d)"
+  local arch_dir
+  case "${KERNEL_ARCH}" in
+    x86_64) arch_dir="x86" ;;
+    arm64)  arch_dir="arm64" ;;
+    *)
+      echo "Unknown kernel architecture: ${KERNEL_ARCH}"
+      exit $RETCODE_ERROR
+      ;;
+  esac
+
   (
     find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl
     find arch/*/include include scripts -type f -o -type l
-    find "arch/${KERNEL_ARCH}" -name module.lds -o -name Kbuild.platforms -o -name Platform
-    find "arch/${KERNEL_ARCH}" -name include -o -name scripts -type d | while IFS='' read -r line; do
+    find "arch/${arch_dir}" -name module.lds -o -name Kbuild.platforms -o -name Platform
+    find "arch/${arch_dir}" -name include -o -name scripts -type d | while IFS='' read -r line; do
       find "${line}" -type f
     done
   ) > "${tmpdir}/hdrsrcfiles"
@@ -332,7 +342,7 @@ tar_kernel_headers() {
     if [[ -d tools/objtool ]]; then
       find tools/objtool -type f -executable
     fi
-    find "arch/${KERNEL_ARCH}/include" Module.symvers System.map \
+    find "arch/${arch_dir}/include" Module.symvers System.map \
       include scripts .config \
       -type f ! -name "*.cmd"  ! -name "*.o"
   ) > "${tmpdir}/hdrobjfiles"
