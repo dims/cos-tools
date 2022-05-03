@@ -18,7 +18,7 @@ ROOT_OS_RELEASE="${ROOT_MOUNT_DIR}/etc/os-release"
 readonly RETCODE_ERROR=1
 RELEASE_ID=""  # Loaded from host during execution
 BUILD_DIR="" # based on RELEASE_ID
-KERNEL_CONFIG="defconfig"
+KERNEL_CONFIGS="defconfig"
 BUILD_DEBUG_PACKAGE="false"
 BUILD_HEADERS_PACKAGE="false"
 CLEAN_BEFORE_BUILD="false"
@@ -380,7 +380,7 @@ kernel_build() {
   if [[ "${CLEAN_BEFORE_BUILD}" = "true" ]]; then
     kmake "$@" mrproper
   fi
-  kmake "$@" "${KERNEL_CONFIG}"
+  kmake "$@" "${KERNEL_CONFIGS[@]}"
   local -r version=$(kmake "$@" -s kernelrelease)
   kmake "$@" "${image_target}" modules
   INSTALL_MOD_PATH="${tmproot_dir}" kmake "$@" modules_install
@@ -427,7 +427,7 @@ module_build() {
 usage() {
 cat 1>&2 <<__EOUSAGE__
 Usage: $0 [-k | -m | -i] [-cdH] [-A <x86_64|arm64>]
-    [-C <kernelconfig>] [-O  <objdir>]
+    [-C <kernelconfig>[,fragment1.config,...]] [-O  <objdir>]
     [-B <build> -b <board> | -R <release> | -G <bucket>]
     [-t <toolchain_version>] [VAR=value ...] [target ...]
 
@@ -438,7 +438,9 @@ Options:
                 build number developer can specify the branch name
                 to use the latest build off that branch.
                 Example: main-R93, release-R89. Requires -b option.
-  -C <config>   kernel config target. Example: lakitu_defconfig
+  -C <configs>  kernel configs target. Example: lakitu_defconfig.
+                It's also possible to specify main config and fragments
+                separated by coma, i.e.: lakitu_defconfig,google/xfstest.config
   -G <bucket>   seed the toolchain and kernel headers from the custom
                 GCS bucket <bucket>. Directory structure needs to conform
                 to the COS standard.
@@ -477,7 +479,7 @@ main() {
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
-      C) KERNEL_CONFIG=${OPTARG} ;;
+      C) KERNEL_CONFIGS=(${OPTARG//,/ }) ;;
       G) custom_bucket=${OPTARG} ;;
       H) BUILD_HEADERS_PACKAGE="true" ;;
       O) KBUILD_OUTPUT=${OPTARG} ;;
