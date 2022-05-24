@@ -381,8 +381,10 @@ kernel_build() {
     kmake "$@" mrproper
   fi
   kmake "$@" "${KERNEL_CONFIGS[@]}"
-  local -r version=$(kmake "$@" -s kernelrelease)
   kmake "$@" "${image_target}" modules
+  # kernelrelease should be evaluated after the build
+  # otherwise CONFIG_LOCALVERSION value is not picked up properly
+  local -r version=$(kmake "$@" -s kernelrelease)
   INSTALL_MOD_PATH="${tmproot_dir}" kmake "$@" modules_install
 
   mkdir -p "${tmproot_dir}/boot/"
