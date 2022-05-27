@@ -12,12 +12,18 @@ readonly CHROMIUMOS_SDK_GCS="https://storage.googleapis.com/chromiumos-sdk"
 readonly TOOLCHAIN_URL_FILENAME="toolchain_path"
 readonly KERNEL_HEADERS="kernel-headers.tgz"
 readonly KERNEL_HEADERS_DIR="kernel-headers"
-readonly TOOLCHAIN_ARCHIVE="toolchain.tar.xz"
+readonly TOOLCHAIN_ARCHIVE_GCS="toolchain.tar.xz.gcs"
 readonly TOOLCHAIN_ENV_FILENAME="toolchain_env"
 ROOT_OS_RELEASE="${ROOT_MOUNT_DIR}/etc/os-release"
 readonly RETCODE_ERROR=1
-RELEASE_ID=""  # Loaded from host during execution
-BUILD_DIR="" # based on RELEASE_ID
+RELEASE_ID=""
+#
+# Individual build directory, contains kernel headers for the specific build and
+# a symlink 'toolchain' that points to the toolchain used for this particular
+# build
+#
+BUILD_DIR=""
+
 KERNEL_CONFIGS="defconfig"
 BUILD_DEBUG_PACKAGE="false"
 BUILD_HEADERS_PACKAGE="false"
@@ -96,15 +102,6 @@ get_cos_tools_bucket() {
 	esac
 }
 
-load_etc_os_release() {
-  if [[ ! -f "${ROOT_OS_RELEASE}" ]]; then
-    error "File ${ROOT_OS_RELEASE} not found, /etc/os-release from COS host must be mounted."
-    exit ${RETCODE_ERROR}
-  fi
-  . "${ROOT_OS_RELEASE}"
-  info "Running on COS build id ${RELEASE_ID}"
-}
-
 download_from_url() {
   local -r url="$1"
   local -r output="$2"
@@ -141,42 +138,36 @@ download_from_gcs() {
   info "Download finished"
 }
 
-# Get toolchain tarball from Chromium GCS bucket when
-# toolchain tarball is not found in COS GCS bucket
-get_cross_toolchain_pkg() {
-  # First, check if the toolchain path is available locally.
-  local -r tc_path_file="${ROOT_MOUNT_DIR}/etc/toolchain-path"
-  if [[ -f "${tc_path_file}" ]]; then
-    info "Found toolchain path file locally"
-    local -r tc_path="$(cat "${tc_path_file}")"
-    local -r tc_download_url="${CHROMIUMOS_SDK_GCS}/${tc_path}"
-  else
-    # Next, check if the toolchain path is available in GCS.
-    local -r tc_path_url="${COS_DOWNLOAD_GCS}/${RELEASE_ID}/${TOOLCHAIN_URL_FILENAME}"
-    info "Obtaining toolchain download URL from ${tc_path_url}"
-    local -r tc_download_url="$(curl --http1.1 -sfS "${tc_path_url}")"
-  fi
-  echo "${tc_download_url}"
-}
-
 install_cross_toolchain_pkg() {
   local -r download_url=$1
-  info "Downloading prebuilt toolchain from ${download_url}"
-  local -r pkg_name="$(basename "${download_url}")"
-  download_from_url "${download_url}" "${BUILD_DIR}/${pkg_name}"
-  # Don't unpack Rust toolchain elements because they are not needed and they
-  # use a lot of disk space.
-  tar axf "${BUILD_DIR}/${pkg_name}" -C "${BUILD_DIR}" \
-    --exclude='./usr/lib64/rustlib*' \
-    --exclude='./usr/lib64/libstd-*.so' \
-    --exclude='./lib/libstd-*.so' \
-    --exclude='./lib/librustc*' \
-    --exclude='./usr/lib64/librustc*'
-  rm "${BUILD_DIR}/${pkg_name}"
+  local -r tmpdownload="$(mktemp -d)"
+  local -r archive_name="$(basename "${download_url}")"
+  local -r pkg_name="${archive_name%%.tar.xz}"
+  local -r toolchain_dir="/build/toolchains/${pkg_name}"
+  if [[ ! -d "${toolchain_dir}" ]]; then
+    info "toolchains/Downloading prebuilt toolchain from ${download_url}"
+    download_from_url "${download_url}" "${tmpdownload}/${archive_name}"
+    # Don't unpack Rust toolchain elements because they are not needed and they
+    # use a lot of disk space.
+    mkdir -p "${toolchain_dir}"
+    info "Unpacking toolchain to ${toolchain_dir}"
+    tar axf "${tmpdownload}/${archive_name}" -C "${toolchain_dir}" \
+      --exclude='./usr/lib64/rustlib*' \
+      --exclude='./usr/lib64/libstd-*.so' \
+      --exclude='./lib/libstd-*.so' \
+      --exclude='./lib/librustc*' \
+      --exclude='./usr/lib64/librustc*'
+    rm -rf "${tmpdownload}"
+    info "Toolchain installed"
+  else
+    info "Toolchain is already cached"
+  fi
+
+  if [[ ! -L "${BUILD_DIR}/toolchain" ]]; then
+    ln -s "${toolchain_dir}" "${BUILD_DIR}/toolchain"
+  fi
 }
 
-# Set-up compilation environment using toolchain used for
-# kernel compilation
 install_release_cross_toolchain() {
   info "Downloading and installing a toolchain"
   # Get toolchain_env path from COS GCS bucket
@@ -190,7 +181,18 @@ install_release_cross_toolchain() {
     return ${RETCODE_ERROR}
   fi
 
-  local -r tc_download_url="${COS_DOWNLOAD_GCS}/${RELEASE_ID}/${TOOLCHAIN_ARCHIVE}"
+  # Download .gcs file with the original location of the toolchain
+  # we need the version to put it in cachable location
+  local -r tc_gcs_download_url="${COS_DOWNLOAD_GCS}/${RELEASE_ID}/${TOOLCHAIN_ARCHIVE_GCS}"
+  if ! download_from_url "${tc_gcs_download_url}" "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}"; then
+    error "Failed to download toolchain .gcs file"
+    error "Make sure build id '$RELEASE_ID' is valid"
+    return ${RETCODE_ERROR}
+  fi
+
+  local -r bucket=$(cat "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}" | grep ^bucket: | cut -d ' ' -f 2)
+  local -r path=$(cat "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}" | grep ^path: | cut -d ' ' -f 2)
+  local -r tc_download_url="https://storage.googleapis.com/$bucket/$path"
 
   # Install toolchain pkg
   install_cross_toolchain_pkg "${tc_download_url}"
@@ -245,6 +247,7 @@ install_build_cross_toolchain() {
   install_cross_toolchain_pkg "${tc_download_url}"
 }
 
+# Download and install kernel headers from the CI or tryjob build directory
 install_build_kernel_headers() {
   local -r bucket="$1"
 
@@ -284,8 +287,9 @@ set_compilation_env() {
   fi
   info "Configuring environment variables for cross-compilation"
   # CC and CXX are already set in toolchain_env
-  export PATH="${BUILD_DIR}/bin:${BUILD_DIR}/usr/bin:${PATH}"
-  export SYSROOT="${BUILD_DIR}/usr/${TOOLCHAIN_ARCH}-cros-linux-gnu"
+  TOOLCHAIN_DIR="${BUILD_DIR}/toolchain"
+  export PATH="${TOOLCHAIN_DIR}/bin:${TOOLCHAIN_DIR}/usr/bin:${PATH}"
+  export SYSROOT="${TOOLCHAIN_DIR}/usr/${TOOLCHAIN_ARCH}-cros-linux-gnu"
   export HOSTCC="x86_64-pc-linux-gnu-clang"
   export HOSTCXX="x86_64-pc-linux-gnu-clang++"
   export LD="${TOOLCHAIN_ARCH}-cros-linux-gnu-ld.lld"
@@ -560,24 +564,28 @@ main() {
   fi
   echo "Mode: $MODE"
 
-  if [[ ! -d ${BUILD_DIR} ]]; then
-    mkdir -p "${BUILD_DIR}"
-    case "$MODE" in
-      cross) install_generic_cross_toolchain ;;
-      release)
-        install_release_cross_toolchain
-        install_release_kernel_headers
-        ;;
-      build)
-        local -r bucket="${COS_CI_DOWNLOAD_GCS}/${BOARD}-release/${BUILD_ID}"
-        install_build_cross_toolchain "${bucket}"
-        install_build_kernel_headers "${bucket}"
-        ;;
-      custom)
-        install_build_cross_toolchain "${custom_bucket}"
-        install_build_kernel_headers "${custom_bucket}"
-        ;;
-    esac
+  if [[ -n "${BUILD_DIR}" ]]; then
+    if [[ ! -d "${BUILD_DIR}" ]]; then
+      mkdir -p "${BUILD_DIR}"
+      case "$MODE" in
+        cross)
+          install_generic_cross_toolchain
+          ;;
+        release)
+          install_release_cross_toolchain
+          install_release_kernel_headers
+          ;;
+        build)
+          local -r bucket="${COS_CI_DOWNLOAD_GCS}/${BOARD}-release/${BUILD_ID}"
+          install_build_cross_toolchain "${bucket}"
+          install_build_kernel_headers "${bucket}"
+          ;;
+        custom)
+          install_build_cross_toolchain "${custom_bucket}"
+          install_build_kernel_headers "${custom_bucket}"
+          ;;
+      esac
+    fi
   fi
 
   set_compilation_env
