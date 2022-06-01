@@ -197,3 +197,118 @@ func TestGetOperation(t *testing.T) {
 		})
 	}
 }
+
+func TestListInstances(t *testing.T) {
+	gce, svc := GCEForTest(t, "project")
+	defer gce.Close()
+	gce.Instances = []*compute.Instance{
+		{
+			Name: "instance1",
+			Zone: "zone1",
+		},
+	}
+	testData := []struct {
+		name            string
+		zone            string
+		project         string
+		expctedInstance []string
+		expectErr       bool
+	}{
+		{
+			name:            "Found",
+			zone:            "zone1",
+			project:         "project",
+			expctedInstance: []string{"instance1"},
+		},
+		{
+			name:            "WrongZone",
+			zone:            "zone2",
+			project:         "project",
+			expctedInstance: []string{},
+		},
+		{
+			name:            "WrongProject",
+			zone:            "zone1",
+			project:         "project2",
+			expctedInstance: []string{},
+			expectErr:       true,
+		},
+	}
+	for _, input := range testData {
+		t.Run(input.name, func(t *testing.T) {
+			instancesListCall := svc.Instances.List(input.project, input.zone)
+			instancesList, err := instancesListCall.Do()
+			if gotErr := err != nil; gotErr != input.expectErr {
+				t.Fatalf("Unexpected error status, err: %v, expect err: %v", err, input.expectErr)
+			}
+			if err == nil {
+				if len(instancesList.Items) != len(input.expctedInstance) {
+					t.Fatalf("Wrong number of instances: %d, expected: %d", len(instancesList.Items), len(input.expctedInstance))
+				}
+				for idx, instance := range instancesList.Items {
+					if instance.Name != input.expctedInstance[idx] {
+						t.Fatalf("Wrong instance name. idx: %d, name: %s, expected: %s", idx, instance.Name, input.expctedInstance[idx])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteInstances(t *testing.T) {
+	testData := []struct {
+		name         string
+		zone         string
+		project      string
+		instanceName string
+		expectErr    bool
+	}{
+		{
+			name:         "SuccessfullyDeleted",
+			zone:         "zone1",
+			project:      "project",
+			instanceName: "instance1",
+		},
+		{
+			name:         "WrongZone",
+			zone:         "zone2",
+			project:      "project",
+			instanceName: "instance1",
+			expectErr:    true,
+		},
+		{
+			name:         "WrongProject",
+			zone:         "zone1",
+			project:      "project2",
+			instanceName: "instance1",
+			expectErr:    true,
+		},
+		{
+			name:         "WrongName",
+			zone:         "zone1",
+			project:      "project",
+			instanceName: "instance2",
+			expectErr:    true,
+		},
+	}
+	for _, input := range testData {
+		t.Run(input.name, func(t *testing.T) {
+			gce, svc := GCEForTest(t, "project")
+			defer gce.Close()
+			gce.Instances = []*compute.Instance{
+				{
+					Name: "instance1",
+					Zone: "zone1",
+				},
+			}
+			instancesDeleteCall := svc.Instances.Delete(input.project, input.zone, input.instanceName)
+			_, err := instancesDeleteCall.Do()
+			if gotErr := err != nil; gotErr != input.expectErr {
+				t.Fatalf("Unexpected error status, err: %v, expect err: %v", err, input.expectErr)
+			}
+			if err == nil && len(gce.Instances) != 0 {
+				t.Fatalf("Instance not deleted. Number of instnaces left: %d", len(gce.Instances))
+			}
+		})
+	}
+}

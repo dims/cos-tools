@@ -34,6 +34,11 @@ import (
 	"github.com/google/subcommands"
 )
 
+const (
+	cleanupVMLabel = "cos-customizer-cleanup"
+	cleanupVMTTL   = time.Hour * 24 // 1 day
+)
+
 // FinishImageBuild implements subcommands.Command for the "finish-image-build" command.
 // This command finishes an image build by converting saved image configurations into
 // an actual GCE image.
@@ -57,6 +62,7 @@ type FinishImageBuild struct {
 	diskType       string
 	diskSize       int
 	timeout        time.Duration
+	enableCleanup  bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -120,6 +126,7 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 		"indicates the default size.")
 	flags.DurationVar(&f.timeout, "timeout", time.Hour, "Timeout value of the image build process. Must be formatted "+
 		"according to Golang's time.Duration string format.")
+	flags.BoolVar(&f.enableCleanup, "enable-cleanup", false, "Enable cleanup of old VM instances created by COS-Customizer.")
 }
 
 func (f *FinishImageBuild) validate() error {
@@ -312,6 +319,13 @@ func (f *FinishImageBuild) Execute(ctx context.Context, flags *flag.FlagSet, arg
 		return subcommands.ExitFailure
 	}
 	defer gcsClient.Close()
+	if f.enableCleanup {
+		log.Println("Deleting old VM instances created by COS-Customizer...")
+		if err := gce.DeleteOldVMWithLabel(svc, f.project, f.zone, cleanupVMLabel, "", cleanupVMTTL); err != nil {
+			log.Printf("Failed to delete old instances, err: %v\n", err)
+		}
+		log.Println("Finished deleting old VM instances created by COS-Customizer.")
+	}
 	if err := f.validate(); err != nil {
 		log.Println(err)
 		return subcommands.ExitFailure

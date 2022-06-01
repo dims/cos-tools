@@ -16,13 +16,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "gce",
-    srcs = ["gce.go"],
+    srcs = [
+        "gce.go",
+        "delete_old_vm.go",
+    ],
     importpath = "cos.googlesource.com/cos/tools.git/src/pkg/gce",
     visibility = ["//visibility:public"],
     deps = [
         "//src/pkg/config",
         "@org_golang_google_api//compute/v1:compute",
         "@org_golang_google_api//googleapi",
+        "@org_golang_x_oauth2//google",
     ],
 )
 
@@ -35,4 +39,11 @@ go_test(
         "//src/pkg/fakes",
         "@org_golang_google_api//compute/v1:compute",
     ],
+)
+
+go_test(
+    name = "delete_old_vm_test",
+    srcs = ["delete_old_vm_test.go"],
+    embed = [":gce"],
+    deps = ["//src/pkg/fakes"]
 )

@@ -56,8 +56,9 @@ type GCE struct {
 	Operations []*compute.Operation
 	// server is an HTTP server that serves fake GCE requests. Requests are served using the state stored in
 	// the other struct fields.
-	server  *httptest.Server
-	project string
+	server    *httptest.Server
+	project   string
+	Instances []*compute.Instance
 }
 
 // NewGCEServer constructs a fake GCE implementation for a given GCE project.
@@ -71,6 +72,7 @@ func NewGCEServer(project string) *GCE {
 	mux.HandleFunc(fmt.Sprintf("/projects/%s/global/images", project), gce.imagesListHandler)
 	mux.HandleFunc(fmt.Sprintf("/projects/%s/global/images/", project), gce.imageHandler)
 	mux.HandleFunc(fmt.Sprintf("/projects/%s/global/operations/", project), gce.operationsHandler)
+	mux.HandleFunc(fmt.Sprintf("/projects/%s/zones/", project), gce.instancesHandler)
 	gce.server = httptest.NewServer(mux)
 	return gce
 }
@@ -170,6 +172,60 @@ func (g *GCE) operationsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(bytes)
+}
+
+func (g *GCE) instancesHandler(w http.ResponseWriter, r *http.Request) {
+	splitPath := strings.Split(r.URL.Path, "/")
+	switch r.Method {
+	case "GET":
+		if len(splitPath) != 6 {
+			writeError(w, r, http.StatusNotFound)
+			return
+		}
+		zone := splitPath[4]
+		instancesList := compute.InstanceList{}
+		for _, instance := range g.Instances {
+			if instance.Zone != zone {
+				continue
+			}
+			instancesList.Items = append(instancesList.Items, instance)
+
+		}
+
+		bytes, err := json.Marshal(instancesList)
+		if err != nil {
+			writeError(w, r, http.StatusInternalServerError)
+			return
+		}
+		w.Write(bytes)
+	case "DELETE":
+		if len(splitPath) != 7 {
+			writeError(w, r, http.StatusNotFound)
+			return
+		}
+		zone := splitPath[4]
+		name := splitPath[6]
+		for idx, instance := range g.Instances {
+			if instance.Zone != zone || instance.Name != name {
+				continue
+			}
+			g.Instances[idx] = g.Instances[len(g.Instances)-1]
+			g.Instances = g.Instances[:len(g.Instances)-1]
+			op := compute.Operation{}
+			bytes, err := json.Marshal(&op)
+			if err != nil {
+				writeError(w, r, http.StatusInternalServerError)
+				return
+			}
+			w.Write(bytes)
+			return
+		}
+		log.Printf("instance not found: name=%q, zone=%q", name, zone)
+		writeError(w, r, http.StatusNotFound)
+	default:
+		log.Printf("unrecognized path: %s", r.URL.Path)
+		writeError(w, r, http.StatusNotFound)
+	}
 }
 
 // Close closes the fake GCE server.
