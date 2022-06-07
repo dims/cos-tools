@@ -1,7 +1,6 @@
 package cos
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -19,7 +18,6 @@ const (
 	cosToolsGCS      = "cos-tools"
 	cosToolsGCSAsia  = "cos-tools-asia"
 	cosToolsGCSEU    = "cos-tools-eu"
-	chromiumOSSDKGCS = "chromiumos-sdk"
 	kernelInfo       = "kernel_info"
 	kernelSrcArchive = "kernel-src.tar.gz"
 	kernelHeaders    = "kernel-headers.tgz"
@@ -95,15 +93,7 @@ func (d *GCSDownloader) DownloadToolchainEnv(destDir string) error {
 
 // DownloadToolchain downloads toolchain package to destination directory.
 func (d *GCSDownloader) DownloadToolchain(destDir string) error {
-	downloadURL, err := d.getToolchainURL()
-	if err != nil {
-		return errors.Wrap(err, "failed to download toolchain")
-	}
-	outputPath := filepath.Join(destDir, toolchainArchive)
-	if err := utils.DownloadContentFromURL(downloadURL, outputPath, toolchainArchive); err != nil {
-		return errors.Wrap(err, "failed to download toolchain")
-	}
-	return nil
+	return d.DownloadArtifact(destDir, toolchainArchive)
 }
 
 // DownloadKernelHeaders downloads COS kernel headers to destination directory.
@@ -138,28 +128,4 @@ func (d *GCSDownloader) DownloadArtifact(destDir, artifactPath string) error {
 		return errors.Errorf("failed to download %s from gs://%s/%s : %s", artifactPath, d.gcsDownloadBucket, gcsPath, err)
 	}
 	return nil
-}
-
-func (d *GCSDownloader) getToolchainURL() (string, error) {
-	// First, check if the toolchain path is available locally
-	tcPath := d.envReader.ToolchainPath()
-	if tcPath != "" {
-		log.V(2).Info("Found toolchain path file locally")
-		return fmt.Sprintf("https://storage.googleapis.com/%s/%s", chromiumOSSDKGCS, tcPath), nil
-	}
-
-	// Next, check if the toolchain path is available in GCS.
-	tmpDir, err := ioutil.TempDir("", "temp")
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create tmp dir")
-	}
-	defer os.RemoveAll(tmpDir)
-	if err := d.DownloadArtifact(tmpDir, toolchainURL); err != nil {
-		return "", err
-	}
-	toolchainURLContent, err := ioutil.ReadFile(filepath.Join(tmpDir, toolchainURL))
-	if err != nil {
-		return "", errors.Wrap(err, "failed to read toolchain URL file")
-	}
-	return string(toolchainURLContent), nil
 }

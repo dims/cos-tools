@@ -22,10 +22,8 @@ set -u
 set -x
 COS_KERNEL_INFO_FILENAME="kernel_info"
 COS_KERNEL_SRC_HEADER="kernel-headers.tgz"
-TOOLCHAIN_URL_FILENAME="toolchain_url"
 TOOLCHAIN_ENV_FILENAME="toolchain_env"
 TOOLCHAIN_PKG_DIR="${TOOLCHAIN_PKG_DIR:-/build/cos-tools}"
-CHROMIUMOS_SDK_GCS="https://storage.googleapis.com/chromiumos-sdk"
 ROOT_OS_RELEASE="${ROOT_OS_RELEASE:-/root/etc/os-release}"
 KERNEL_SRC_HEADER="${KERNEL_SRC_HEADER:-/build/usr/src/linux}"
 NVIDIA_DRIVER_VERSION="${NVIDIA_DRIVER_VERSION:-418.67}"
@@ -299,22 +297,9 @@ download_content_from_url() {
   return ${RETCODE_SUCCESS}
 }
 
-# Get the toolchain from Chromiumos GCS bucket when
-# toolchain tarball is not found in COS GCS bucket.
+# Calculate address of the toolchain package.
 get_cross_toolchain_pkg() {
-  # First, check if the toolchain path is available locally.
-  local -r tc_path_file="${ROOT_MOUNT_DIR}/etc/toolchain-path"
-  if [[ -f "${tc_path_file}" ]]; then
-    info "Found toolchain path file locally"
-    local -r tc_path="$(cat "${tc_path_file}")"
-    local -r download_url="${CHROMIUMOS_SDK_GCS}/${tc_path}"
-  else
-    # Next, check if the toolchain path is available in GCS.
-    local -r tc_path_url="${COS_DOWNLOAD_GCS}/${TOOLCHAIN_URL_FILENAME}"
-    info "Obtaining toolchain download URL from ${tc_path_url}"
-    local -r download_url="$(curl --http1.1 -sfS "${tc_path_url}")"
-  fi
-  echo "${download_url}"
+  echo "${COS_DOWNLOAD_GCS}/toolchain.tar.xz"
 }
 
 # Download, extracts and install the toolchain package
