@@ -8,7 +8,7 @@ steps:
 # interpreter needs to be added to /proc/sys/fs/binfmt_misc to run arm64
 # programs.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['run', '--privileged', 'linuxkit/binfmt:v0.7']
+  args: ['run', '--privileged', 'linuxkit/binfmt:a17941b47f5cb262638cfb49ffc59ac5ac2bf334-amd64']
 # The default builder (which appears to be the Docker daemon that implements
 # the old, familiar `docker build` behavior) doesn't support the --platform
 # flag, so we need to create a new builder.

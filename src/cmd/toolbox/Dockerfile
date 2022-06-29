@@ -1,5 +1,4 @@
-# Start from debian:buster-backports base.
-FROM debian:buster-backports
+FROM debian:bullseye-backports
 
 # Prepare the image.
 ENV DEBIAN_FRONTEND noninteractive
@@ -33,7 +32,7 @@ RUN apt-get install -u -qq vim \
 # These packages are required or extracting source tarballs and building the kernel.
 RUN apt-get update && \
     apt-get install -u -qq \
-        xz-utils make gcc python-minimal bc libelf-dev libssl-dev \
+        xz-utils make gcc python3-minimal bc libelf-dev libssl-dev \
         crash bison flex dwarves libdw1 && \
     apt-get clean
 COPY cos-kernel /usr/local/bin
