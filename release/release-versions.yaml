@@ -6,10 +6,10 @@
     - "v20220627"
 - staging_container_name: "toolbox"
   release_container_name: "toolbox"
-  build_commit: "31cd1cf488df785e53d0c917b07488fad920e056"
+  build_commit: "a07d3cff3f6aae6c9d7e1a4f72027a1ad1c1d975"
   release_tags:
     - "latest"
-    - "v20220614"
+    - "v20220630"
 - staging_container_name: "cos-gpu-installer-v1"
   release_container_name: "cos-gpu-installer"
   build_commit: "382a20f5903bf5f3336c0f8ef3f3dfd9ae19932e"
