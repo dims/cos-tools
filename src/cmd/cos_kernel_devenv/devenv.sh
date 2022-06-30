@@ -8,7 +8,6 @@ ROOT_MOUNT_DIR="${ROOT_MOUNT_DIR:-/root}"
 RETRY_COUNT=${RETRY_COUNT:-5}
 
 readonly COS_CI_DOWNLOAD_GCS="gs://cos-infra-prod-artifacts-official"
-readonly CHROMIUMOS_SDK_GCS="https://storage.googleapis.com/chromiumos-sdk"
 readonly TOOLCHAIN_URL_FILENAME="toolchain_path"
 readonly KERNEL_HEADERS="kernel-headers.tgz"
 readonly KERNEL_HEADERS_DIR="kernel-headers"
@@ -36,7 +35,10 @@ BUILD_ID=""
 MODE=""
 
 CROS_TC_VERSION="2021.06.26.094653"
-CROS_TC_DOWNLOAD_GCS="https://storage.googleapis.com/chromiumos-sdk/"
+# Chromium OS toolchain bucket
+CROS_TC_DOWNLOAD_GCS="gs://chromiumos-sdk/"
+# COS toolchain bucket
+COS_TC_DOWNLOAD_GCS="gs://cos-sdk/"
 
 # Can be overridden by the command-line argument
 TOOLCHAIN_ARCH="x86_64"
@@ -81,23 +83,23 @@ get_cos_tools_bucket() {
 	# Example output: projects/438692578867/zones/us-west2-a
 	# If not running on GCE, use "cos-tools" by default.
 	metadata_zone="$(curl -s -H Metadata-Flavor:Google http://metadata/computeMetadata/v1/instance/zone)" || {
-		readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+		readonly COS_DOWNLOAD_GCS="gs://cos-tools"
 		return
 	}
 	zone="$( echo $metadata_zone | rev | cut -d '/' -f 1 | rev )"
 	prefix="$( echo $zone | cut -d '-' -f 1 )"
 	case $prefix in
 		"us" | "northamerica" | "southamerica")
-			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+			readonly COS_DOWNLOAD_GCS="gs://cos-tools"
 			;;
 		"europe")
-			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools-eu"
+			readonly COS_DOWNLOAD_GCS="gs://cos-tools-eu"
 			;;
 		"asia" | "australia")
-			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools-asia"
+			readonly COS_DOWNLOAD_GCS="gs://cos-tools-asia"
 			;;
 		*)
-			readonly COS_DOWNLOAD_GCS="https://storage.googleapis.com/cos-tools"
+			readonly COS_DOWNLOAD_GCS="gs://cos-tools"
 			;;
 	esac
 }
@@ -138,15 +140,37 @@ download_from_gcs() {
   info "Download finished"
 }
 
+# Get the toolchain description in the form of $toolchain-$version
+# For CrOS toolchain it's just a basename without extension but for
+# COS toolchain version needs to be extarcted from the GCS bucket path
+get_toolchain_pkg_name() {
+  local -r download_url=$1
+  case "${download_url}" in
+    *//cos-sdk/*)
+      local -r toolchain="$(basename -s .tar.xz "${download_url}")"
+      local -r path="$(echo "${download_url}" | sed 's@\w\+://cos-sdk/@@')"
+      local -r version="$(echo "${path}" | awk -F / '{print $1 "-" $2}')"
+      echo "${toolchain}-${version}"
+      ;;
+    *//chromiumos-sdk/*)
+      echo "$(basename -s .tar.xz "${download_url}")"
+      ;;
+    *)
+      error "Unknown toolchain source: ${download_url}"
+      exit ${RETCODE_ERROR}
+      ;;
+  esac
+}
+
 install_cross_toolchain_pkg() {
   local -r download_url=$1
   local -r tmpdownload="$(mktemp -d)"
   local -r archive_name="$(basename "${download_url}")"
-  local -r pkg_name="${archive_name%%.tar.xz}"
+  local -r pkg_name="$(get_toolchain_pkg_name "${download_url}")"
   local -r toolchain_dir="/build/toolchains/${pkg_name}"
   if [[ ! -d "${toolchain_dir}" ]]; then
-    info "toolchains/Downloading prebuilt toolchain from ${download_url}"
-    download_from_url "${download_url}" "${tmpdownload}/${archive_name}"
+    info "Downloading prebuilt toolchain from ${download_url}"
+    download_from_gcs "${download_url}" "${tmpdownload}/${archive_name}"
     # Don't unpack Rust toolchain elements because they are not needed and they
     # use a lot of disk space.
     mkdir -p "${toolchain_dir}"
@@ -175,7 +199,7 @@ install_release_cross_toolchain() {
   info "Obtaining toolchain_env file from ${tc_env_file_path}"
 
   # Download toolchain_env if present
-  if ! download_from_url "${tc_env_file_path}" "${BUILD_DIR}/${TOOLCHAIN_ENV_FILENAME}"; then
+  if ! download_from_gcs "${tc_env_file_path}" "${BUILD_DIR}/${TOOLCHAIN_ENV_FILENAME}"; then
     error "Failed to download toolchain file"
     error "Make sure build id '$RELEASE_ID' is valid"
     return ${RETCODE_ERROR}
@@ -184,7 +208,7 @@ install_release_cross_toolchain() {
   # Download .gcs file with the original location of the toolchain
   # we need the version to put it in cachable location
   local -r tc_gcs_download_url="${COS_DOWNLOAD_GCS}/${RELEASE_ID}/${TOOLCHAIN_ARCHIVE_GCS}"
-  if ! download_from_url "${tc_gcs_download_url}" "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}"; then
+  if ! download_from_gcs "${tc_gcs_download_url}" "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}"; then
     error "Failed to download toolchain .gcs file"
     error "Make sure build id '$RELEASE_ID' is valid"
     return ${RETCODE_ERROR}
@@ -192,7 +216,7 @@ install_release_cross_toolchain() {
 
   local -r bucket=$(cat "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}" | grep ^bucket: | cut -d ' ' -f 2)
   local -r path=$(cat "${BUILD_DIR}/${TOOLCHAIN_ARCHIVE_GCS}" | grep ^path: | cut -d ' ' -f 2)
-  local -r tc_download_url="https://storage.googleapis.com/$bucket/$path"
+  local -r tc_download_url="gs://$bucket/$path"
 
   # Install toolchain pkg
   install_cross_toolchain_pkg "${tc_download_url}"
@@ -203,7 +227,7 @@ install_release_kernel_headers() {
   local -r kernel_headers_file_path="${COS_DOWNLOAD_GCS}/${RELEASE_ID}/${KERNEL_HEADERS}"
   info "Obtaining kernel headers file from ${kernel_headers_file_path}"
 
-  if ! download_from_url "${kernel_headers_file_path}" "${BUILD_DIR}/${KERNEL_HEADERS}"; then
+  if ! download_from_gcs "${kernel_headers_file_path}" "${BUILD_DIR}/${KERNEL_HEADERS}"; then
         return ${RETCODE_ERROR}
   fi
   mkdir -p "${BUILD_DIR}/${KERNEL_HEADERS_DIR}"
@@ -236,11 +260,15 @@ install_build_cross_toolchain() {
         return ${RETCODE_ERROR}
   fi
 
-  local -r tc_download_url="${CROS_TC_DOWNLOAD_GCS}$(cat ${BUILD_DIR}/${TOOLCHAIN_URL_FILENAME})"
-  if [[ -z "$tc_download_url" ]]; then
-    error "Failed to download toolchain URL file"
-    error "Make sure build id '$RELEASE_ID' is valid"
-    return ${RETCODE_ERROR}
+  local -r tc_path="$(cat ${BUILD_DIR}/${TOOLCHAIN_URL_FILENAME})"
+  local tc_download_url="${COS_TC_DOWNLOAD_GCS}${tc_path}"
+  if ! gsutil -q stat "${tc_download_url}"; then
+    tc_download_url="${CROS_TC_DOWNLOAD_GCS}${tc_path}"
+  fi
+
+  if ! gsutil -q stat "${tc_download_url}"; then
+        error "Toolchain path '${tc_path}' does not exist in either COS or CrOS GCS buckets"
+        return ${RETCODE_ERROR}
   fi
 
   # Install toolchain pkg
