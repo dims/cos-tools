@@ -603,3 +603,11 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 		CLNum:    clData.CLNum,
 	}, nil
 }
+
+// findReleasedBuild locates the first build that a CL was introduced in using the builds-info database
+func findReleasedBuild(request *BuildRequest) (*BuildResponse, error) {
+	log.Debugf("Fetching first build for CL: %s", request.CL)
+
+	// SELECT DBName.release_build_number FROM sql.DBName WHERE DBName.commit_sha = request.CL;
+	return nil, fmt.Errorf("method not implemented")
+}
