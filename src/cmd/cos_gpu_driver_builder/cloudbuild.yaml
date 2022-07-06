@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-f', 'src/cmd/cos_gpu_driver_builder/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-driver-builder:${TAG_NAME}', '.']
+images:
+- 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-driver-builder:${TAG_NAME}'
