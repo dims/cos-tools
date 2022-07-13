@@ -34,8 +34,11 @@
 package findbuild
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -47,10 +50,12 @@ import (
 	"go.chromium.org/luci/common/proto/git"
 	"go.chromium.org/luci/common/proto/gitiles"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	gerrit "github.com/andygrunwald/go-gerrit"
 	log "github.com/sirupsen/logrus"
 	gitilesApi "go.chromium.org/luci/common/api/gitiles"
 	gitilesProto "go.chromium.org/luci/common/proto/gitiles"
+	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 )
 
 const (
@@ -64,6 +69,11 @@ const (
 
 	shortSHALength = 7
 	fullSHALength  = 40
+
+	// Definitions of column names in table.
+	commitSha       = "commit_sha"
+	landedInBuild   = "landed_build_number"
+	releasedInBuild = "released_build_number"
 )
 
 var (
@@ -605,9 +615,56 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 }
 
 // findReleasedBuild locates the first build that a CL was introduced in using the builds-info database
-func findReleasedBuild(request *BuildRequest) (*BuildResponse, error) {
+func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildResponse, error) {
 	log.Debugf("Fetching first build for CL: %s", request.CL)
+	// access secretmanager
+	client, err := secretmanager.NewClient(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secretmanager client: %v", err)
+	}
+	var (
+		projectID            = os.Getenv("COS_CHANGELOG_PROJECT_ID")
+		findBuildDbName      = os.Getenv("COS_FINDBUILD_DB_NAME")
+		findBuildTableName   = os.Getenv("COS_FINDBUILD_TABLE_NAME")
+		dbPasswordSecretName = os.Getenv("COS_FINDBUILD_PASSWORD_NAME")
+		user                 = "readonly"
+		zone                 = "us-west2"
+	)
+	dbName, err := retrieveSecret(client, projectID, findBuildDbName)
+	if err != nil {
+		log.Fatalf("failed to retrieve database name: %s\n%v", findBuildDbName, err)
+	}
+	tableName, err := retrieveSecret(client, projectID, findBuildTableName)
+	if err != nil {
+		log.Fatalf("failed to retrieve table name: %s\n%v", findBuildTableName, err)
+	}
+	password, err := retrieveSecret(client, projectID, dbPasswordSecretName)
+	if err != nil {
+		log.Fatalf("failed to retrieve password %s\n%v", dbPasswordSecretName, err)
+	}
+	connectionName := projectID + ":" + zone + ":" + dbName
+	// connect to database
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@cloudsql(%s)/%s", user, password, connectionName, dbName))
+	if err != nil {
+		log.Fatalf("Could not open db: %v", err)
+	}
+	// query database
+	// SELECT release_build_number FROM DBName WHERE commit_sha = request.CL;
+	_, err = db.Query("SELECT %s FROM %s WHERE %s = %s", releasedInBuild, tableName, commitSha, request.CL)
+	if err != nil {
+		log.Fatalf("Could not query db: %v", err)
+	}
+	// TODO: cast rows to BuildResponse type
+	return nil, err
+}
 
-	// SELECT DBName.release_build_number FROM sql.DBName WHERE DBName.commit_sha = request.CL;
-	return nil, fmt.Errorf("method not implemented")
+func retrieveSecret(client *secretmanager.Client, projectID string, secretName string) (string, error) {
+	accessRequest := &secretmanagerpb.AccessSecretVersionRequest{
+		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, secretName),
+	}
+	result, err := client.AccessSecretVersion(context.Background(), accessRequest)
+	if err != nil {
+		return "", fmt.Errorf("failed to access secret at %s: %v", accessRequest.Name, err)
+	}
+	return string(result.Payload.Data), nil
 }
