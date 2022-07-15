@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package gpuconfig;
+
+option go_package = ".;pb";
+
+message COSGPUBuildRequest {
+  // Kernel source tarball in tgz or tar.gz format.
+  // Ex: for release builds,
+  //   gs://cos-tools/16108.403.42/kernel-src.tar.gz
+  // Ex: for kernel CI builds, or for precompiled driver generation,
+  //   gs://cos-kernel-artifacts/builds/5.10.105-23.m97/cos-kernel-src-5.10.105-23.m97.tgz,
+  optional string kernel_src_tarball_gcs = 1;
+
+  // Kernel headers tarball in tgz or tar.gz format.
+  // Ex: for release builds,
+  //   gs://cos-tools/16108.403.42/kernel-headers.tgz
+  // Ex: for kernel CI builds, or for precompiled driver generation,
+  //   gs://cos-kernel-artifacts/builds/5.10.105-23.m97/cos-kernel-headers-5.10.105-23.m97-x86_64.tgz
+  optional string kernel_headers_tarball_gcs = 2;
+
+  // Nvidia driver .run file address.
+  // Ex:
+  // https://us.download.nvidia.com/tesla/450.119.04/NVIDIA-Linux-x86_64-450.119.04.run
+  optional string nvidia_runfile_address = 3;
+
+  // Toolchain tarball in tar.xz format.
+  // Ex: for release builds,
+  //   gs://cos-tools/16108.403.42/toolchain.tar.xz
+  // Ex: for kernel CI builds, or for precompiled driver generation,
+  //   gs://cos-kernel-artifacts/builds/5.10.105-23.m97/toolchain.tar.xz
+  optional string toolchain_tarball_gcs = 4;
+
+  // Toolchain environment file
+  // Ex: for release builds,
+  //   gs://cos-tools/16108.403.42/toolchain_env
+  // Ex: for kernel CI builds, or for precompiled driver generation,
+  //   gs://cos-kernel-artifacts/builds/5.10.105-23.m97/toolchain_env
+  optional string toolchain_env_gcs = 5;
+
+  // Driver output gcs bucket
+  // This will be the gcs directory where the output of the build will be pushed
+  // as the precompiled driver file (self executing archive) Ex:
+  // gs://nvidia-drivers-us-public/nvidia-cos-project/5.10.105-23.m97/
+  optional string driver_output_gcs_dir = 6;
+}
