@@ -51,22 +51,31 @@ func DownloadGCSObject(ctx context.Context,
 }
 
 // UploadGCSObject uploads an object at inputPath to destination URL
-func UploadGCSObject(ctx context.Context,
-	gcsClient *storage.Client, inputPath, destinationURL string) error {
-
-	gcsBucket, name, err := getGCSVariables(destinationURL)
-	if err != nil {
-		return fmt.Errorf("error parsing destination URL: %v", err)
-	}
+func UploadGCSObject(ctx context.Context, gcsClient *storage.Client, inputPath, destinationURL string) error {
 	fileReader, err := os.Open(inputPath)
 	if err != nil {
 		return err
 	}
+	return uploadGCSObject(ctx, gcsClient, fileReader, destinationURL)
+}
 
+// UploadGCSObjectString uploads an input string as a file to destination URL
+func UploadGCSObjectString(ctx context.Context, gcsClient *storage.Client, inputStr, destinationURL string) error {
+	reader := strings.NewReader(inputStr)
+	return uploadGCSObject(ctx, gcsClient, reader, destinationURL)
+}
+
+func uploadGCSObject(ctx context.Context,
+	gcsClient *storage.Client, reader io.Reader, destinationURL string) error {
+	gcsBucket, name, err := getGCSVariables(destinationURL)
+	if err != nil {
+		return fmt.Errorf("error parsing destination URL: %v", err)
+	}
 	w := gcsClient.Bucket(gcsBucket).Object(name).NewWriter(ctx)
-	defer w.Close()
-
-	if _, err := io.Copy(w, fileReader); err != nil {
+	if _, err := io.Copy(w, reader); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
 		return err
 	}
 	return nil
