@@ -190,6 +190,9 @@ install_cross_toolchain_pkg() {
   if [[ ! -L "${BUILD_DIR}/toolchain" ]]; then
     ln -s "${toolchain_dir}" "${BUILD_DIR}/toolchain"
   fi
+
+  # keep toolchain source information
+  echo -n "${download_url}" > "${BUILD_DIR}/toolchain_url"
 }
 
 install_release_cross_toolchain() {
@@ -311,7 +314,7 @@ set_compilation_env() {
     export CXX
   else
     export CC="${TOOLCHAIN_ARCH}-cros-linux-gnu-clang"
-    export CXX="${TOOLCHAIN_ARCH}-cros-linux-gnu-clang"
+    export CXX="${TOOLCHAIN_ARCH}-cros-linux-gnu-clang++"
   fi
   info "Configuring environment variables for cross-compilation"
   # CC and CXX are already set in toolchain_env
@@ -448,6 +451,15 @@ kernel_build() {
 
   if [[ "${BUILD_HEADERS_PACKAGE}" = "true" ]]; then
     tar_kernel_headers
+  fi
+
+  # pass env information
+  echo "CC=${CC}" >  "${KBUILD_OUTPUT}/toolchain_env"
+  echo "CXX=${CXX}" >>  "${KBUILD_OUTPUT}/toolchain_env"
+
+  # pass toolchain source location
+  if [[ -f "${BUILD_DIR}/toolchain_url" ]]; then
+    cp "${BUILD_DIR}/toolchain_url" "${KBUILD_OUTPUT}/toolchain_url";
   fi
 }
 
