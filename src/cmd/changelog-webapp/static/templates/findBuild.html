@@ -46,20 +46,20 @@
       <div class="radio">
         {{if .Internal}}
           <label>
-            <input type="radio" class="internal" name="internal" value="true" checked>
+            <input type="radio" class="internal" name="instance" value="cos-internal" checked>
             Internal
           </label>
           <label>
-            <input type="radio" class="external" name="internal" value="false">
+            <input type="radio" class="external" name="instance" value="cos">
             External
           </label>
         {{else}}
           <label>
-            <input type="radio" class="internal" name="internal" value="true">
+            <input type="radio" class="internal" name="instance" value="cos-internal">
             Internal
           </label>
           <label>
-            <input type="radio" class="external" name="internal" value="false" checked>
+            <input type="radio" class="external" name="instance" value="cos" checked>
             External
           </label>
         {{end}}

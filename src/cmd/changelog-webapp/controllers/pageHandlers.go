@@ -437,7 +437,7 @@ func HandleFindBuild(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	internal, gerrit, fallbackGerrit, gob, repo := false, externalGerritInstance, externalFallbackGerritInstance, externalGoBInstance, externalManifestRepo
-	if r.FormValue("internal") == "true" {
+	if r.FormValue("cos-internal") == "true" {
 		internal, gerrit, fallbackGerrit, gob, repo = true, internalGerritInstance, internalFallbackGerritInstance, internalGoBInstance, internalManifestRepo
 	}
 	httpClient, err := HTTPClient(w, r)
