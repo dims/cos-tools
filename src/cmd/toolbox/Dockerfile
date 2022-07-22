@@ -26,7 +26,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] \
 # Various networking and other tools. net-tools installs arp, netstat, etc.
 RUN apt-get install -u -qq vim \
     net-tools netcat ipset conntrack inetutils-traceroute bridge-utils \
-    ebtables \
+    ebtables iputils-ping \
     && apt-get clean
 
 # These packages are required or extracting source tarballs and building the kernel.
