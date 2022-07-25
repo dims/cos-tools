@@ -72,6 +72,7 @@ const (
 
 	// Definitions of column names in table.
 	commitSha       = "commit_sha"
+	cLNumber        = "cl_number"
 	landedInBuild   = "landed_build_number"
 	releasedInBuild = "released_build_number"
 )
@@ -614,6 +615,11 @@ func FindBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 	}, nil
 }
 
+type secretBundle struct {
+	name  string
+	value *string
+}
+
 // findReleasedBuild locates the first build that a CL was introduced in using the builds-info database
 func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildResponse, error) {
 	log.Debugf("Fetching first build for CL: %s", request.CL)
@@ -630,17 +636,13 @@ func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildRespon
 		user                 = "readonly"
 		zone                 = "us-west2"
 	)
-	dbName, err := retrieveSecret(client, projectID, findBuildDbName)
-	if err != nil {
-		log.Fatalf("failed to retrieve database name: %s\n%v", findBuildDbName, err)
-	}
-	tableName, err := retrieveSecret(client, projectID, findBuildTableName)
-	if err != nil {
-		log.Fatalf("failed to retrieve table name: %s\n%v", findBuildTableName, err)
-	}
-	password, err := retrieveSecret(client, projectID, dbPasswordSecretName)
-	if err != nil {
-		log.Fatalf("failed to retrieve password %s\n%v", dbPasswordSecretName, err)
+	var dbName, tableName, password string
+	if err := retrieveSecrets(client, projectID, []secretBundle{
+		{findBuildDbName, &dbName},
+		{findBuildTableName, &tableName},
+		{dbPasswordSecretName, &password},
+	}); err != nil {
+		return nil, err
 	}
 	connectionName := projectID + ":" + zone + ":" + dbName
 	// connect to database
@@ -649,13 +651,30 @@ func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildRespon
 		log.Fatalf("Could not open db: %v", err)
 	}
 	// query database
-	// SELECT release_build_number FROM DBName WHERE commit_sha = request.CL;
-	_, err = db.Query("SELECT %s FROM %s WHERE %s = %s", releasedInBuild, tableName, commitSha, request.CL)
+	// SELECT release_build_number FROM DBName WHERE cLNumber = request.CL;
+	rows, err := db.Query("SELECT %s FROM %s WHERE %s = %s", releasedInBuild, tableName, cLNumber, request.CL)
 	if err != nil {
 		log.Fatalf("Could not query db: %v", err)
 	}
-	// TODO: cast rows to BuildResponse type
-	return nil, err
+	// change rows to BuildResponse type
+	defer rows.Close()
+	var releasedBuildNumber string
+	if rows.Next() {
+		if err := rows.Scan(&releasedBuildNumber); err != nil {
+			log.Errorf("Could not scan result: %v", err)
+			return nil, err
+		}
+	} else {
+		log.Errorf("No build number found")
+		return nil, nil
+	}
+	if rows.Next() {
+		log.Errorf("More than one build number found")
+	}
+	releasedBuild := BuildResponse{}
+	releasedBuild.BuildNum = releasedBuildNumber
+	releasedBuild.CLNum = request.CL
+	return &releasedBuild, err
 }
 
 func retrieveSecret(client *secretmanager.Client, projectID string, secretName string) (string, error) {
@@ -667,4 +686,15 @@ func retrieveSecret(client *secretmanager.Client, projectID string, secretName s
 		return "", fmt.Errorf("failed to access secret at %s: %v", accessRequest.Name, err)
 	}
 	return string(result.Payload.Data), nil
+}
+
+func retrieveSecrets(client *secretmanager.Client, projectID string, secrets []secretBundle) error {
+	for _, secret := range secrets {
+		fetchedSecret, err := retrieveSecret(client, projectID, secret.name)
+		if err != nil {
+			return err
+		}
+		secret.value = &fetchedSecret
+	}
+	return nil
 }
