@@ -6,6 +6,7 @@
     "output_image_family": {"Value": "", "Description": "Family of output image."},
     "output_image_project": {"Required": true, "Description": "Project of output image."},
     "cidata_img": {"Required": true, "Description": "Path to CIDATA vfat image containing cloud-init user-data and the provisioner program. Must be in .tar.gz format."},
+    "scratch_img": {"Required": true, "Description": "Path to SCRATCH ext4 image. Must be in .tar.gz format."},
     "disk_type": {"Value": "pd-standard", "Description": "The disk type to use for preloading."},
     "disk_size_gb": {"Value": "10", "Description": "The disk size to use for preloading."},
     "host_maintenance": {"Value": "MIGRATE", "Description": "VM behavior when there is maintenance."},
@@ -15,6 +16,7 @@
   },
   "Sources": {
     "cloud-config": "/data/startup.yaml",
+    "scratch.tar.gz_": "${scratch_img}",
     "cidata.tar.gz_": "${cidata_img}"
   },
   "Steps": {
@@ -23,21 +25,32 @@
         {
           "Source": "${SOURCESPATH}/cidata.tar.gz_",
           "Destination": "${SOURCESPATH}/cidata.tar.gz"
+        },
+        {
+          "Source": "${SOURCESPATH}/scratch.tar.gz_",
+          "Destination": "${SOURCESPATH}/scratch.tar.gz"
         }
       ]
     },
-    "create-cidata": {
+    "create-images": {
       "CreateImages": [
         {
           "Name": "cidata",
           "RawDisk": {
             "Source": "${SOURCESPATH}/cidata.tar.gz"
           }
+        },
+        {
+          "Name": "scratch",
+          "RawDisk": {
+            "Source": "${SOURCESPATH}/scratch.tar.gz"
+          }
         }
       ]
     },
     "setup": {
       "CreateDisks": [
+	{{.ScratchDisks}}
         {
           "Name": "boot-disk",
           "SourceImage": "${source_image}",
@@ -55,7 +68,7 @@
       "CreateInstances": [
         {
           "Name": "preload-vm",
-          "Disks": [{"Source": "boot-disk"}, {"Source": "cidata-disk"}],
+          "Disks": [{"Source": "boot-disk"}, {{.ScratchDiskSource}} {"Source": "cidata-disk"}],
           "Labels": {"cos-customizer-cleanup":""},
           "MachineType": "${machine_type}",
           "guestAccelerators": {{.Accelerators}},
@@ -135,8 +148,8 @@
     }
   },
   "Dependencies": {
-    "create-cidata": ["copy-gcs"],
-    "setup": ["create-cidata"],
+    "create-images" : ["copy-gcs"],
+    "setup": ["create-images"],
     "run": ["setup"],
     "wait-preload-finished": ["run"],
     "wait-for-resize": ["run"],

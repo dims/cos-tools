@@ -43,6 +43,9 @@ import (
 //go:embed cidata.img
 var ciDataImg []byte
 
+//go:embed scratch.img
+var scratchImg []byte
+
 // storeInGCS stores the given files in GCS using the given gcsManager.
 // Files to store are provided in a map where each key is a file on the local
 // file system and each value is the relative path in GCS at which to store the
@@ -66,6 +69,15 @@ func storeInGCS(ctx context.Context, gcs *gcsManager, files map[string]string) e
 		}
 	}
 	return nil
+}
+
+func needScratchDisk(provConfig *provisioner.Config) bool {
+	for _, step := range provConfig.Steps {
+		if step.Type == "InstallGPU" {
+			return true
+		}
+	}
+	return false
 }
 
 func needDiskResize(provConfig *provisioner.Config, buildSpec *config.Build) bool {
@@ -105,6 +117,24 @@ func writeDaisyWorkflow(inputWorkflow string, outputImage *config.Image, buildSp
 		return "", err
 	}
 
+	// template content for the scratch disk.
+	// This disk is used for certain tasks that require additional disk space.
+	// We use a scratch disk in order to keep from increasing the boot disk size.
+	// The thinking here is that steps that require temporary files for their devops
+	// process can use this scratch disk instead of writing to the boot disk directly.
+	var scratchDiskJson string
+	var scratchDiskSource string
+	if needScratchDisk(provConfig) {
+		scratchDiskJson =  `
+      {
+        "Name": "scratch-disk",
+        "SourceImage": "scratch",
+        "Type": "${disk_type}",
+        "SizeGb": "5"
+      },`
+		scratchDiskSource = `{"Source": "scratch-disk"},`
+	}
+
 	// template content for the step resize-disk.
 	// If the oem-size is set, or need to reclaim sda3 (with disk-size-gb set),
 	// create the disk with the default size, and then resize the disk.
@@ -142,17 +172,21 @@ func writeDaisyWorkflow(inputWorkflow string, outputImage *config.Image, buildSp
 		return "", err
 	}
 	if err := tmpl.Execute(w, struct {
-		Labels       string
-		Accelerators string
-		Licenses     string
-		ResizeDisks  string
-		WaitResize   string
+		Labels            string
+		Accelerators      string
+		Licenses          string
+		ResizeDisks       string
+		WaitResize        string
+		ScratchDisks      string
+		ScratchDiskSource string
 	}{
 		string(labelsJSON),
 		string(acceleratorsJSON),
 		string(licensesJSON),
 		resizeDiskJSON,
 		waitResizeJSON,
+		scratchDiskJson,
+		scratchDiskSource,
 	}); err != nil {
 		w.Close()
 		os.Remove(w.Name())
@@ -165,12 +199,16 @@ func writeDaisyWorkflow(inputWorkflow string, outputImage *config.Image, buildSp
 	return w.Name(), nil
 }
 
-func writeCIDataImage(files *fs.Files) (path string, err error) {
-	img, err := ioutil.TempFile(fs.ScratchDir, "cidata-")
+func mcopyFiles(path string, files *fs.Files) (err error) {
+	return utils.RunCommand([]string{"mcopy", "-i", path, files.ProvConfig, "::/config.json"}, "", nil)
+}
+
+func writeImage(imgData *[]byte) (path string, err error) {
+	img, err := ioutil.TempFile(fs.ScratchDir, "img-")
 	if err != nil {
 		return "", err
 	}
-	_, writeErr := img.Write(ciDataImg)
+	_, writeErr := img.Write(*imgData)
 	closeErr := img.Close()
 	if writeErr != nil {
 		return "", writeErr
@@ -178,10 +216,11 @@ func writeCIDataImage(files *fs.Files) (path string, err error) {
 	if closeErr != nil {
 		return "", closeErr
 	}
-	if err := utils.RunCommand([]string{"mcopy", "-i", img.Name(), files.ProvConfig, "::/config.json"}, "", nil); err != nil {
-		return "", err
-	}
-	out, err := ioutil.TempFile(fs.ScratchDir, "cidata-tar-")
+	return img.Name(), err
+}
+
+func tarImage(imageName string) (path string, err error) {
+	out, err := ioutil.TempFile(fs.ScratchDir, "img-tar-")
 	if err != nil {
 		return "", err
 	}
@@ -193,8 +232,8 @@ func writeCIDataImage(files *fs.Files) (path string, err error) {
 	if err := utils.RunCommand([]string{
 		"tar",
 		"cf", out.Name(),
-		"--transform", fmt.Sprintf("s|%s|disk.raw|g", strings.TrimLeft(img.Name(), "/")),
-		img.Name(),
+		"--transform", fmt.Sprintf("s|%s|disk.raw|g", strings.TrimLeft(imageName, "/")),
+		imageName,
 	}, "", nil); err != nil {
 		return "", err
 	}
@@ -266,7 +305,22 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 	if err := updateProvConfig(provConfig, buildSpec, buildContexts, gcs, files); err != nil {
 		return nil, err
 	}
-	ciDataFile, err := writeCIDataImage(files)
+	ciDataFile, err := writeImage(&ciDataImg)
+	if err != nil {
+		return nil, err
+	}
+	if err := mcopyFiles(ciDataFile, files); err != nil {
+		return nil, err
+	}
+	ciDataFileTar, err := tarImage(ciDataFile)
+	if err != nil {
+		return nil, err
+	}
+	scratchImgFile, err := writeImage(&scratchImg)
+	if err != nil {
+		return nil, err
+	}
+	scratchImgFileTar, err := tarImage(scratchImgFile)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +359,9 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 		"-var:output_image_project",
 		output.Project,
 		"-var:cidata_img",
-		ciDataFile,
+		ciDataFileTar,
+		"-var:scratch_img",
+		scratchImgFileTar,
 		"-var:machine_type",
 		buildSpec.MachineType,
 		"-var:disk_type",

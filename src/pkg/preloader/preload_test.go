@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/config"
@@ -135,64 +136,82 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 		testName    string
 		outputImage *config.Image
 		buildConfig *config.Build
+		provConfig  *provisioner.Config
 		workflow    []byte
-		want        []byte
+		want        string
 	}{
 		{
 			testName:    "Empty",
 			outputImage: config.NewImage("", ""),
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}} {{.Labels}} {{.Accelerators}}"),
-			want:        []byte("null {} []"),
+			want:        "null {} []",
 		},
 		{
 			testName:    "OneLicense",
 			outputImage: &config.Image{Image: &compute.Image{Licenses: []string{"my-license"}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}}"),
-			want:        []byte("[\"my-license\"]"),
+			want:        "[\"my-license\"]",
 		},
 		{
 			testName:    "TwoLicenses",
 			outputImage: &config.Image{Image: &compute.Image{Licenses: []string{"license-1", "license-2"}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}}"),
-			want:        []byte("[\"license-1\",\"license-2\"]"),
+			want:        "[\"license-1\",\"license-2\"]",
 		},
 		{
 			testName:    "EmptyStringLicense",
 			outputImage: &config.Image{Image: &compute.Image{Licenses: []string{""}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}}"),
-			want:        []byte("null"),
+			want:        "null",
 		},
 		{
 			testName:    "OneEmptyLicense",
 			outputImage: &config.Image{Image: &compute.Image{Licenses: []string{"license-1", ""}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}}"),
-			want:        []byte("[\"license-1\"]"),
+			want:        "[\"license-1\"]",
 		},
 		{
 			testName:    "URLLicense",
 			outputImage: &config.Image{Image: &compute.Image{Licenses: []string{"https://www.googleapis.com/compute/v1/projects/my-proj/global/licenses/my-license"}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Licenses}}"),
-			want:        []byte("[\"projects/my-proj/global/licenses/my-license\"]"),
+			want:        "[\"projects/my-proj/global/licenses/my-license\"]",
 		},
 		{
 			testName:    "Labels",
 			outputImage: &config.Image{Image: &compute.Image{Labels: map[string]string{"key": "value"}}, Project: ""},
 			buildConfig: &config.Build{GCSBucket: "bucket"},
 			workflow:    []byte("{{.Labels}}"),
-			want:        []byte("{\"key\":\"value\"}"),
+			want:        "{\"key\":\"value\"}",
 		},
 		{
 			testName:    "Accelerators",
 			outputImage: config.NewImage("", ""),
 			buildConfig: &config.Build{GCSBucket: "bucket", GPUType: "nvidia-tesla-k80", Project: "p", Zone: "z"},
 			workflow:    []byte("{{.Accelerators}}"),
-			want:        []byte("[{\"acceleratorCount\":1,\"acceleratorType\":\"projects/p/zones/z/acceleratorTypes/nvidia-tesla-k80\"}]"),
+			want:        "[{\"acceleratorCount\":1,\"acceleratorType\":\"projects/p/zones/z/acceleratorTypes/nvidia-tesla-k80\"}]",
+		},
+		{
+			testName:    "ScratchDisk",
+			outputImage: config.NewImage("", ""),
+			buildConfig: &config.Build{GCSBucket: "bucket", GPUType: "nvidia-tesla-k80", Project: "p", Zone: "z"},
+			provConfig:  &provisioner.Config{
+				Steps: []provisioner.StepConfig{
+					{
+						Type: "InstallGPU",
+						Args: mustMarshalJSON(t, &provisioner.InstallGPUStep{
+							GCSDepsPrefix: "gcs_deps",
+						}),
+					},
+				},
+			},
+			workflow:    []byte("{{.ScratchDisks}} {{.ScratchDiskSource}}"),
+			want:        `{"Name":"scratch-disk","SourceImage":"scratch","Type":"${disk_type}","SizeGb":"5"},{"Source":"scratch-disk"},`,
 		},
 	}
 	gcs := fakes.GCSForTest(t)
@@ -209,7 +228,10 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 			if err := ioutil.WriteFile(files.DaisyWorkflow, input.workflow, 0744); err != nil {
 				t.Fatal(err)
 			}
-			args, err := daisyArgs(context.Background(), gm, files, config.NewImage("", ""), input.outputImage, input.buildConfig, &provisioner.Config{})
+			if input.provConfig == nil {
+				input.provConfig = &provisioner.Config{}
+			}
+			args, err := daisyArgs(context.Background(), gm, files, config.NewImage("", ""), input.outputImage, input.buildConfig, input.provConfig)
 			if err != nil {
 				t.Fatalf("daisyArgs: %v", err)
 			}
@@ -217,8 +239,14 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !cmp.Equal(got, input.want) {
-				t.Errorf("daisyArgs: template Daisy: got %s, want %s", string(got), string(input.want))
+			gotStr := string(got)
+			gotStr = strings.Replace(gotStr, "\n", "", -1)
+			gotStr = strings.Replace(gotStr, " ", "", -1)
+
+			input.want = strings.Replace(input.want, "\n", "", -1) 
+			input.want = strings.Replace(input.want, " ", "", -1) 
+			if !cmp.Equal(gotStr, input.want) {
+				t.Errorf("daisyArgs: template Daisy: got %s, want %s", gotStr, input.want)
 			}
 		})
 	}

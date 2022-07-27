@@ -25,10 +25,22 @@ write_files:
     set -o errexit
     set -o pipefail
     set -o nounset
+    set -x
 
     status() {
       $@ 2>&1 | sed "s/^/BuildStatus: /"
       return "${PIPESTATUS[0]}"
+    }
+
+    # Setup the scratch disk for use among tasks that need it.
+    # Directories are created for any task that might use them.
+    # E.g. there will be a /mnt/disks/scratch/gpu for the gpu step
+    # and potentially other directories for other steps.
+    setup_scratch_disk() {
+      status mkdir -p /mnt/disks/scratch
+      status resize2fs -f /dev/disk/by-label/SCRATCH
+      status mount /dev/disk/by-label/SCRATCH /mnt/disks/scratch
+      status mkdir -p /mnt/disks/scratch/gpu
     }
 
     # To make sure that ARCH gets set properly, this function cannot run in a
@@ -74,7 +86,7 @@ write_files:
         # that key to appear (and shutdown anyway after 5 minutes).
         /mnt/disks/cidata/metadata_watcher_${ARCH} DaisyEnd
         umount /mnt/disks/cidata
-        rm -r /mnt/disks || :
+        umount /mnt/disks/scratch || :
         shutdown -h now
         while true; do sleep 1; done
       fi
@@ -83,6 +95,9 @@ write_files:
     main() {
       status history -c
       set_arch
+      if [[ -e /dev/disk/by-label/SCRATCH ]]; then
+        setup_scratch_disk
+      fi
       status mkdir -p /mnt/disks/cidata
       status mount /dev/disk/by-label/CIDATA /mnt/disks/cidata
       if [[ ! -d /var/lib/.cos-customizer ]]; then

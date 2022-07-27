@@ -17,6 +17,7 @@ package provisioner
 const gpuSetupScriptTemplate = `#!/bin/bash
 
 set -o errexit
+set -x
 
 export NVIDIA_DRIVER_VERSION={{.NvidiaDriverVersion}}
 export NVIDIA_DRIVER_MD5SUM={{.NvidiaDriverMD5Sum}}
@@ -24,6 +25,8 @@ export NVIDIA_INSTALL_DIR_HOST={{.NvidiaInstallDirHost}}
 export COS_NVIDIA_INSTALLER_CONTAINER={{.NvidiaInstallerContainer}}
 export NVIDIA_INSTALL_DIR_CONTAINER=/usr/local/nvidia
 export ROOT_MOUNT_DIR=/root
+export TOOLCHAIN_PKG_DIR="/toolchain"
+export SCRATCH_DISK_LOCATION="/mnt/disks/scratch/gpu"
 
 pull_installer() {
   local docker_code
@@ -56,6 +59,8 @@ main() {
     --volume ${NVIDIA_INSTALL_DIR_HOST}:${NVIDIA_INSTALL_DIR_CONTAINER} \
     --volume /dev:/dev \
     --volume /:${ROOT_MOUNT_DIR} \
+    --volume ${SCRATCH_DISK_LOCATION}:/toolchain \
+    -e TOOLCHAIN_PKG_DIR \
     -e NVIDIA_DRIVER_VERSION \
     -e NVIDIA_DRIVER_MD5SUM \
     -e NVIDIA_INSTALL_DIR_HOST \

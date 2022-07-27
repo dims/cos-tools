@@ -15,6 +15,16 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 genrule(
+    name = "scratch",
+    outs = ["scratch.img"],
+    cmd = "\
+fallocate -l 512M $@;\
+mkfs.ext4 $@;\
+tune2fs -c0 -i0 $@;\
+e2label $@ SCRATCH",
+)
+
+genrule(
     name = "cidata",
     srcs = [
         "//:src/data/startup.yaml",
@@ -47,6 +57,7 @@ go_library(
     ],
     embedsrcs = [
         ":cidata",
+	":scratch"
     ],
     importpath = "cos.googlesource.com/cos/tools.git/src/pkg/preloader",
     visibility = ["//visibility:public"],
