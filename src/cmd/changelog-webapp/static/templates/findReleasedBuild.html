@@ -1,46 +1,43 @@
 <html>
 <head>
   <title>Find Build</title>
-  <meta name="description" content="Find the first build containing a changelist">
+  <meta name="description" content="Find the first build containing a changelist that was released">
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/changelog.css">
 </head>
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
-    <a class="signout" href="/signout/?redirect=/findbuild/">Sign Out</a>
+    <a class="signout" href="/signout/?redirect=/findreleasedbuild/">Sign Out</a>
   </div>
   <div class="sidenav">
     <a href="/">Home</a>
     <a href="/changelog/">Changelog</a>
-    <a class="active" href="/findbuild/">Find Build</a>
-    <a href="/findreleasedbuild/">Find Released Build</a>
+    <a href="/findbuild/">Find Build</a>
+    <a class="active" href="/findreleasedbuild/">Find Released Build</a>
     <a href="/readme/">Readme</a>
   </div>
   <div class="main">
-    <h1>Find Build with CL</h1>
+    <h1>Find Released Build with CL</h1>
     <p class="feature-info">
-      Find the first Container-Optimized OS build containing a desired
-      changelist.<br>
+        Find the first Container-Optimized OS released build containing a desired
+        changelist.<br>
       Example input: <b>3280</b> or
-      <b>18d4ce48c1dc2f530120f85973fec348367f78a0</b>
     </p>
     <p class="feature-info">
-      <b>Note:</b> It is possible that a COS build was not created using the
-      build number returned. However, any COS build with build number greater
-      than the returned build number should have the desired change present.
+      <b>Note:</b>  It is possible that COS build was released with the cl number so please check out the Landed in tab. 
     </p>
     <p class="feature-info">
       <b>Note:</b> Commits must be submitted through Gerrit to be tracked by
       this tool. Commits directly submitted to a Git repository are not
       supported.
     </p>
-    <form class="changelog-form" action="/findbuild">
+    <form class="changelog-form" action="/findreleasedbuild">
       <div class="text">
         {{if (ne .CL "")}}
-          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" value={{.CL}} required>
+          <input type="text" class="cl-input" name="cl" placeholder="CL-Number" value={{.CL}} required>
         {{else}}
-          <input type="text" class="cl-input" name="cl" placeholder="CL-Number or Commit-SHA" required>
+          <input type="text" class="cl-input" name="cl" placeholder="CL-Number" required>
         {{end}}
         <input class="submit" type="submit" value="Submit"><br>
       </div>
@@ -70,7 +67,7 @@
       {{if (ne .BuildNum "")}}
         <p>
           <a href={{.GerritLink}} target="_blank"> CL {{.CLNum}}</a>
-          landed in build <b>{{.BuildNum}}</b>.
+          released in build <b>{{.BuildNum}}</b>.
         </p>
       {{end}}
     </div>

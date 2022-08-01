@@ -49,14 +49,15 @@ var (
 	envBoard                       string
 	artifactsBucket                string
 
-	staticBasePath          string
-	indexTemplate           *template.Template
-	readme                  *template.Template
-	changelogTemplate       *template.Template
-	promptLoginTemplate     *template.Template
-	findBuildTemplate       *template.Template
-	statusForbiddenTemplate *template.Template
-	basicTextTemplate       *template.Template
+	staticBasePath            string
+	indexTemplate             *template.Template
+	readme                    *template.Template
+	changelogTemplate         *template.Template
+	promptLoginTemplate       *template.Template
+	findBuildTemplate         *template.Template
+	findReleasedBuildTemplate *template.Template
+	statusForbiddenTemplate   *template.Template
+	basicTextTemplate         *template.Template
 )
 
 func init() {
@@ -101,6 +102,7 @@ func init() {
 	readme = template.Must(template.ParseFiles(staticBasePath + "templates/readme.html"))
 	changelogTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/changelog.html"))
 	findBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/findBuild.html"))
+	findReleasedBuildTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/findReleasedBuild.html"))
 	promptLoginTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/promptLogin.html"))
 	basicTextTemplate = template.Must(template.ParseFiles(staticBasePath + "templates/error.html"))
 }
@@ -290,6 +292,21 @@ func findBuildWithFallback(httpClient *http.Client, gerrit, fallbackGerrit, gob,
 	return buildData, didFallback, err
 }
 
+func findReleaseBuild(httpClient *http.Client, gerrit, gob, repo, cl string, internal bool) (*findbuild.BuildResponse, utils.ChangelogError) {
+	request := &findbuild.BuildRequest{
+		HTTPClient:   httpClient,
+		GerritHost:   gerrit,
+		GitilesHost:  gob,
+		ManifestRepo: repo,
+		CL:           cl,
+	}
+	buildData, err := findbuild.FindReleasedBuild(request)
+	if err != nil && err.HTTPCode() == "404" {
+		log.Debugf("Cl %s not found in Gerrit instance", cl)
+	}
+	return buildData, err
+}
+
 // handleError creates the error page for a given error
 func handleError(w http.ResponseWriter, r *http.Request, displayErr utils.ChangelogError, currPage string) {
 	err := basicTextTemplate.Execute(w, &basicTextPage{
@@ -468,6 +485,63 @@ func HandleFindBuild(w http.ResponseWriter, r *http.Request) {
 	err = findBuildTemplate.Execute(w, page)
 	if err != nil {
 		log.Errorf("error executing findbuild template: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// HandleFindReleasedBuild serves the Locate CL page
+func HandleFindReleasedBuild(w http.ResponseWriter, r *http.Request) {
+	if RequireToken(w, r, "/findreleasedbuild/") { // TODO add findreleasebuild.html
+		return
+	}
+	var err error
+	if err = r.ParseForm(); err != nil {
+		err = findReleasedBuildTemplate.Execute(w, &findBuildPage{Internal: true})
+		if err != nil {
+			log.Errorf("error executing findbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	cl := r.FormValue("cl")
+	// If no CL value specified in request, display empty CL form
+	if cl == "" {
+		err = findReleasedBuildTemplate.Execute(w, &findBuildPage{Internal: true})
+		if err != nil {
+			log.Errorf("error executing findreleasedbuild template: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	internal, gerrit, gob, repo := false, externalGerritInstance, externalGoBInstance, externalManifestRepo
+	if r.FormValue("cos-internal") == "true" {
+		internal, gerrit, gob, repo = true, internalGerritInstance, internalGoBInstance, internalManifestRepo
+	}
+	httpClient, err := HTTPClient(w, r)
+	if err != nil {
+		loginURL := GetLoginURL("/findreleasedbuild/", false)
+		http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+		return
+	}
+	buildData, utilErr := findReleaseBuild(httpClient, gerrit, gob, repo, cl, internal)
+	if utilErr != nil {
+		log.Errorf("error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
+		handleError(w, r, utilErr, "/findreleasedbuild/")
+		return
+	}
+
+	gerritLink := gerrit + "/c/" + buildData.CLNum
+
+	page := &findBuildPage{
+		CL:         cl,
+		CLNum:      buildData.CLNum,
+		BuildNum:   buildData.BuildNum,
+		Internal:   internal,
+		GerritLink: gerritLink,
+	}
+	err = findReleasedBuildTemplate.Execute(w, page)
+	if err != nil {
+		log.Errorf("error executing findreleasebuild template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

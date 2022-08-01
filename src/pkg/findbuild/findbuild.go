@@ -621,12 +621,13 @@ type secretBundle struct {
 }
 
 // findReleasedBuild locates the first build that a CL was introduced in using the builds-info database
-func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildResponse, error) {
+func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogError) {
 	log.Debugf("Fetching first build for CL: %s", request.CL)
 	// access secretmanager
 	client, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create secretmanager client: %v", err)
+		log.Error("failed to create secretmanager client: %v", err)
+		return nil, utils.InternalServerError
 	}
 	var (
 		projectID            = os.Getenv("COS_CHANGELOG_PROJECT_ID")
@@ -642,7 +643,8 @@ func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildRespon
 		{findBuildTableName, &tableName},
 		{dbPasswordSecretName, &password},
 	}); err != nil {
-		return nil, err
+		log.Error("failed to retrieve secrets from secretmanager: %v", err)
+		return nil, utils.InternalServerError
 	}
 	connectionName := projectID + ":" + zone + ":" + dbName
 	// connect to database
@@ -662,7 +664,7 @@ func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildRespon
 	if rows.Next() {
 		if err := rows.Scan(&releasedBuildNumber); err != nil {
 			log.Errorf("Could not scan result: %v", err)
-			return nil, err
+			return nil, utils.InternalServerError
 		}
 	} else {
 		log.Errorf("No build number found")
@@ -674,7 +676,7 @@ func findReleasedBuild(ctx context.Context, request *BuildRequest) (*BuildRespon
 	releasedBuild := BuildResponse{}
 	releasedBuild.BuildNum = releasedBuildNumber
 	releasedBuild.CLNum = request.CL
-	return &releasedBuild, err
+	return &releasedBuild, nil
 }
 
 func retrieveSecret(client *secretmanager.Client, projectID string, secretName string) (string, error) {

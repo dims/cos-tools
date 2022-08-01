@@ -41,6 +41,7 @@ func main() {
 	http.HandleFunc("/readme/", controllers.HandleReadme)
 	http.HandleFunc("/changelog/", controllers.HandleChangelog)
 	http.HandleFunc("/findbuild/", controllers.HandleFindBuild)
+	http.HandleFunc("/findreleasedbuild/", controllers.HandleFindReleasedBuild)
 	http.HandleFunc("/login/", controllers.HandleLogin)
 	http.HandleFunc("/oauth2callback/", controllers.HandleCallback)
 	http.HandleFunc("/signout/", controllers.HandleSignOut)
