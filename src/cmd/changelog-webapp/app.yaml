@@ -27,3 +27,9 @@ env_variables:
   COS_INTERNAL_GOB_INSTANCE_NAME: "cos-internal-gob-instance"
   COS_INTERNAL_MANIFEST_REPO_NAME: "cos-internal-manifest-repo"
   CROSLAND_NAME: "crosland-url"
+
+  # Findbuild variables
+  COS_FINDBUILD_DB_NAME: "cos-findbuild-db-name"
+  COS_FINDBUILD_TABLE_NAME: "cos-findbuild-table-name"
+  COS_FINDBUILD_PASSWORD_NAME: "cos-findbuild-password-name"
+  COS_FINDBUILD_INSTANCE_NAME: "cos-findbuild-instance-name"

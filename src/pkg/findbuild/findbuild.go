@@ -634,19 +634,21 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 		findBuildDbName      = os.Getenv("COS_FINDBUILD_DB_NAME")
 		findBuildTableName   = os.Getenv("COS_FINDBUILD_TABLE_NAME")
 		dbPasswordSecretName = os.Getenv("COS_FINDBUILD_PASSWORD_NAME")
+		instanceSecretName   = os.Getenv("COS_FINDBUILD_INSTANCE_NAME")
 		user                 = "readonly"
 		zone                 = "us-west2"
 	)
-	var dbName, tableName, password string
+	var dbName, tableName, password, instanceName string
 	if err := retrieveSecrets(client, projectID, []secretBundle{
 		{findBuildDbName, &dbName},
 		{findBuildTableName, &tableName},
 		{dbPasswordSecretName, &password},
+		{instanceSecretName, &instanceName},
 	}); err != nil {
 		log.Error("failed to retrieve secrets from secretmanager: %v", err)
 		return nil, utils.InternalServerError
 	}
-	connectionName := projectID + ":" + zone + ":" + dbName
+	connectionName := projectID + ":" + zone + ":" + instanceName
 	// connect to database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@cloudsql(%s)/%s", user, password, connectionName, dbName))
 	if err != nil {
