@@ -633,6 +633,7 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 	}
 	var (
 		projectID            = os.Getenv("COS_CHANGELOG_PROJECT_ID")
+		dbProjectSecretName  = os.Getenv("COS_FINDBUILD_DB_PROJECT")
 		findBuildDbName      = os.Getenv("COS_FINDBUILD_DB_NAME")
 		findBuildTableName   = os.Getenv("COS_FINDBUILD_TABLE_NAME")
 		dbPasswordSecretName = os.Getenv("COS_FINDBUILD_PASSWORD_NAME")
@@ -640,17 +641,18 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 		user                 = "readonly"
 		zone                 = "us-west2"
 	)
-	var dbName, tableName, password, instanceName string
+	var dbProjectID, dbName, tableName, password, instanceName string
 	if err := retrieveSecrets(client, projectID, []secretBundle{
 		{findBuildDbName, &dbName},
 		{findBuildTableName, &tableName},
 		{dbPasswordSecretName, &password},
 		{instanceSecretName, &instanceName},
+		{dbProjectSecretName, &dbProjectID},
 	}); err != nil {
 		log.Error("failed to retrieve secrets from secretmanager: %v", err)
 		return nil, utils.InternalServerError
 	}
-	connectionName := projectID + ":" + zone + ":" + instanceName
+	connectionName := dbProjectID + ":" + zone + ":" + instanceName
 	// connect to database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@cloudsql(%s)/%s", user, password, connectionName, dbName))
 	if err != nil {
@@ -658,7 +660,8 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 	}
 	// query database
 	// SELECT release_build_number FROM DBName WHERE cLNumber = request.CL;
-	rows, err := db.Query("SELECT %s FROM %s WHERE %s = %s", releasedInBuild, tableName, cLNumber, request.CL)
+	queryStmt := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", releasedInBuild, tableName, cLNumber)
+	rows, err := db.Query(queryStmt, request.CL)
 	if err != nil {
 		log.Fatalf("Could not query db: %v", err)
 	}
@@ -700,7 +703,7 @@ func retrieveSecrets(client *secretmanager.Client, projectID string, secrets []s
 		if err != nil {
 			return err
 		}
-		secret.value = &fetchedSecret
+		*secret.value = fetchedSecret
 	}
 	return nil
 }

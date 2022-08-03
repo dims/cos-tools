@@ -1,4 +1,4 @@
-runtime: go114
+runtime: go116
 instance_class: F2
 
 env_variables:
@@ -29,6 +29,7 @@ env_variables:
   CROSLAND_NAME: "crosland-url"
 
   # Findbuild variables
+  COS_FINDBUILD_DB_PROJECT: "cos-findbuild-db-project"
   COS_FINDBUILD_DB_NAME: "cos-findbuild-db-name"
   COS_FINDBUILD_TABLE_NAME: "cos-findbuild-table-name"
   COS_FINDBUILD_PASSWORD_NAME: "cos-findbuild-password-name"
