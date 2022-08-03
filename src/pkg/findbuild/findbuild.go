@@ -46,7 +46,9 @@ import (
 	"time"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
+	_ "github.com/GoogleCloudPlatform/cloudsql-proxy/proxy/dialers/mysql"
 	"github.com/beevik/etree"
+	_ "github.com/go-sql-driver/mysql"
 	"go.chromium.org/luci/common/proto/git"
 	"go.chromium.org/luci/common/proto/gitiles"
 
