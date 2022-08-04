@@ -529,6 +529,11 @@ func HandleFindReleasedBuild(w http.ResponseWriter, r *http.Request) {
 		handleError(w, r, utilErr, "/findreleasedbuild/")
 		return
 	}
+	if buildData == nil {
+		log.Errorf("CL %s not found", cl)
+		handleError(w, r, utilErr, "/findreleasedbuild/")
+		return
+	}
 
 	gerritLink := gerrit + "/c/" + buildData.CLNum
 
