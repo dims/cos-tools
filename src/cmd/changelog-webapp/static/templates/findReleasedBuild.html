@@ -22,7 +22,7 @@
     <p class="feature-info">
         Find the first Container-Optimized OS released build containing a desired
         changelist.<br>
-      Example input: <b>3280</b> or
+      Example input: <b>3280</b>
     </p>
     <p class="feature-info">
       <b>Note:</b>  It is possible that COS build was released with the cl number so please check out the Landed in tab. 
@@ -65,10 +65,17 @@
     </form>
     <div class="locate-build-result">
       {{if (ne .BuildNum "")}}
-        <p>
-          <a href={{.GerritLink}} target="_blank"> CL {{.CLNum}}</a>
-          released in build <b>{{.BuildNum}}</b>.
-        </p>
+        {{if (ne .BuildNum "0.000.0")}}
+          <p>
+            <a href={{.GerritLink}} target="_blank"> CL {{.CLNum}}</a>
+            released in build <b>{{.BuildNum}}</b>.
+          </p>
+        {{else}}
+          <p>
+            <a href={{.GerritLink}} target="_blank"> CL {{.CLNum}}</a>
+            no released build found.
+          </p>
+        {{end}}
       {{end}}
     </div>
   </div>

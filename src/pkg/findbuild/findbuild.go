@@ -657,6 +657,7 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@cloudsql(%s)/%s", user, password, connectionName, dbName))
 	if err != nil {
 		log.Fatalf("Could not open db: %v", err)
+		return nil, utils.InternalServerError
 	}
 	// query database
 	// SELECT release_build_number FROM DBName WHERE cLNumber = request.CL;
@@ -664,10 +665,12 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 	rows, err := db.Query(queryStmt, request.CL)
 	if err != nil {
 		log.Fatalf("Could not query db: %v", err)
+		return nil, utils.InternalServerError
 	}
 	// change rows to BuildResponse type
 	defer rows.Close()
 	var releasedBuildNumber string
+	releasedBuild := BuildResponse{}
 	if rows.Next() {
 		if err := rows.Scan(&releasedBuildNumber); err != nil {
 			log.Errorf("Could not scan result: %v", err)
@@ -675,12 +678,13 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 		}
 	} else {
 		log.Errorf("No build number found")
-		return nil, nil
+		releasedBuild.BuildNum = "0.000.0"
+		releasedBuild.CLNum = request.CL
+		return &releasedBuild, nil
 	}
 	if rows.Next() {
 		log.Errorf("More than one build number found")
 	}
-	releasedBuild := BuildResponse{}
 	releasedBuild.BuildNum = releasedBuildNumber
 	releasedBuild.CLNum = request.CL
 	return &releasedBuild, nil
