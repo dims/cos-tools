@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -549,4 +550,31 @@ func HandleFindReleasedBuild(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("error executing findreleasebuild template: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// HandleFindReleasedBuildGerrit returns the released build number in JSON
+func HandleFindReleasedBuildGerrit(w http.ResponseWriter, r *http.Request) {
+	var err error
+	if err = r.ParseForm(); err != nil {
+		log.Errorf("error parsing form: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cl := r.FormValue("cl")
+	// If no CL value specified in request, display empty CL form
+	if cl == "" {
+		http.Error(w, "empty cl provided", http.StatusInternalServerError)
+		return
+	}
+	internal, gerrit, gob, repo := false, externalGerritInstance, externalGoBInstance, externalManifestRepo
+	if r.FormValue("cos-internal") == "true" {
+		internal, gerrit, gob, repo = true, internalGerritInstance, internalGoBInstance, internalManifestRepo
+	}
+	buildData, utilErr := findReleaseBuild(nil, gerrit, gob, repo, cl, internal)
+	if utilErr != nil {
+		log.Errorf("error retrieving build for CL %s with internal set to %t\n%v", cl, internal, utilErr)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"versions": buildData.BuildNum})
 }

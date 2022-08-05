@@ -8,13 +8,13 @@
 <body>
   <div class="navbar">
     <p class="navbar-title">Container Optimized OS</p>
-    <a class="signout" href="/signout/?redirect=/findreleasedbuild/">Sign Out</a>
+    <a class="signout" href="/signout/?redirect=/findreleasedbuildv2/">Sign Out</a>
   </div>
   <div class="sidenav">
     <a href="/">Home</a>
     <a href="/changelog/">Changelog</a>
     <a href="/findbuild/">Find Build</a>
-    <a class="active" href="/findreleasedbuild/">Find Released Build</a>
+    <a class="active" href="/findreleasedbuildv2/">Find Released Build</a>
     <a href="/readme/">Readme</a>
   </div>
   <div class="main">
@@ -32,7 +32,7 @@
       this tool. Commits directly submitted to a Git repository are not
       supported.
     </p>
-    <form class="changelog-form" action="/findreleasedbuild">
+    <form class="changelog-form" action="/findreleasedbuildv2">
       <div class="text">
         {{if (ne .CL "")}}
           <input type="text" class="cl-input" name="cl" placeholder="CL-Number" value={{.CL}} required>
