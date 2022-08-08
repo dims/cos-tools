@@ -34,3 +34,8 @@ env_variables:
   COS_FINDBUILD_TABLE_NAME: "cos-findbuild-table-name"
   COS_FINDBUILD_PASSWORD_NAME: "cos-findbuild-password-name"
   COS_FINDBUILD_INSTANCE_NAME: "cos-findbuild-instance-name"
+
+handlers:
+- url: /findreleasedbuild
+  http_headers:
+    Access-Control-Allow-Origin: https://cos-review.googlesource.com
