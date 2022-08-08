@@ -42,7 +42,7 @@ func main() {
 	http.HandleFunc("/changelog/", controllers.HandleChangelog)
 	http.HandleFunc("/findbuild/", controllers.HandleFindBuild)
 	http.HandleFunc("/findreleasedbuildv2/", controllers.HandleFindReleasedBuild)
-	http.HandleFunc("/findreleasedbuild/", controllers.HandleFindReleasedBuildGerrit)
+	http.HandleFunc("/findreleasedbuild", controllers.HandleFindReleasedBuildGerrit)
 	http.HandleFunc("/login/", controllers.HandleLogin)
 	http.HandleFunc("/oauth2callback/", controllers.HandleCallback)
 	http.HandleFunc("/signout/", controllers.HandleSignOut)

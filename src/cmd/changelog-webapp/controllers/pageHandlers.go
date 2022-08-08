@@ -549,6 +549,11 @@ func HandleFindReleasedBuild(w http.ResponseWriter, r *http.Request) {
 
 // HandleFindReleasedBuildGerrit returns the released build number in JSON
 func HandleFindReleasedBuildGerrit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if origin, ok := allowedOrigin(r.Header.Get("Origin")); ok {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
 	var err error
 	if err = r.ParseForm(); err != nil {
 		log.Errorf("error parsing form: %v", err)
@@ -571,5 +576,12 @@ func HandleFindReleasedBuildGerrit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"versions": buildData.BuildNum})
+	json.NewEncoder(w).Encode(map[string][]string{"versions": {buildData.BuildNum}})
+}
+
+func allowedOrigin(origin string) (string, bool) {
+	if origin == "https://cos-review.googlesource.com" || origin == "https://cos-internal-review.googlesource.com" {
+		return origin, true
+	}
+	return "", false
 }
