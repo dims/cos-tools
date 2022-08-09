@@ -576,7 +576,13 @@ func HandleFindReleasedBuildGerrit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string][]string{"versions": {buildData.BuildNum}})
+	versions := []string{}
+	if buildData.BuildNum == "0.000.0" {
+		versions = append(versions, "no build")
+	} else {
+		versions = append(versions, buildData.BuildNum)
+	}
+	json.NewEncoder(w).Encode(map[string][]string{"versions": versions})
 }
 
 func allowedOrigin(origin string) (string, bool) {
