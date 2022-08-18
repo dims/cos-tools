@@ -22,6 +22,7 @@ require (
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/urfave/cli/v2 v2.2.0
 	go.chromium.org/luci v0.0.0-20200722211809-bab0c30be68b
+	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	golang.org/x/oauth2 v0.0.0-20220722155238-128564f6959c
 	golang.org/x/sys v0.0.0-20220731174439-a90be440212d
 	google.golang.org/api v0.90.0

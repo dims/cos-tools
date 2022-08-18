@@ -41,12 +41,8 @@ check_prerequisites() {
 
 compile_proto() {
     ~/protoc/bin/protoc -I "${SCRIPT_DIR}"/../versions --go_out=paths=source_relative:"${SCRIPT_DIR}"/../versions "${SCRIPT_DIR}"/../versions/versions.proto
-    trap cleanup_proto EXIT
 }
 
-cleanup_proto() {
-    rm "${SCRIPT_DIR}"/../versions/versions.pb.go
-}
 
 run_test() {
     go test -v "${SCRIPT_DIR}"/check_drivers_test.go
