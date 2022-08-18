@@ -60,6 +60,11 @@ verified when the VM boots and when the data inside are accessed.
 `disable-auto-update` allows users to disable the auto-update service. And it
 will reclaim the disk space of the unused root partition.
 
+### COS Customizer Design
+
+See the `DESIGN.md` document for more information on the design particulars
+of the customizer.
+
 ### Minimal example
 
 Here is a minimal Google Cloud Build workflow demonstrating usage of the COS
@@ -332,7 +337,9 @@ An example `run-script` step looks like the following:
 
 The `install-gpu` build step configures the image build to install GPU drivers
 on the builder VM. GPU drivers are installed using the
-[COS GPU installer](https://github.com/GoogleCloudPlatform/cos-gpu-installer).
+[COS GPU installer](https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer_v1/).
+Currently, this installer gets pulled from GCR at runtime onto the preload VM meaning that
+the preload VM must have access to gcr.
 In addition to installing GPU drivers, the `install-gpu` step installs a script
 named `setup_gpu.sh` in the GPU driver install directory. _In order to use the
 installed GPU drivers, this script must be run every time the system boots_. It
