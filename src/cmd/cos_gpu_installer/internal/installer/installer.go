@@ -4,6 +4,7 @@ package installer
 import (
 	stderrors "errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -187,7 +188,7 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 		filepath.Join(nvidiaKernelDir, "precompiled", "nv-linux.o"),
 		filepath.Join(nvidiaKernelDir, "nvidia", "nv-kernel.o_binary"),
 	}
-	args := append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "nvidia.ko")}, nvidiaObjs...)
+	args := append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "precompiled", "nvidia.ko")}, nvidiaObjs...)
 	cmd := exec.Command(linker, args...)
 	log.Infof("Running link command: %v", cmd.Args)
 	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
@@ -198,23 +199,30 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 		filepath.Join(nvidiaKernelDir, "precompiled", "nv-modeset-linux.o"),
 		filepath.Join(nvidiaKernelDir, "nvidia-modeset", "nv-modeset-kernel.o_binary"),
 	}
-	args = append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "nvidia-modeset.ko")}, modesetObjs...)
+	args = append([]string{"-T", linkerScript, "-r", "-o", filepath.Join(nvidiaKernelDir, "precompiled", "nvidia-modeset.ko")}, modesetObjs...)
 	cmd = exec.Command(linker, args...)
 	log.Infof("Running link command: %v", cmd.Args)
 	if err := utils.RunCommandAndLogOutput(cmd, false); err != nil {
 		return fmt.Errorf("failed to link nvidia-modeset.ko: %v", err)
 	}
-	// nvidia-uvm.ko is pre-linked; move to kernel dir
-	oldPath := filepath.Join(nvidiaKernelDir, "precompiled", "nvidia-uvm.ko")
-	newPath := filepath.Join(nvidiaKernelDir, "nvidia-uvm.ko")
-	if err := unix.Rename(oldPath, newPath); err != nil {
-		return fmt.Errorf("failed to move %q to %q: %v", oldPath, newPath, err)
-	}
-	// nvidia-drm.ko is pre-linked; move to kernel dir
-	oldPath = filepath.Join(nvidiaKernelDir, "precompiled", "nvidia-drm.ko")
-	newPath = filepath.Join(nvidiaKernelDir, "nvidia-drm.ko")
-	if err := unix.Rename(oldPath, newPath); err != nil {
-		return fmt.Errorf("failed to move %q to %q: %v", oldPath, newPath, err)
+	// Move all modules to kernel dir (includes some pre-linked modules, in
+	// addition to the above linked ones)
+	if err := filepath.WalkDir(filepath.Join(nvidiaKernelDir, "precompiled"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) == ".ko" {
+			newPath := filepath.Join(nvidiaKernelDir, filepath.Base(path))
+			if err := unix.Rename(path, newPath); err != nil {
+				return fmt.Errorf("failed to move %q to %q: %v", path, newPath, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to copy kernel modules: %v", err)
 	}
 	log.Info("Done linking drivers")
 	return nil
