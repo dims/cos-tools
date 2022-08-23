@@ -1,0 +1,57 @@
+# Automate code coverage upload to NG3 Metrics bucket
+#
+# Substitutions:
+#   _NG3_BUCKET: where coverage and metadata should be uploaded to reflect in NorthStar, Non-Google3 Metrics owned
+#    COMMIT_SHA: most recent commit
+#          _REF: target branch
+#        _OWNER: email to contact for issues
+#
+# Schema for bazel test redirection, in output.txt:
+#   [bazel server connection logs]
+#   [test name, PASSED/FAILED in: xxx]
+#   [coverage file location]
+#   ...
+#   (repeat for every test)
+#
+# Example:
+#   Starting local Bazel server and connecting to it...
+#   //src/pkg/config:config_test                                      (cached) PASSED in 0.1s
+#   /usr/local/.cache/bazel-out/k8-fastbuild/testlogs/src/pkg/config/config_test/coverage.dat
+steps:
+  # Use docker container to install bazel
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      cat <<EOF | docker build -t bazel -
+      FROM gcr.io/cloud-builders/bazel
+      RUN apt-get update && apt-get install -y mtools
+      EOF
+  # Run bash script that builds the metadata.json
+  # Run bazel tests and redirect to output.txt
+  # Open and merge coverage files found in output.txt
+  # Remove duplicate coverage lines
+  - name: 'bazel'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      set -o errexit
+      ./coverage/build-metadata.sh
+      bazel test --collect_code_coverage --spawn_strategy=standalone -- ... -//src/pkg/tools/... > output.txt
+      cat $(grep -A 1 --no-group-separator -E 'PASSED in|FAILED in' output.txt | grep -v -E 'PASSED in|FAILED in') > merged-coverage.txt
+      cat -n merged-coverage.txt | sort -uk2 | sort -nk1 | cut -f2- > combined-coverage.out
+    env:
+      - 'COMMIT_SHA=$COMMIT_SHA'
+      - 'REF=$_REF'
+      - 'OWNER=$_OWNER'
+  # Upload coverage and metadata to NG3 buckets
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'combined-coverage.out', '${_NG3_BUCKET}/$BUILD_ID/combined-coverage.out']
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'metadata.json', '${_NG3_BUCKET}/$BUILD_ID/metadata.json']
+options:
+  machineType: 'N1_HIGHCPU_8'
+  substitutionOption: 'MUST_MATCH'
+timeout: '3000s'
