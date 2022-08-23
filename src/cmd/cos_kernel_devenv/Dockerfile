@@ -1,6 +1,8 @@
 FROM ubuntu:21.10
 
-RUN apt-get -y update && \
+RUN sed -i 's/archive.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list && \
+	sed -i 's/security.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list && \
+	apt-get -y update && \
 	apt-get -y install apt-transport-https ca-certificates gnupg curl && \
 	echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
 	    > /etc/apt/sources.list.d/google-cloud-sdk.list && \
