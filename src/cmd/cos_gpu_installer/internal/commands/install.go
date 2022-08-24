@@ -240,17 +240,19 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 	}
 	defer func() { callback <- 0 }()
 
-	if !c.unsignedDriver {
-		if c.signatureURL != "" {
-			if err := signing.DownloadDriverSignaturesFromURL(c.signatureURL); err != nil {
-				return errors.Wrap(err, "failed to download driver signature")
-			}
-		} else if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
-			if strings.Contains(err.Error(), "404 Not Found") {
-				return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
-			}
-			return errors.Wrap(err, "failed to download driver signature")
-		}
+	if err := cos.SetCompilationEnv(downloader); err != nil {
+		return errors.Wrap(err, "failed to set compilation environment variables")
+	}
+	if err := remountExecutable(toolchainPkgDir); err != nil {
+		return fmt.Errorf("failed to remount %q as executable: %v", filepath.Dir(toolchainPkgDir), err)
+	}
+	if err := cos.InstallCrossToolchain(downloader, toolchainPkgDir); err != nil {
+		return errors.Wrap(err, "failed to install toolchain")
+	}
+
+	// Skip driver installation if we are only populating build tools cache
+	if c.prepareBuildTools {
+		return nil
 	}
 
 	var installerFile string
@@ -267,19 +269,17 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 
-	if err := cos.SetCompilationEnv(downloader); err != nil {
-		return errors.Wrap(err, "failed to set compilation environment variables")
-	}
-	if err := remountExecutable(toolchainPkgDir); err != nil {
-		return fmt.Errorf("failed to remount %q as executable: %v", filepath.Dir(toolchainPkgDir), err)
-	}
-	if err := cos.InstallCrossToolchain(downloader, toolchainPkgDir); err != nil {
-		return errors.Wrap(err, "failed to install toolchain")
-	}
-
-	// Skip driver installation if we are only populating build tools cache
-	if c.prepareBuildTools {
-		return nil
+	if !c.unsignedDriver {
+		if c.signatureURL != "" {
+			if err := signing.DownloadDriverSignaturesFromURL(c.signatureURL); err != nil {
+				return errors.Wrap(err, "failed to download driver signature")
+			}
+		} else if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
+			if strings.Contains(err.Error(), "404 Not Found") {
+				return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
+			}
+			return errors.Wrap(err, "failed to download driver signature")
+		}
 	}
 
 	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, c.test, false); err != nil {
