@@ -18,9 +18,9 @@
     - "v20220608"
 - staging_container_name: "cos-gpu-installer"
   release_container_name: "cos-gpu-installer"
-  build_commit: "590810404ea2fe1bd57b91fe997b8a9041e15058"
+  build_commit: "0340e4b17bde4e7e307a64ab218db8c148030bf1"
   release_tags:
-    - "v2.0.24"
+    - "v2.0.25"
 - staging_container_name: "cos-gpu-driver-builder"
   release_container_name: "cos-gpu-driver-builder"
   build_commit: "37655b424d6dbbac740b1b8d5ceae9dab7c6fb16"
