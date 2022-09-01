@@ -28,6 +28,7 @@ const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
 	defaultGPUDriverFile          = "gpu_default_version"
 	latestGPUDriverFile           = "gpu_latest_version"
+	r470GPUDriverFile             = "gpu_R470_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
 	signedURLKey                  = "Expires"
@@ -410,6 +411,16 @@ func GetLatestGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, erro
 	content, err := downloader.GetArtifact(latestGPUDriverFile)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get latest GPU driver version")
+	}
+	return strings.Trim(string(content), "\n "), nil
+}
+
+// GetR470GPUDriverVersion gets the R470 GPU driver version.
+func GetR470GPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
+	log.Info("Getting the R470 GPU driver version")
+	content, err := downloader.GetArtifact(r470GPUDriverFile)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get R470 GPU driver version")
 	}
 	return strings.Trim(string(content), "\n "), nil
 }

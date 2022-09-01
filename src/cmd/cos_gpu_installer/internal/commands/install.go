@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,7 +19,6 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_installer/internal/signing"
 	"cos.googlesource.com/cos/tools.git/src/pkg/cos"
 	"cos.googlesource.com/cos/tools.git/src/pkg/modules"
-	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	log "github.com/golang/glog"
 	"github.com/google/subcommands"
@@ -31,6 +31,38 @@ const (
 	kernelSrcDir    = "/build/usr/src/linux"
 	toolchainPkgDir = "/build/cos-tools"
 )
+
+type GPUType int
+
+const (
+	// Currently we only need to know if K80 is used.
+	K80 GPUType = iota
+	Others
+)
+
+func (g GPUType) String() string {
+	switch g {
+	case K80:
+		return "K80"
+	case Others:
+		return "Others"
+	default:
+		return "Unknown"
+	}
+}
+
+type Fallback struct {
+	maxMajorVersion          int
+	getFallbackDriverVersion func(cos.ArtifactsDownloader) (string, error)
+}
+
+var fallbackMap = map[GPUType]Fallback{
+	// R470 is the last driver family supporting K80 GPU devices.
+	K80: {
+		maxMajorVersion:          470,
+		getFallbackDriverVersion: installer.GetR470GPUDriverVersion,
+	},
+}
 
 // InstallCommand is the subcommand to install GPU drivers.
 type InstallCommand struct {
@@ -60,7 +92,10 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&c.driverVersion, "version", "",
 		"The GPU driver verion to install. "+
 			"It will install the default GPU driver if the flag is not set explicitly. "+
-			"Set the flag to 'latest' to install the latest GPU driver version.")
+			"Set the flag to 'latest' to install the latest GPU driver version. "+
+			"Please note that R470 is the last driver family supporting K80 GPU devices. "+
+			"If a higher version is used with K80 GPU, the installer will automatically "+
+			"choose an available R470 driver version.")
 	f.StringVar(&c.hostInstallDir, "host-dir", "",
 		"Host directory that GPU drivers should be installed to. "+
 			"It tries to read from the env NVIDIA_INSTALL_DIR_HOST if the flag is not set explicitly.")
@@ -128,10 +163,12 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitFailure
 	}
 
+	var gpuType GPUType
+
 	if !c.prepareBuildTools {
 		var isGpuConfigured bool
-		if isGpuConfigured, err = c.isGpuConfigured(); err != nil {
-			c.logError(errors.Wrapf(err, "failed to check if GPU is configured"))
+		if isGpuConfigured, gpuType, err = c.getGPUTypeInfo(); err != nil {
+			c.logError(errors.Wrapf(err, "failed to get GPU type information"))
 			return subcommands.ExitFailure
 		}
 
@@ -158,6 +195,10 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 				c.logError(errors.Wrap(err, "failed to get default driver version"))
 				return subcommands.ExitFailure
 			}
+		}
+		if err := c.checkDriverCompatibility(downloader, gpuType); err != nil {
+			c.logError(errors.Wrap(err, "failed to check driver compatibility"))
+			return subcommands.ExitFailure
 		}
 		log.Infof("Installing GPU driver version %s", c.driverVersion)
 	} else {
@@ -316,12 +357,37 @@ func (c *InstallCommand) logError(err error) {
 	}
 }
 
-func (c *InstallCommand) isGpuConfigured() (bool, error) {
+func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
 	cmd := "lspci | grep -i \"nvidia\""
-	returnCode, err := utils.RunCommandWithExitCode([]string{"/bin/bash", "-c", cmd}, "", nil)
+	outBytes, err := exec.Command("/bin/bash", "-c", cmd).Output()
 	if err != nil {
-		return false, err
+		return false, Others, err
 	}
-	isConfigured := returnCode == grepFound
-	return isConfigured, nil
+	out := string(outBytes)
+	switch {
+	case strings.Contains(out, "[Tesla K80]"):
+		return true, K80, nil
+	default:
+		return true, Others, nil
+	}
+}
+
+func (c *InstallCommand) checkDriverCompatibility(downloader *cos.GCSDownloader, gpuType GPUType) error {
+	driverMajorVersion, err := strconv.Atoi(strings.Split(c.driverVersion, ".")[0])
+	if err != nil {
+		return errors.Wrap(err, "failed to get driver major version")
+	}
+
+	fallback, found := fallbackMap[gpuType]
+	if found && driverMajorVersion > fallback.maxMajorVersion {
+		log.Warningf("\n\nDriver version %s doesn't support %s GPU devices.\n\n", c.driverVersion, gpuType)
+		fallbackVersion, err := fallback.getFallbackDriverVersion(downloader)
+		if err != nil {
+			return errors.Wrap(err, "failed to get fallback driver")
+		}
+		log.Warningf("\n\nUsing driver version %s for %s GPU compatibility.\n\n", fallbackVersion, gpuType)
+		c.driverVersion = fallbackVersion
+		return nil
+	}
+	return nil
 }
