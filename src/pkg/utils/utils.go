@@ -70,7 +70,7 @@ type listStorageObjectsResponse struct {
 }
 
 // Flock exclusively locks a special file on the host to make sure only one calling process is running at any time.
-func Flock() {
+func Flock() *os.File {
 	// TODO(mikewu): generalize Flock to make it useful for other use cases.
 	f, err := os.OpenFile(lockFile, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -79,6 +79,7 @@ func Flock() {
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		glog.Exitf("File %s is locked. Other process might be running.", lockFile)
 	}
+	return f
 }
 
 // DownloadContentFromURL downloads file from a given URL.
