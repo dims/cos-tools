@@ -20,7 +20,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive \
     xmlstarlet \
     git
 
-RUN pip3 install cot
+COPY /src/cmd/cos_ova_converter/requirements.txt /work/src/cmd/cos_ova_converter/requirements.txt
+RUN pip3 install --require-hashes -r /work/src/cmd/cos_ova_converter/requirements.txt
 
 RUN git clone https://cos.googlesource.com/third_party/platform/crosutils.git
 RUN cd crosutils && git checkout 74d0afda96dc8c58863f76b2e144c373f92451f6
