@@ -26,6 +26,8 @@ import (
 
 const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
+	gpuFirmwareDirContainer       = "/usr/local/nvidia/firmware/nvidia"
+	gspFileName                   = "gsp.bin"
 	defaultGPUDriverFile          = "gpu_default_version"
 	latestGPUDriverFile           = "gpu_latest_version"
 	r470GPUDriverFile             = "gpu_R470_version"
@@ -293,7 +295,7 @@ func installUserLibs(nvidiaDir string) error {
 
 // RunDriverInstaller runs GPU driver installer. Only works if the provided
 // installer includes precompiled drivers.
-func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, test, legacyLink bool) error {
+func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, needSigned, test, legacyLink bool) error {
 	log.Info("Running GPU driver installer")
 
 	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
@@ -389,6 +391,9 @@ func RunDriverInstaller(toolchainDir, installerFilename string, needSigned, test
 	if (legacyLink && legacyInstallerFailed) || !legacyLink {
 		if err := installUserLibs(extractDir); err != nil {
 			return fmt.Errorf("failed to install userspace libraries: %v", err)
+		}
+		if err := prepareGSPFirmware(extractDir, driverVersion); err != nil {
+			return fmt.Errorf("failed to prepare GSP firmware, err: %v", err)
 		}
 	}
 
@@ -517,8 +522,12 @@ func createOverlayFS(lowerDir, upperDir, workDir string) error {
 func loadGPUDrivers(needSigned, test bool) error {
 	// Don't need to load public key in test mode. Platform key is used.
 	if needSigned && !test {
-		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der")); err != nil {
+		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der"), modules.SecondaryKeyring); err != nil {
 			return errors.Wrap(err, "failed to load public key")
+		}
+		// Load public key to IMA keyring for GSP firmware. For backward compatibility, it's OK if pubkey cannot be loaded.
+		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der"), modules.IMAKeyring); err != nil {
+			log.Infof("Falied to load public key to IMA keyring, err: %v", err)
 		}
 	}
 	gpuModules := map[string]string{
@@ -534,6 +543,40 @@ func loadGPUDrivers(needSigned, test bool) error {
 		if err := modules.LoadModule(moduleName, modulePath); err != nil {
 			return errors.Wrapf(err, "failed to load module %s", modulePath)
 		}
+	}
+	return nil
+}
+
+func prepareGSPFirmware(extractDir, driverVersion string) error {
+	// Check signature availability.
+	signaturePath := signing.GetModuleSignature(gspFileName)
+	if _, err := os.Stat(signaturePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Infof("GSP firmware signature doesn't exist. Skipping firmware preparation.")
+			return nil
+		} else {
+			return fmt.Errorf("failed to stat %s, err: %v", signaturePath, err)
+		}
+	}
+	// Copy gsp firmware.
+	installerGSPPath := filepath.Join(extractDir, "firmware", gspFileName)
+	containerGSPPath := filepath.Join(gpuFirmwareDirContainer, driverVersion, gspFileName)
+	if _, err := os.Stat(installerGSPPath); err != nil {
+		return fmt.Errorf("failed to stat %s, err: %v", installerGSPPath, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(containerGSPPath), defaultFilePermission); err != nil {
+		return fmt.Errorf("Falied to create firmware directory, err: %v", err)
+	}
+	if err := utils.CopyFile(installerGSPPath, containerGSPPath); err != nil {
+		return fmt.Errorf("Falied to copy %s, err: %v", gspFileName, err)
+	}
+	// Set IAM xattr.
+	signature, err := os.ReadFile(signaturePath)
+	if err != nil {
+		return fmt.Errorf("failed to read signature err: %v", err)
+	}
+	if err := syscall.Setxattr(containerGSPPath, "security.ima", signature, 0); err != nil {
+		return fmt.Errorf("failed to set xattr for security.ima, err: %v", err)
 	}
 	return nil
 }

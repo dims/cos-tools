@@ -323,11 +323,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 
-	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, c.test, false); err != nil {
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false); err != nil {
 		if errors.Is(err, installer.ErrDriverLoad) {
 			// Drivers were linked, but couldn't load; try again with legacy linking
 			log.Infof("Failed to load kernel module, err: %v. Retrying driver installation with legacy linking", err)
-			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, !c.unsignedDriver, c.test, true); err != nil {
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true); err != nil {
 				return fmt.Errorf("failed to run GPU driver installer: %v", err)
 			}
 		} else {

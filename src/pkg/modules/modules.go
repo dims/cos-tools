@@ -21,7 +21,9 @@ const (
 	// PKEYIDPKCS7 is a constant defined in https://github.com/torvalds/linux/blob/master/scripts/sign-file.c
 	PKEYIDPKCS7 = byte(2)
 	// magicNumber is a constant defined in https://github.com/torvalds/linux/blob/master/scripts/sign-file.c
-	magicNumber = "~Module signature appended~\n"
+	magicNumber      = "~Module signature appended~\n"
+	SecondaryKeyring = "%keyring:.secondary_trusted_keys"
+	IMAKeyring       = "%keyring:.ima"
 )
 
 var (
@@ -64,21 +66,21 @@ func UpdateHostLdCache(hostRootDir, moduleLibDir string) error {
 	return nil
 }
 
-// LoadPublicKey loads the given public key to the secondary keyring.
-func LoadPublicKey(keyName, keyPath string) error {
-	log.Infof("Loading %s to secondary system keyring", keyName)
+// LoadPublicKey loads the given public key to system keyring.
+func LoadPublicKey(keyName, keyPath, keyring string) error {
+	log.Infof("Loading %s to keyring %s", keyName, keyring)
 
 	keyBytes, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read key %s", keyPath)
 	}
 
-	cmd := execCommand("/bin/keyctl", "padd", "asymmetric", keyName, "%keyring:.secondary_trusted_keys")
+	cmd := execCommand("/bin/keyctl", "padd", "asymmetric", keyName, keyring)
 	cmd.Stdin = bytes.NewBuffer(keyBytes)
 	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "failed to load %s to system keyring", keyName)
+		return errors.Wrapf(err, "failed to load %s to keyring %s", keyName, keyring)
 	}
-	log.Infof("Successfully load key %s into secondary system keyring.", keyName)
+	log.Infof("Successfully load key %s into keyring %s.", keyName, keyring)
 	return nil
 }
 
