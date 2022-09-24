@@ -52,16 +52,26 @@ func TestReadObjectNotFound(t *testing.T) {
 	}
 }
 
+type Obj struct {
+	Bucket string
+	Name   string
+	Prefix string
+}
+
 func TestIterate(t *testing.T) {
 	testData := []struct {
 		testName        string
 		prefix          string
+		delimiter       string
+		startOffset     string
 		objects         map[string][]byte
 		bucket          string
-		expectedObjects []string
+		expectedObjects []Obj
 	}{
 		{
 			"HasItems",
+			"",
+			"",
 			"",
 			map[string][]byte{
 				"/test-bucket/obj-1": []byte(""),
@@ -70,14 +80,16 @@ func TestIterate(t *testing.T) {
 				"/bucket/obj-4":      []byte(""),
 			},
 			"test-bucket",
-			[]string{
-				"/test-bucket/obj-1",
-				"/test-bucket/obj-2",
-				"/test-bucket/obj-3",
+			[]Obj{
+				{"test-bucket", "obj-1", ""},
+				{"test-bucket", "obj-2", ""},
+				{"test-bucket", "obj-3", ""},
 			},
 		},
 		{
 			"NoItems",
+			"",
+			"",
 			"",
 			make(map[string][]byte),
 			"test-bucket",
@@ -86,15 +98,37 @@ func TestIterate(t *testing.T) {
 		{
 			"HasPrefix",
 			"pre",
+			"",
+			"",
 			map[string][]byte{
 				"/test-bucket/pre-1": []byte(""),
 				"/test-bucket/pre-2": []byte(""),
 				"/test-bucket/obj-3": []byte(""),
 			},
 			"test-bucket",
-			[]string{
-				"/test-bucket/pre-1",
-				"/test-bucket/pre-2",
+			[]Obj{
+				{"test-bucket", "pre-1", ""},
+				{"test-bucket", "pre-2", ""},
+			},
+		},
+		{
+			"HasStartOffset",
+			"",
+			"/",
+			"pre-2",
+			map[string][]byte{
+				"/test-bucket/pre-1/1": []byte(""),
+				"/test-bucket/pre-1/2": []byte(""),
+				"/test-bucket/pre-2":   []byte(""),
+				"/test-bucket/pre-3/1": []byte(""),
+				"/test-bucket/pre-3/2": []byte(""),
+				"/test-bucket/pre-4":   []byte(""),
+			},
+			"test-bucket",
+			[]Obj{
+				{"", "", "pre-3/"},
+				{"test-bucket", "pre-2", ""},
+				{"test-bucket", "pre-4", ""},
 			},
 		},
 	}
@@ -104,12 +138,13 @@ func TestIterate(t *testing.T) {
 		t.Run(input.testName, func(t *testing.T) {
 			gcs.Objects = input.objects
 			q := &storage.Query{
-				Delimiter: "",
-				Prefix:    input.prefix,
-				Versions:  false,
+				Delimiter:   input.delimiter,
+				Prefix:      input.prefix,
+				StartOffset: input.startOffset,
+				Versions:    false,
 			}
 			it := gcs.Client.Bucket(input.bucket).Objects(context.Background(), q)
-			var actualObjects []string
+			var actualObjects []Obj
 			for {
 				objAttrs, err := it.Next()
 				if err == iterator.Done {
@@ -118,9 +153,9 @@ func TestIterate(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				actualObjects = append(actualObjects, fmt.Sprintf("/%s/%s", objAttrs.Bucket, objAttrs.Name))
+				actualObjects = append(actualObjects, Obj{objAttrs.Bucket, objAttrs.Name, objAttrs.Prefix})
 			}
-			sortStrSlices := cmpopts.SortSlices(func(a, b string) bool { return a < b })
+			sortStrSlices := cmpopts.SortSlices(func(a, b Obj) bool { return a.Name < b.Name })
 			if !cmp.Equal(actualObjects, input.expectedObjects, sortStrSlices) {
 				t.Errorf("bucket %s has %v, want %v", input.bucket, actualObjects, input.expectedObjects)
 			}

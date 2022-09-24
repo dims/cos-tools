@@ -15,7 +15,7 @@ import (
 )
 
 func destDir(gcsBucket string) string {
-	timestamp := strings.TrimSuffix(time.Now().Format(time.RFC3339), "Z")
+	timestamp := strings.TrimSuffix(timeNow().Format(time.RFC3339), "Z")
 	uid := uuid.NewString()[:8]
 	return fmt.Sprintf("gs://%s/%s", gcsBucket, timestamp+"-"+uid)
 }

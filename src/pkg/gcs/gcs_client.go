@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
@@ -27,14 +28,18 @@ import (
 
 const schemeGCS = "gs"
 
+func readGCSObject(ctx context.Context, gcsClient *storage.Client, inputURL string) (*storage.Reader, error) {
+	gcsBucket, name, err := getGCSVariables(inputURL)
+	if err != nil {
+		return nil, err
+	}
+	return gcsClient.Bucket(gcsBucket).Object(name).NewReader(ctx)
+}
+
 // DownloadGCSObject downloads the object at inputURL and saves it at destinationPath
 func DownloadGCSObject(ctx context.Context,
 	gcsClient *storage.Client, inputURL, destinationPath string) error {
-	gcsBucket, name, err := getGCSVariables(inputURL)
-	if err != nil {
-		return err
-	}
-	r, err := gcsClient.Bucket(gcsBucket).Object(name).NewReader(ctx)
+	r, err := readGCSObject(ctx, gcsClient, inputURL)
 	if err != nil {
 		return err
 	}
@@ -48,6 +53,22 @@ func DownloadGCSObject(ctx context.Context,
 		return fmt.Errorf("error copying file from gcs bucket: %v", err)
 	}
 	return nil
+}
+
+// DownloadGCSObjectString downloads the object at inputURL and saves the contents of the object file to a string
+func DownloadGCSObjectString(ctx context.Context,
+	gcsClient *storage.Client, inputURL string) (string, error) {
+	r, err := readGCSObject(ctx, gcsClient, inputURL)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+
+	ret, err := ioutil.ReadAll(r)
+	if err != nil {
+		return "", fmt.Errorf("unable to read file from gcs bucket: %v", err)
+	}
+	return string(ret), nil
 }
 
 // UploadGCSObject uploads an object at inputPath to destination URL

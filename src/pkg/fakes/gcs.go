@@ -35,7 +35,10 @@ import (
 )
 
 type gcsObject struct{ Name, Bucket string }
-type gcsObjects struct{ Items []gcsObject }
+type gcsObjects struct {
+	Items    []gcsObject
+	Prefixes []string
+}
 
 func setTransportAddr(transport *http.Transport, addr string) {
 	transport.DialTLS = func(_, _ string) (net.Conn, error) {
@@ -97,7 +100,7 @@ func (g *GCS) objectHandler(w http.ResponseWriter, r *http.Request) {
 
 // list handles a `list` request.
 // See: https://cloud.google.com/storage/docs/json_api/v1/#Objects, `list` method.
-// Only handles the 'prefix' optional parameter.
+// Only handles the 'prefix', 'startOffset' and 'delimiter' optional parameters.
 func (g *GCS) list(w http.ResponseWriter, r *http.Request, bucket string) {
 	if err := r.ParseForm(); err != nil {
 		log.Printf("failed to parse form %q: %v", r.URL.Path, err)
@@ -105,11 +108,26 @@ func (g *GCS) list(w http.ResponseWriter, r *http.Request, bucket string) {
 	}
 	bucketPrefix := fmt.Sprintf("/%s/", bucket)
 	prefix := bucketPrefix + r.Form.Get("prefix")
+	startOffset := bucketPrefix + r.Form.Get("startOffset")
+	delimiter := r.Form.Get("delimiter")
 	var all gcsObjects
+	allPrefixes := make(map[string]bool)
 	for k := range g.Objects {
-		if strings.HasPrefix(k, prefix) {
-			all.Items = append(all.Items, gcsObject{strings.TrimPrefix(k, bucketPrefix), bucket})
+		if k < startOffset {
+			continue
 		}
+		if strings.HasPrefix(k, prefix) {
+			part := strings.TrimPrefix(k, prefix)
+			idx := strings.Index(part, delimiter)
+			if delimiter == "" || idx == -1 {
+				all.Items = append(all.Items, gcsObject{strings.TrimPrefix(k, bucketPrefix), bucket})
+			} else {
+				allPrefixes[strings.TrimPrefix(prefix+part[:idx+1], bucketPrefix)] = true
+			}
+		}
+	}
+	for k := range allPrefixes {
+		all.Prefixes = append(all.Prefixes, k)
 	}
 	bytes, err := json.Marshal(all)
 	if err != nil {
