@@ -29,7 +29,7 @@
     - "v0.1.0"
 - staging_container_name: "cos-gpu-config-builder"
   release_container_name: "cos-gpu-config-builder"
-  build_commit: "46884ba2f01c2439c9aa08eed67c4911434f7413"
+  build_commit: "3e19b481013cc45ef82aedc710d63e964c70f3c9"
   release_tags:
     - "latest"
-    - "v0.1.0"
+    - "v0.1.1"
