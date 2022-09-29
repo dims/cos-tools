@@ -36,6 +36,17 @@ type GPUPrecompilationConfig struct {
 	VersionType   string                 `json:"version_type"`
 }
 
+func kernelVersionToMilestone(kernelVersion string) string {
+	milestone := ""
+	for _, sep := range []string{"m", "r"} { // release branch or main branch check
+		if split := strings.Split(kernelVersion, sep); len(split) == 2 {
+			milestone = split[1]
+			break
+		}
+	}
+	return milestone
+}
+
 // Generates and GPU precompilation build configs(and metadata) for a given
 // tuple of kernelVersion and driver versions
 func GenerateKernelCIConfigs(ctx context.Context, client *storage.Client, kernelVersion string, driverVersions []string) ([]GPUPrecompilationConfig, error) {
@@ -45,7 +56,7 @@ func GenerateKernelCIConfigs(ctx context.Context, client *storage.Client, kernel
 		if err != nil {
 			return nil, err
 		}
-		milestone := strings.Split(kernelVersion, "m")[1]
+		milestone := kernelVersionToMilestone(kernelVersion)
 		configs = append(configs, GPUPrecompilationConfig{config, driverVersion, milestone, kernelVersion, "Kernel"})
 	}
 	return configs, nil

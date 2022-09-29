@@ -58,6 +58,21 @@ func TestGenerateKernelCIConfigs(t *testing.T) {
 	}
 }
 
+func TestKernelVersionToMilestone(t *testing.T) {
+	for _, tc := range []struct {
+		kernelVersion     string
+		milestoneExpected string
+	}{
+		{"5.10.100-14.m97", "97"},
+		{"5.10.107-10.r97", "97"},
+		{"5.10.100-14", ""},
+	} {
+		if got := kernelVersionToMilestone(tc.kernelVersion); got != tc.milestoneExpected {
+			t.Errorf("kernelVersionToMilestone() = %+v, want %+v", got, tc.milestoneExpected)
+		}
+	}
+}
+
 func TestFetchToolchainTarballPath(t *testing.T) {
 	gcs := fakes.GCSForTest(t)
 	defer gcs.Close()
