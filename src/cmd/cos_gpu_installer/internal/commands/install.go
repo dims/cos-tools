@@ -210,7 +210,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		if err != nil {
 			c.logError(fmt.Errorf("failed to read kernel command line: %v", err))
 		}
-		if !cos.CheckKernelModuleSigning(string(kernelCmdline)) {
+		if cos.CheckKernelModuleSigning(string(kernelCmdline)) {
 			log.Warning("Current kernel command line does not support unsigned kernel modules. Not enforcing kernel module signing may cause installation fail.")
 		}
 	}
