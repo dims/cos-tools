@@ -181,7 +181,11 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 	// COS 85+ kernels use lld as their linker
 	linker := filepath.Join(toolchainDir, "bin", "ld.lld")
 	linkerScript := filepath.Join(toolchainDir, "usr", "src", "linux-headers-"+kernelRelease, "scripts", "module.lds")
-	if _, err := os.Stat(linkerScript); os.IsNotExist(err) {
+	linkerScriptExists, err := checkFileExists(linkerScript)
+	if err != nil {
+		return fmt.Errorf("failed to check if %s exists, err: %v", linkerScript, err)
+	}
+	if !linkerScriptExists {
 		// Fallback to module-common.lds, which is used in the 5.4 kernel
 		linkerScript = filepath.Join(toolchainDir, "usr", "src", "linux-headers-"+kernelRelease, "scripts", "module-common.lds")
 	}
@@ -392,7 +396,7 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 		if err := installUserLibs(extractDir); err != nil {
 			return fmt.Errorf("failed to install userspace libraries: %v", err)
 		}
-		if err := prepareGSPFirmware(extractDir, driverVersion); err != nil {
+		if err := prepareGSPFirmware(extractDir, driverVersion, needSigned); err != nil {
 			return fmt.Errorf("failed to prepare GSP firmware, err: %v", err)
 		}
 	}
@@ -547,30 +551,53 @@ func loadGPUDrivers(needSigned, test bool) error {
 	return nil
 }
 
-func prepareGSPFirmware(extractDir, driverVersion string) error {
-	// Check signature availability.
+func prepareGSPFirmware(extractDir, driverVersion string, needSigned bool) error {
 	signaturePath := signing.GetModuleSignature(gspFileName)
-	if _, err := os.Stat(signaturePath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			log.Infof("GSP firmware signature doesn't exist. Skipping firmware preparation.")
-			return nil
-		} else {
-			return fmt.Errorf("failed to stat %s, err: %v", signaturePath, err)
-		}
-	}
-	// Copy gsp firmware.
 	installerGSPPath := filepath.Join(extractDir, "firmware", gspFileName)
 	containerGSPPath := filepath.Join(gpuFirmwareDirContainer, driverVersion, gspFileName)
-	if _, err := os.Stat(installerGSPPath); err != nil {
-		return fmt.Errorf("failed to stat %s, err: %v", installerGSPPath, err)
+	haveSignature, err := checkFileExists(signaturePath)
+	if err != nil {
+		return fmt.Errorf("failed to check if %s exists, err: %v", signaturePath, err)
 	}
+	haveFirmware, err := checkFileExists(installerGSPPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if %s exists, err: %v", installerGSPPath, err)
+	}
+	switch {
+	case haveSignature && !haveFirmware:
+		return fmt.Errorf("firmware doesn't exist but its signature does.")
+	case !haveFirmware:
+		log.Infof("GSP firmware doesn't exist. Skipping firmware preparation.")
+		return nil
+	case !needSigned:
+		// No signature needed, copy firmware only.
+		if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
+			return fmt.Errorf("failed to copy firmware, err: %v.", err)
+		}
+		return nil
+	case !haveSignature:
+		log.Infof("GSP firmware signature doesn't exist. Skipping firmware preparation.")
+		return nil
+	default:
+		// Both firmware and signature exist.
+		if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
+			return fmt.Errorf("failed to copy firmware, err: %v.", err)
+		}
+		return setIMAXattr(signaturePath, containerGSPPath)
+	}
+}
+
+func copyFirmware(installerGSPPath, containerGSPPath, driverVersion string) error {
 	if err := os.MkdirAll(filepath.Dir(containerGSPPath), defaultFilePermission); err != nil {
 		return fmt.Errorf("Falied to create firmware directory, err: %v", err)
 	}
 	if err := utils.CopyFile(installerGSPPath, containerGSPPath); err != nil {
 		return fmt.Errorf("Falied to copy %s, err: %v", gspFileName, err)
 	}
-	// Set IAM xattr.
+	return nil
+}
+
+func setIMAXattr(signaturePath, containerGSPPath string) error {
 	signature, err := os.ReadFile(signaturePath)
 	if err != nil {
 		return fmt.Errorf("failed to read signature err: %v", err)
@@ -579,4 +606,15 @@ func prepareGSPFirmware(extractDir, driverVersion string) error {
 		return fmt.Errorf("failed to set xattr for security.ima, err: %v", err)
 	}
 	return nil
+}
+
+func checkFileExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("failed to stat %s, err: %v", path, err)
+		}
+	}
+	return true, nil
 }
