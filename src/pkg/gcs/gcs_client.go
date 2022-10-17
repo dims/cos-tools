@@ -71,6 +71,19 @@ func DownloadGCSObjectString(ctx context.Context,
 	return string(ret), nil
 }
 
+// GCSObjectExists checks if an object exists at inputURL
+func GCSObjectExists(ctx context.Context, gcsClient *storage.Client, inputURL string) (bool, error) {
+	gcsBucket, name, err := getGCSVariables(inputURL)
+	_, err = gcsClient.Bucket(gcsBucket).Object(name).Attrs(ctx)
+	if err == storage.ErrObjectNotExist {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // UploadGCSObject uploads an object at inputPath to destination URL
 func UploadGCSObject(ctx context.Context, gcsClient *storage.Client, inputPath, destinationURL string) error {
 	fileReader, err := os.Open(inputPath)

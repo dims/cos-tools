@@ -6,8 +6,9 @@ import (
 	"log"
 
 	"cloud.google.com/go/storage"
-	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_driver_builder/builder"
 	"cos.googlesource.com/cos/tools.git/src/pkg/gpuconfig"
+
+	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_driver_builder/internal/config"
 )
 
 var (
@@ -32,5 +33,5 @@ func main() {
 		log.Fatal("could not read configs: %v", err)
 	}
 
-	_ = builder.BuildPrecompiledDrivers(ctx, client, configs)
+	config.ProcessConfigs(ctx, client, configs)
 }
