@@ -92,6 +92,7 @@ func InstallCrossToolchain(downloader ArtifactsDownloader, destDir string) error
 			return errors.Wrap(err, "failed to download toolchain")
 		}
 		log.Info("Unpacking toolchain...")
+		// TODO (rnv): exclude rust dirs during unpacking toolchain archive
 		if err := exec.Command("tar", "xf", filepath.Join(destDir, toolchainArchive), "-C", destDir).Run(); err != nil {
 			return errors.Wrap(err, "failed to extract toolchain archive tarball")
 		}
@@ -237,4 +238,23 @@ func correctKernelMagicVersionIfNeeded(kernelSrcDir string) error {
 		}
 	}
 	return nil
+}
+
+func ForceSymlinkLinker(symlinkPath string) error {
+	if err := symlinkLinker(symlinkPath); err != nil {
+		// remove old symlink and try again
+		if _, err := os.Lstat(symlinkPath); err == nil {
+			if os.Remove(symlinkPath); err != nil {
+				return errors.Wrap(err, "failed to unlink")
+			}
+		} else if os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to check symlink")
+		}
+		return symlinkLinker(symlinkPath)
+	}
+	return nil
+}
+
+func symlinkLinker(symlinkPath string) error {
+	return os.Symlink("x86_64-cros-linux-gnu-ld", symlinkPath)
 }

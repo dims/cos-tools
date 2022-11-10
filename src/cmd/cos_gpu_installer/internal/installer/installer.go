@@ -181,7 +181,7 @@ func linkDrivers(toolchainDir, nvidiaDir string) error {
 	// COS 85+ kernels use lld as their linker
 	linker := filepath.Join(toolchainDir, "bin", "ld.lld")
 	linkerScript := filepath.Join(toolchainDir, "usr", "src", "linux-headers-"+kernelRelease, "scripts", "module.lds")
-	linkerScriptExists, err := checkFileExists(linkerScript)
+	linkerScriptExists, err := utils.CheckFileExists(linkerScript)
 	if err != nil {
 		return fmt.Errorf("failed to check if %s exists, err: %v", linkerScript, err)
 	}
@@ -555,11 +555,11 @@ func prepareGSPFirmware(extractDir, driverVersion string, needSigned bool) error
 	signaturePath := signing.GetModuleSignature(gspFileName)
 	installerGSPPath := filepath.Join(extractDir, "firmware", gspFileName)
 	containerGSPPath := filepath.Join(gpuFirmwareDirContainer, driverVersion, gspFileName)
-	haveSignature, err := checkFileExists(signaturePath)
+	haveSignature, err := utils.CheckFileExists(signaturePath)
 	if err != nil {
 		return fmt.Errorf("failed to check if %s exists, err: %v", signaturePath, err)
 	}
-	haveFirmware, err := checkFileExists(installerGSPPath)
+	haveFirmware, err := utils.CheckFileExists(installerGSPPath)
 	if err != nil {
 		return fmt.Errorf("failed to check if %s exists, err: %v", installerGSPPath, err)
 	}
@@ -606,15 +606,4 @@ func setIMAXattr(signaturePath, containerGSPPath string) error {
 		return fmt.Errorf("failed to set xattr for security.ima, err: %v", err)
 	}
 	return nil
-}
-
-func checkFileExists(path string) (bool, error) {
-	if _, err := os.Stat(path); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		} else {
-			return false, fmt.Errorf("failed to stat %s, err: %v", path, err)
-		}
-	}
-	return true, nil
 }

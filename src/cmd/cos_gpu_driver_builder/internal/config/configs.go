@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"cloud.google.com/go/storage"
 	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_driver_builder/internal/builder"
@@ -18,18 +20,18 @@ func outputDriverFile(config gpuconfig.GPUPrecompilationConfig) string {
 
 func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuconfig.GPUPrecompilationConfig) error {
 	for _, config := range configs {
-		log.Printf("building precompiled GPU driver for: %s, driver version %s\n", config.Version, config.DriverVersion)
+		log.Printf("building precompiled GPU driver for %s:%s, driver version %s\n", config.VersionType, config.Version, config.DriverVersion)
 		if processed, _ := gcs.GCSObjectExists(ctx, client, outputDriverFile(config)); processed {
 			continue
 		}
-
-		precompiledDriver, err := builder.BuildPrecompiledDriver(ctx, client, config)
+		dir, precompiledDriver, err := builder.BuildPrecompiledDriver(ctx, client, config)
+		defer os.RemoveAll(dir)
 		if err != nil {
 			log.Printf("precompilation failed for: %s, driver version %s\n", config.Version, config.DriverVersion)
 			continue
 		}
-
-		if err := gcs.UploadGCSObject(ctx, client, precompiledDriver, outputDriverFile(config)); err != nil {
+		outputDriverFile := filepath.Join(config.ProtoConfig.GetDriverOutputGcsDir(), precompiledDriver)
+		if err := gcs.UploadGCSObject(ctx, client, filepath.Join(dir, precompiledDriver), outputDriverFile); err != nil {
 			log.Printf("export failed for: %s, driver version %s\n", config.Version, config.DriverVersion)
 			continue
 		}

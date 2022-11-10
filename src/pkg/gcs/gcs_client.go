@@ -52,6 +52,9 @@ func DownloadGCSObject(ctx context.Context,
 	if _, err := io.Copy(f, r); err != nil {
 		return fmt.Errorf("error copying file from gcs bucket: %v", err)
 	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("error closing file: %v", err)
+	}
 	return nil
 }
 

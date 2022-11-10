@@ -442,3 +442,13 @@ func StringSliceContains(arr []string, elem string) bool {
 	}
 	return false
 }
+
+func CheckFileExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat %s, err: %v", path, err)
+	}
+	return true, nil
+}
