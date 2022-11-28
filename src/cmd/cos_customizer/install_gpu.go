@@ -44,7 +44,7 @@ const (
 
 // TODO(b/121332360): Move most GPU functionality to cos-gpu-installer
 var (
-	validGPUs = []string{"nvidia-tesla-k80", "nvidia-tesla-p100", "nvidia-tesla-v100"}
+	validGPUs = []string{"nvidia-tesla-k80", "nvidia-tesla-p100", "nvidia-tesla-v100", "nvidia-tesla-t4"}
 )
 
 // InstallGPU implements subcommands.Command for the "install-gpu" command.
