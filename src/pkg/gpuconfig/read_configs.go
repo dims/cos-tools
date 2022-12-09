@@ -41,6 +41,9 @@ func listConfigDirs(ctx context.Context, client *storage.Client, bucketName stri
 // Reads precompilation config from GCS bucket into GPUPrecompilationConfig struct.
 func ReadConfig(ctx context.Context, client *storage.Client, dirName string) (GPUPrecompilationConfig, error) {
 	var config GPUPrecompilationConfig
+	if len(dirName) > 1 && dirName[len(dirName)-1] != '/' {
+		dirName += "/"
+	}
 	metadata, err := gcs.DownloadGCSObjectString(ctx, client, dirName+"metadata")
 	if err != nil {
 		return config, err
@@ -64,7 +67,7 @@ func ReadConfig(ctx context.Context, client *storage.Client, dirName string) (GP
 }
 
 // Reads all config dirs published within <lookBackDays> of current date into a list of GPUPrecompilationConfig struct
-func ReadConfigs(ctx context.Context, client *storage.Client, bucketName string, lookBackDays int) ([]GPUPrecompilationConfig, error) {
+func ReadConfigs(ctx context.Context, client *storage.Client, bucketName string, lookBackDays int, versionType string) ([]GPUPrecompilationConfig, error) {
 	startDay := strings.TrimSuffix(timeNow().AddDate(0, 0, -lookBackDays).Format(time.RFC3339), "Z")
 	dirNames, err := listConfigDirs(ctx, client, bucketName, startDay)
 	if err != nil {
@@ -77,7 +80,16 @@ func ReadConfigs(ctx context.Context, client *storage.Client, bucketName string,
 		if err != nil {
 			return nil, err
 		}
-		configs = append(configs, config)
+		if matchVersionType(versionType, config.VersionType) {
+			configs = append(configs, config)
+		}
 	}
 	return configs, nil
+}
+
+func matchVersionType(mode string, versionType string) bool {
+	if strings.EqualFold(mode, "both") {
+		return true
+	}
+	return strings.EqualFold(mode, versionType)
 }

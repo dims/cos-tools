@@ -17,6 +17,8 @@ var (
 	configDir = flag.String("config-dir", "", "Directory containing config.textproto and metadata file that needs to be processed.")
 	bucket    = flag.String("watcher-gcs", "", "GCS bucket to watch for unprocessed configs.")
 	lookBack  = flag.Int("lookBackDays", 7, "read configs produced within the past <lookBack> days.")
+	// default to only building image CI precompiled drivers
+	mode = flag.String("mode", "image", "image, kernel, or both for processing image CI/kernel CI configs. Works only with watcher-gcs arg")
 )
 
 func main() {
@@ -34,7 +36,7 @@ func main() {
 
 	var configs []gpuconfig.GPUPrecompilationConfig
 	if *bucket != "" { // cos_gpu_driver_builder --watcher-gcs="cos-gpu-configs"
-		configs, err = gpuconfig.ReadConfigs(ctx, client, *bucket, *lookBack)
+		configs, err = gpuconfig.ReadConfigs(ctx, client, *bucket, *lookBack, *mode)
 		if err != nil {
 			log.Fatal("could not read configs:", err)
 		}
