@@ -27,7 +27,6 @@ import (
 const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
 	gpuFirmwareDirContainer       = "/usr/local/nvidia/firmware/nvidia"
-	gspFileName                   = "gsp.bin"
 	defaultGPUDriverFile          = "gpu_default_version"
 	latestGPUDriverFile           = "gpu_latest_version"
 	r470GPUDriverFile             = "gpu_R470_version"
@@ -37,6 +36,7 @@ const (
 )
 
 var (
+	gspFileNames = []string{"gsp.bin", "gsp_tu10x.bin", "gsp_ad10x.bin"}
 	// ErrDriverLoad indicates that installed GPU drivers could not be loaded into
 	// the kernel.
 	ErrDriverLoad = stderrors.New("failed to load GPU drivers")
@@ -552,42 +552,44 @@ func loadGPUDrivers(needSigned, test bool) error {
 }
 
 func prepareGSPFirmware(extractDir, driverVersion string, needSigned bool) error {
-	signaturePath := signing.GetModuleSignature(gspFileName)
-	installerGSPPath := filepath.Join(extractDir, "firmware", gspFileName)
-	containerGSPPath := filepath.Join(gpuFirmwareDirContainer, driverVersion, gspFileName)
-	haveSignature, err := utils.CheckFileExists(signaturePath)
-	if err != nil {
-		return fmt.Errorf("failed to check if %s exists, err: %v", signaturePath, err)
-	}
-	haveFirmware, err := utils.CheckFileExists(installerGSPPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if %s exists, err: %v", installerGSPPath, err)
-	}
-	switch {
-	case haveSignature && !haveFirmware:
-		return fmt.Errorf("firmware doesn't exist but its signature does.")
-	case !haveFirmware:
-		log.Infof("GSP firmware doesn't exist. Skipping firmware preparation.")
-		return nil
-	case !needSigned:
-		// No signature needed, copy firmware only.
-		if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
-			return fmt.Errorf("failed to copy firmware, err: %v.", err)
+	for _, gspFileName := range gspFileNames {
+		signaturePath := signing.GetModuleSignature(gspFileName)
+		installerGSPPath := filepath.Join(extractDir, "firmware", gspFileName)
+		containerGSPPath := filepath.Join(gpuFirmwareDirContainer, driverVersion, gspFileName)
+		haveSignature, err := utils.CheckFileExists(signaturePath)
+		if err != nil {
+			return fmt.Errorf("failed to check if %s exists, err: %v", signaturePath, err)
 		}
-		return nil
-	case !haveSignature:
-		log.Infof("GSP firmware signature doesn't exist. Skipping firmware preparation.")
-		return nil
-	default:
-		// Both firmware and signature exist.
-		if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
-			return fmt.Errorf("failed to copy firmware, err: %v.", err)
+		haveFirmware, err := utils.CheckFileExists(installerGSPPath)
+		if err != nil {
+			return fmt.Errorf("failed to check if %s exists, err: %v", installerGSPPath, err)
 		}
-		return setIMAXattr(signaturePath, containerGSPPath)
+		switch {
+		case haveSignature && !haveFirmware:
+			return fmt.Errorf("firmware doesn't exist but its signature does.")
+		case !haveFirmware:
+			log.Infof("GSP firmware for %s doesn't exist. Skipping firmware preparation for %s.", gspFileName, gspFileName)
+		case !needSigned:
+			// No signature needed, copy firmware only.
+			if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
+				return fmt.Errorf("failed to copy firmware, err: %v.", err)
+			}
+		case !haveSignature:
+			log.Infof("GSP firmware signature for %s doesn't exist. Skipping firmware preparation for %s.", gspFileName, gspFileName)
+		default:
+			// Both firmware and signature exist.
+			if err := copyFirmware(installerGSPPath, containerGSPPath, driverVersion); err != nil {
+				return fmt.Errorf("failed to copy firmware, err: %v.", err)
+			}
+			if err := setIMAXattr(signaturePath, containerGSPPath); err != nil {
+				return err
+			}
+		}
 	}
+	return nil
 }
 
-func copyFirmware(installerGSPPath, containerGSPPath, driverVersion string) error {
+func copyFirmware(installerGSPPath, containerGSPPath, gspFileName string) error {
 	if err := os.MkdirAll(filepath.Dir(containerGSPPath), defaultFilePermission); err != nil {
 		return fmt.Errorf("Falied to create firmware directory, err: %v", err)
 	}
