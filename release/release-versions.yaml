@@ -23,10 +23,10 @@
     - "v2.0.31"
 - staging_container_name: "cos-gpu-driver-builder"
   release_container_name: "cos-gpu-driver-builder"
-  build_commit: "35e5afd33a30562c424d71500df26ac2fc4bc5da"
+  build_commit: "d72d557590c807a36c3398fda1ba02864f37f029"
   release_tags:
     - "latest"
-    - "v1.0.0"
+    - "v1.1.0"
 - staging_container_name: "cos-gpu-config-builder"
   release_container_name: "cos-gpu-config-builder"
   build_commit: "3e19b481013cc45ef82aedc710d63e964c70f3c9"
