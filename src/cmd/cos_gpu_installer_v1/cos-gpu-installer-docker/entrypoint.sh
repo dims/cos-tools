@@ -34,6 +34,7 @@ ROOT_MOUNT_DIR="${ROOT_MOUNT_DIR:-/root}"
 CACHE_FILE="${NVIDIA_INSTALL_DIR_CONTAINER}/.cache"
 LOCK_FILE="${ROOT_MOUNT_DIR}/tmp/cos_gpu_installer_lock"
 LOCK_FILE_FD=20
+GSP_FIRMWARE_FILES=("gsp.bin" "gsp_tu10x.bin" "gsp_ad10x.bin")
 set +x
 
 # TOOLCHAIN_DOWNLOAD_URL, CC and CXX are set by
@@ -448,6 +449,17 @@ run_nvidia_installer() {
     # drivers are consistent.
     sh "${INSTALLER_FILE}" -x --target "${dir_to_extract}"
     "${dir_to_extract}/nvidia-installer" "${installer_args[@]}"
+    local -r firmware_dir="${NVIDIA_INSTALL_DIR_CONTAINER}/firmware/nvidia/${NVIDIA_DRIVER_VERSION}"
+    for gsp_file in ${GSP_FIRMWARE_FILES[@]};
+    do
+      if [[ -f "${dir_to_extract}/firmware/${gsp_file}" ]]; then
+        info "installing firmware file ${gsp_file}"
+        mkdir -p "${firmware_dir}"
+        cp "${dir_to_extract}/firmware/${gsp_file}" "${firmware_dir}"
+      else
+        info "skipping firmware file ${gsp_file} not found in installer pkg"
+      fi
+    done
   fi
 
   popd
@@ -457,6 +469,7 @@ configure_cached_installation() {
   info "Configuring cached driver installation"
   update_container_ld_cache
   if ! lsmod | grep -q -w 'nvidia'; then
+    # TODO (rnv) use NVreg_EnableGpuFirmware=1 for Turing and later
     insmod "${NVIDIA_INSTALL_DIR_CONTAINER}/drivers/nvidia.ko"
   fi
   if ! lsmod | grep -q -w 'nvidia_uvm'; then
