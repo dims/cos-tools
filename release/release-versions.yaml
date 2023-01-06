@@ -1,9 +1,9 @@
 - staging_container_name: "cos-customizer"
   release_container_name: "cos-customizer"
-  build_commit: "0b9f43f54eb1ab0f9c009649910861434fea229d"
+  build_commit: "52afe150ee35373ec08b1d356af0a1ccbeef0e4c"
   release_tags:
     - "latest"
-    - "v20221130"
+    - "v20230105"
 - staging_container_name: "toolbox"
   release_container_name: "toolbox"
   build_commit: "ad3d535f2b6fe0708341d92524b6625e10192edf"
