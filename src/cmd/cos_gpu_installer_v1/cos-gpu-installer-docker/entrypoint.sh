@@ -414,7 +414,7 @@ configure_nvidia_installation_dirs() {
   update_container_ld_cache
 
   # Install an exit handler to cleanup the overlayfs mount points.
-  trap "{ umount /lib/modules/\"$(uname -r)\"/video; umount -fl /usr/lib/x86_64-linux-gnu ; umount /usr/bin; }" EXIT
+  trap "{ umount /lib/modules/\"$(uname -r)\"/video; umount -fl /usr/lib/x86_64-linux-gnu ; umount -fl /usr/bin; }" EXIT
   popd
 }
 
