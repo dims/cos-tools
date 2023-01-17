@@ -344,8 +344,26 @@ So we create a symlink to make sure the correct linker is used by \
 the nvidia installer."
   ln -sf x86_64-cros-linux-gnu-ld "${TOOLCHAIN_PKG_DIR}/bin/ld"
 
+  info "Creating a CC wrapper. Newer versions of LLVM have different \
+-Wstrict-prototypes behavior that impacts the nvidia installer. The kernel \
+always uses -Werror=strict-prototypes by default. This wrapper removes \
+-Werror=strict-prototypes from the CC command line."
+  mkdir /tmp/wrappers
+  cat <<EOF > "/tmp/wrappers/${CC}"
+#!/bin/bash
+for arg; do
+  shift
+  if [[ "\${arg}" == "-Werror=strict-prototypes" ]]; then continue; fi
+  set -- "\$@" "\${arg}"
+done
+exec ${TOOLCHAIN_PKG_DIR}/bin/${CC} \$@
+EOF
+  chmod a+x "/tmp/wrappers/${CC}"
+  info "Printing CC wrapper to stdout"
+  cat "/tmp/wrappers/${CC}"
+
   info "Configuring environment variables for cross-compilation"
-  export PATH="${TOOLCHAIN_PKG_DIR}/bin:${PATH}"
+  export PATH="/tmp/wrappers:${TOOLCHAIN_PKG_DIR}/bin:${PATH}"
   export SYSROOT="${TOOLCHAIN_PKG_DIR}/usr/x86_64-cros-linux-gnu"
 }
 
