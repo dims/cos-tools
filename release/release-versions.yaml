@@ -12,10 +12,10 @@
     - "v20220722"
 - staging_container_name: "cos-gpu-installer-v1"
   release_container_name: "cos-gpu-installer"
-  build_commit: "e874376bb55b94dc87d039ef115ea69869b21e7b"
+  build_commit: "a871f76942cc222f9bc46412e23f11da411f97b8"
   release_tags:
     - "latest"
-    - "v20230109"
+    - "v20230117"
 - staging_container_name: "cos-gpu-installer"
   release_container_name: "cos-gpu-installer"
   build_commit: "643a342daf56984b542b2dd641d8e530489c9771"
