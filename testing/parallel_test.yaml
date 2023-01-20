@@ -16,7 +16,7 @@ substitutions:
   "_TEST_1": "smoke_test"
   "_INPUT_IMAGE_1": "cos-dev-69-10895-0-0"
   "_TEST_2": "gpu_test"
-  "_INPUT_IMAGE_2": "cos-69-10895-201-0"
+  "_INPUT_IMAGE_2": "cos-89-16108-798-1"
   "_INPUT_PROJECT": "cos-cloud"
 steps:
 - name: 'gcr.io/cloud-builders/bazel'
@@ -56,7 +56,7 @@ steps:
          "-var:test_cfg", "../${_TEST_1}/preload_test.cfg", "testing/util/run_test.wf.json"]
 # TEST_2 workflow
 - name: 'busybox'
-  args: ["sed", "-i", "-e", "s|%s|'396.26'|",
+  args: ["sed", "-i", "-e", "s|%s|'450.216.04'|",
          "testing/${_TEST_2}/preload_test.cfg"]
 - name: 'bazel:cos_customizer'
   waitFor: "docker-build"
@@ -73,9 +73,8 @@ steps:
   id: "test-2-install-gpu"
   args: ["-local-state-workdir=.${_TEST_2}",
          "install-gpu",
-         "-version=396.26",
-         "-md5sum=4c4b23467495338ef2612769ebeadb3d",
-         "-gpu-type=nvidia-tesla-k80"]
+         "-version=450.216.04",
+         "-gpu-type=nvidia-tesla-t4"]
 - name: 'bazel:cos_customizer'
   waitFor: "test-2-install-gpu"
   id: "test-2-run-script"

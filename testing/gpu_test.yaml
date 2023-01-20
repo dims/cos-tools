@@ -20,20 +20,6 @@ steps:
   - '-c'
   - |
     test_list=("gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=390.46 --async --format='value(ID)' ." 
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=396.26 --async --format='value(ID)' ."   
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=396.37 --async --format='value(ID)' ." 
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=396.44 --async --format='value(ID)' ."
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=418.67,_INPUT_IMAGE=cos-73-11647-656-0\
-                  --async --format='value(ID)' ."
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=418.67,_INPUT_IMAGE=cos-77-12371-1079-0\
-                  --async --format='value(ID)' ."
-               "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
                   --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-81-12871-1196-0\
                   --async --format='value(ID)' ."
                "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\

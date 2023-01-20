@@ -14,7 +14,7 @@
 
 substitutions:
   "_TEST": "gpu_test"
-  "_INPUT_IMAGE": "cos-69-10895-201-0"
+  "_INPUT_IMAGE": "cos-89-16108-798-1"
   "_INPUT_PROJECT": "cos-cloud"
   "_DRIVER_VERSION": ""
   "_DEPS_DIR": ""
@@ -43,7 +43,7 @@ steps:
 - name: 'bazel:cos_customizer'
   args: ["install-gpu",
          "-version=${_DRIVER_VERSION}",
-         "-gpu-type=nvidia-tesla-k80",
+         "-gpu-type=nvidia-tesla-t4",
          "-deps-dir=${_DEPS_DIR}"]
 - name: 'bazel:cos_customizer'
   args: ["run-script",

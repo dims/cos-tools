@@ -14,7 +14,9 @@
           "Disks": [{"Source": "boot-disk"}],
           "Metadata": {
             "user-data": "${SOURCE:cloud-config}",
-            "block-project-ssh-keys": "TRUE"
+            "block-project-ssh-keys": "TRUE",
+            "cos-update-strategy": "update_disabled",
+            "google-logging-enabled": "false"
           },
           "guestAccelerators": [
             {
