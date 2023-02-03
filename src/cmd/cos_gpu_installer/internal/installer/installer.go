@@ -397,6 +397,15 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 		if err := installUserLibs(extractDir); err != nil {
 			return fmt.Errorf("failed to install userspace libraries: %v", err)
 		}
+
+		// Driver version may be empty if custom nvidia-installer-url is used
+		// read from manifest file
+		if driverVersion == "" {
+
+			driverVersion = findDriverVersionManifestFile(filepath.Join(extractDir, ".manifest"))
+			log.Info("found driver version from nvidia-installer pkg ", driverVersion)
+		}
+
 		if err := prepareGSPFirmware(extractDir, driverVersion, needSigned); err != nil {
 			return fmt.Errorf("failed to prepare GSP firmware, err: %v", err)
 		}
@@ -610,6 +619,21 @@ func setIMAXattr(signaturePath, containerGSPPath string) error {
 		return fmt.Errorf("failed to set xattr for security.ima, err: %v", err)
 	}
 	return nil
+}
+
+// tries to read .manifest file to find driverVersion present in the manifest
+func findDriverVersionManifestFile(manifestFilePath string) string {
+	manifestFileRawBytes, err := os.ReadFile(manifestFilePath)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(manifestFileRawBytes), "\n")
+	if len(lines) < 2 {
+		return ""
+	}
+	// driver version present in the second line of the file
+	driverVersion := strings.TrimSpace(lines[1])
+	return driverVersion
 }
 
 func RunDriverInstallerPrebuiltModules(downloader *cos.GCSDownloader, installerFilename, driverVersion string) error {
