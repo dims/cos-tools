@@ -15,6 +15,8 @@ const (
 	cacheFile        = ".cache"
 	buildNumberKey   = "BUILD_ID"
 	driverVersionKey = "DRIVER_VERSION"
+	kernelOpenKey    = "KERNEL_OPEN"
+	kernelOpenValue  = "Y"
 )
 
 // Cacher is to cache GPU driver installation info.
@@ -34,7 +36,7 @@ func NewCacher(gpuInstallDir, buildNumber, driverVersion string) *Cacher {
 }
 
 // Cache writes to fs about the information that a given GPU driver has been installed.
-func (c *Cacher) Cache() error {
+func (c *Cacher) Cache(kernelOpen bool) error {
 	cachePath := filepath.Join(c.gpuInstallDir, cacheFile)
 	f, err := os.Create(cachePath)
 	defer f.Close()
@@ -45,6 +47,10 @@ func (c *Cacher) Cache() error {
 	cacheMap := map[string]string{
 		buildNumberKey:   c.buildNumber,
 		driverVersionKey: c.driverVersion}
+
+	if kernelOpen {
+		cacheMap[kernelOpenKey] = kernelOpenValue
+	}
 
 	var cache string
 	for k, v := range cacheMap {
@@ -62,15 +68,18 @@ func (c *Cacher) Cache() error {
 	return nil
 }
 
-// IsCached returns a bool indicating whether a given GPU driver has been installed.
-func (c *Cacher) IsCached() (bool, error) {
+// IsCached returns a bool pair indicating whether a given GPU driver has been
+// installed and if the installation contains open source kernel modules
+func (c *Cacher) IsCached() (bool, bool, error) {
 	cacheMap, err := utils.LoadEnvFromFile(c.gpuInstallDir, cacheFile)
 	if err != nil {
 		log.Infof("error: %v", err)
-		return false, err
+		return false, false, err
 	}
 	log.Infof("%v", cacheMap)
 
 	return (c.buildNumber == cacheMap[buildNumberKey] &&
-		c.driverVersion == cacheMap[driverVersionKey]), nil
+			c.driverVersion == cacheMap[driverVersionKey]),
+		cacheMap[kernelOpenKey] == kernelOpenValue,
+		nil
 }

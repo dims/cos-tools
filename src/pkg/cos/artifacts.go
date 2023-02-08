@@ -45,6 +45,7 @@ type ArtifactsDownloader interface {
 	DownloadKernelHeaders(destDir string) error
 	DownloadArtifact(destDir, artifact string) error
 	GetArtifact(artifact string) ([]byte, error)
+	ArtifactExists(artifact string) (bool, error)
 }
 
 // GCSDownloader is the struct downloading COS artifacts from GCS bucket.
@@ -128,4 +129,18 @@ func (d *GCSDownloader) DownloadArtifact(destDir, artifactPath string) error {
 		return errors.Errorf("failed to download %s from gs://%s/%s : %s", artifactPath, d.gcsDownloadBucket, gcsPath, err)
 	}
 	return nil
+}
+
+func (d *GCSDownloader) ArtifactExists(artifactPath string) (bool, error) {
+	var objects []string
+	var err error
+	if objects, err = utils.ListGCSBucket(d.gcsDownloadBucket, d.gcsDownloadPrefix); err != nil {
+		return false, errors.Wrap(err, "failed to find artifact")
+	}
+	for _, object := range objects {
+		if object == filepath.Join(d.gcsDownloadPrefix, artifactPath) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

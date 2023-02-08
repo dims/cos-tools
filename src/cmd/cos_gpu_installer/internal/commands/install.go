@@ -26,17 +26,20 @@ import (
 )
 
 const (
-	grepFound       = 0
-	hostRootPath    = "/root"
-	kernelSrcDir    = "/build/usr/src/linux"
-	toolchainPkgDir = "/build/cos-tools"
+	grepFound            = 0
+	hostRootPath         = "/root"
+	kernelSrcDir         = "/build/usr/src/linux"
+	toolchainPkgDir      = "/build/cos-tools"
+	installerURLTemplate = "https://us.download.nvidia.com/tesla/%[1]s/NVIDIA-Linux-x86_64-%[1]s.run"
 )
 
 type GPUType int
 
 const (
-	// Currently we only need to know if K80 is used.
 	K80 GPUType = iota
+	P4
+	P100
+	V100
 	Others
 )
 
@@ -44,11 +47,27 @@ func (g GPUType) String() string {
 	switch g {
 	case K80:
 		return "K80"
+	case P4:
+		return "P4"
+	case P100:
+		return "P100"
+	case V100:
+		return "V100"
 	case Others:
 		return "Others"
 	default:
 		return "Unknown"
 	}
+}
+
+func (g GPUType) OpenSupported() bool {
+	switch g {
+	case K80, P4, P100, V100:
+		return false
+	default:
+		return true
+	}
+
 }
 
 type Fallback struct {
@@ -76,6 +95,7 @@ type InstallCommand struct {
 	debug              bool
 	test               bool
 	prepareBuildTools  bool
+	kernelOpen         bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -224,9 +244,9 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	// We only want to cache drivers installed from official sources.
 	if c.nvidiaInstallerURL == "" {
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
-		if isCached, err := cacher.IsCached(); isCached && err == nil {
+		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
-			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test); err != nil {
+			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
 				return subcommands.ExitFailure
 			}
@@ -243,6 +263,28 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 
 	log.V(2).Info("Did not find cached version, installing the drivers...")
+
+	// install OSS kernel modules (if available) if device supports
+	if gpuType.OpenSupported() {
+		c.kernelOpen = gpuType.OpenSupported()
+	}
+
+	prebuiltModulesAvailable, err := installer.PrebuiltModulesAvailable(downloader, c.driverVersion, c.kernelOpen)
+
+	if err != nil {
+		c.logError(errors.Wrap(err, "failed to find prebuilt modules"))
+		return subcommands.ExitFailure
+	}
+
+	if prebuiltModulesAvailable {
+		log.V(2).Info("Found prebuilt kernel modules, installing additional components...")
+		if err := installDriverPrebuiltModules(c, cacher, envReader, downloader); err != nil {
+			c.logError(err)
+			return subcommands.ExitFailure
+		}
+		return subcommands.ExitSuccess
+	}
+
 	if err := installDriver(c, cacher, envReader, downloader); err != nil {
 		c.logError(err)
 		return subcommands.ExitFailure
@@ -335,7 +377,39 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 	if cacher != nil {
-		if err := cacher.Cache(); err != nil {
+		if err := cacher.Cache(false); err != nil {
+			return errors.Wrap(err, "failed to cache installation")
+		}
+	}
+	if err := installer.VerifyDriverInstallation(); err != nil {
+		return errors.Wrap(err, "failed to verify installation")
+	}
+	if err := modules.UpdateHostLdCache(hostRootPath, filepath.Join(c.hostInstallDir, "lib64")); err != nil {
+		return errors.Wrap(err, "failed to update host ld cache")
+	}
+	log.Info("Finished installing the drivers.")
+	return nil
+}
+
+func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, envReader *cos.EnvReader, downloader *cos.GCSDownloader) error {
+	callback, err := installer.ConfigureDriverInstallationDirs(filepath.Join(hostRootPath, c.hostInstallDir), envReader.KernelRelease())
+	if err != nil {
+		return errors.Wrap(err, "failed to configure GPU driver installation dirs")
+	}
+	defer func() { callback <- 0 }()
+
+	installerURL := fmt.Sprintf(installerURLTemplate, c.driverVersion)
+	installerFile, err := installer.DownloadToInstallDir(installerURL, "Downloading driver installer")
+	if err != nil {
+		return err
+	}
+
+	if err := installer.RunDriverInstallerPrebuiltModules(downloader, installerFile, c.driverVersion); err != nil {
+		return err
+	}
+
+	if cacher != nil {
+		if err := cacher.Cache(true); err != nil {
 			return errors.Wrap(err, "failed to cache installation")
 		}
 	}
@@ -367,6 +441,12 @@ func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
 	switch {
 	case strings.Contains(out, "[Tesla K80]"):
 		return true, K80, nil
+	case strings.Contains(out, "NVIDIA Corporation Device 15f8"), strings.Contains(out, "NVIDIA Corporation GP100GL"), strings.Contains(out, "[Tesla P100"):
+		return true, P100, nil
+	case strings.Contains(out, "NVIDIA Corporation Device 1db1"), strings.Contains(out, "NVIDIA Corporation GV100GL"), strings.Contains(out, "[Tesla V100"):
+		return true, V100, nil
+	case strings.Contains(out, "NVIDIA Corporation Device 1bb3"), strings.Contains(out, "NVIDIA Corporation GP104GL"), strings.Contains(out, "[Tesla P4"):
+		return true, P4, nil
 	default:
 		return true, Others, nil
 	}

@@ -82,3 +82,7 @@ func (d *GPUArtifactsDownloader) downloadArtifact(destDir, artifactPath, fileNam
 		return fmt.Errorf("only https:// or gs:// urls supported: %s", url)
 	}
 }
+
+func (d *GPUArtifactsDownloader) ArtifactExists(artifactPath string) (bool, error) {
+	return false, fmt.Errorf("not implemented")
+}

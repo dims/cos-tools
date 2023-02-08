@@ -33,6 +33,7 @@ const (
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
 	signedURLKey                  = "Expires"
+	prebuiltModuleTemplate        = "nvidia-drivers-%s.tgz"
 )
 
 var (
@@ -64,7 +65,7 @@ func VerifyDriverInstallation() error {
 }
 
 // ConfigureCachedInstalltion updates ldconfig and installs the cached GPU driver kernel modules.
-func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned, test bool) error {
+func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned, test, kernelOpen bool) error {
 	log.V(2).Info("Configuring cached driver installation")
 
 	if err := createHostDirBindMount(gpuInstallDirHost, gpuInstallDirContainer); err != nil {
@@ -73,7 +74,7 @@ func ConfigureCachedInstalltion(gpuInstallDirHost string, needSigned, test bool)
 	if err := updateContainerLdCache(); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
-	if err := loadGPUDrivers(needSigned, test); err != nil {
+	if err := loadGPUDrivers(needSigned, test, kernelOpen); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
 
@@ -384,7 +385,7 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 	// The legacy linking method does this when the installer doesn't fail (i.e.
 	// module signature verification isn't enforced).
 	if (legacyLink && legacyInstallerFailed) || !legacyLink {
-		if err := loadGPUDrivers(needSigned, test); err != nil {
+		if err := loadGPUDrivers(needSigned, test, false); err != nil {
 			return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 		}
 	}
@@ -523,9 +524,9 @@ func createOverlayFS(lowerDir, upperDir, workDir string) error {
 	return nil
 }
 
-func loadGPUDrivers(needSigned, test bool) error {
+func loadGPUDrivers(needSigned, test, kernelOpen bool) error {
 	// Don't need to load public key in test mode. Platform key is used.
-	if needSigned && !test {
+	if needSigned && !test && !kernelOpen {
 		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der"), modules.SecondaryKeyring); err != nil {
 			return errors.Wrap(err, "failed to load public key")
 		}
@@ -534,11 +535,12 @@ func loadGPUDrivers(needSigned, test bool) error {
 			log.Infof("Falied to load public key to IMA keyring, err: %v", err)
 		}
 	}
+	kernelModulePath := filepath.Join(gpuInstallDirContainer, "drivers")
 	gpuModules := map[string]string{
-		"nvidia":         filepath.Join(gpuInstallDirContainer, "drivers", "nvidia.ko"),
-		"nvidia_uvm":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-uvm.ko"),
-		"nvidia_drm":     filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-drm.ko"),
-		"nvidia_modeset": filepath.Join(gpuInstallDirContainer, "drivers", "nvidia-modeset.ko"),
+		"nvidia":         filepath.Join(kernelModulePath, "nvidia.ko"),
+		"nvidia_uvm":     filepath.Join(kernelModulePath, "nvidia-uvm.ko"),
+		"nvidia_drm":     filepath.Join(kernelModulePath, "nvidia-drm.ko"),
+		"nvidia_modeset": filepath.Join(kernelModulePath, "nvidia-modeset.ko"),
 	}
 	// Need to load modules in order due to module dependency.
 	moduleNames := []string{"nvidia", "nvidia_uvm", "nvidia_drm", "nvidia_modeset"}
@@ -608,4 +610,47 @@ func setIMAXattr(signaturePath, containerGSPPath string) error {
 		return fmt.Errorf("failed to set xattr for security.ima, err: %v", err)
 	}
 	return nil
+}
+
+func RunDriverInstallerPrebuiltModules(downloader *cos.GCSDownloader, installerFilename, driverVersion string) error {
+	// fetch the prebuilt modules
+	if err := downloader.DownloadArtifact(gpuInstallDirContainer, fmt.Sprintf(prebuiltModuleTemplate, driverVersion)); err != nil {
+		return fmt.Errorf("failed to download prebuilt modules: %v", err)
+	}
+
+	tarballPath := filepath.Join(gpuInstallDirContainer, fmt.Sprintf(prebuiltModuleTemplate, driverVersion))
+	// extract the prebuilt modules and firmware to the installation dirs
+	if err := exec.Command("tar", "--overwrite", "--xattrs", "--xattrs-include=*", "-xf", tarballPath, "-C", gpuInstallDirContainer).Run(); err != nil {
+		return fmt.Errorf("failed to extract prebuilt modules: %v", err)
+	}
+
+	// load the prebuilt kernel modules
+	if err := loadGPUDrivers(false, false, true); err != nil {
+		return fmt.Errorf("%w: %v", ErrDriverLoad, err)
+	}
+
+	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
+	extractDir := "/tmp/extract"
+	if err := os.RemoveAll(extractDir); err != nil {
+		return fmt.Errorf("failed to clean %q: %v", extractDir, err)
+	}
+	cmd := exec.Command("sh", installerFilename, "-x", "--target", extractDir)
+	cmd.Dir = gpuInstallDirContainer
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, "failed to extract installer files")
+	}
+	if err := installUserLibs(extractDir); err != nil {
+		return fmt.Errorf("failed to install userspace libraries: %v", err)
+	}
+
+	return nil
+}
+
+func PrebuiltModulesAvailable(downloader *cos.GCSDownloader, driverVersion string, kernelOpen bool) (bool, error) {
+	if !kernelOpen {
+		return false, nil
+	}
+
+	prebuiltModulesArtifactPath := fmt.Sprintf(prebuiltModuleTemplate, driverVersion)
+	return downloader.ArtifactExists(prebuiltModulesArtifactPath)
 }
