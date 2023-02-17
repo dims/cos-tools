@@ -1,5 +1,5 @@
-# Start from debian
-FROM debian:bookworm
+# Start from ubuntu
+FROM debian:bookworm-backports
 
 RUN apt-get update
 
