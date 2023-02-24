@@ -265,7 +265,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	log.V(2).Info("Did not find cached version, installing the drivers...")
 
 	// install OSS kernel modules (if available) if device supports
-	if gpuType.OpenSupported() {
+	if !c.unsignedDriver && gpuType.OpenSupported() {
 		c.kernelOpen = gpuType.OpenSupported()
 	}
 
