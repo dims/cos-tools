@@ -61,6 +61,10 @@ func VerifyDriverInstallation() error {
 		return errors.Wrap(err, "failed to create unified memory device file")
 	}
 
+	// Create symlinks in /dev/char for all possible NVIDIA device nodes
+	if err := utils.RunCommandAndLogOutput(exec.Command("nvidia-ctk", "system", "create-dev-char-symlinks", "--create-all"), false); err != nil {
+		return errors.Wrap(err, "failed to create symlinks")
+	}
 	return nil
 }
 
