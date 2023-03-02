@@ -134,7 +134,7 @@ func (d *GCSDownloader) DownloadArtifact(destDir, artifactPath string) error {
 func (d *GCSDownloader) ArtifactExists(artifactPath string) (bool, error) {
 	var objects []string
 	var err error
-	if objects, err = utils.ListGCSBucket(d.gcsDownloadBucket, d.gcsDownloadPrefix); err != nil {
+	if objects, err = utils.ListGCSBucket(d.gcsDownloadBucket, filepath.Join(d.gcsDownloadPrefix, artifactPath)); err != nil {
 		return false, errors.Wrap(err, "failed to find artifact")
 	}
 	for _, object := range objects {
