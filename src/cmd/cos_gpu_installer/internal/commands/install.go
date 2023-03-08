@@ -178,7 +178,8 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	log.V(2).Infof("Running on COS build id %s", envReader.BuildNumber())
 
 	// All prerelease builds are in dev-channel. For testing we don't need to check release track.
-	if releaseTrack := envReader.ReleaseTrack(); !c.test && releaseTrack == "dev-channel" {
+	// we can preload dependencies for dev-channel images too.
+	if releaseTrack := envReader.ReleaseTrack(); !c.prepareBuildTools && !c.test && releaseTrack == "dev-channel" {
 		c.logError(fmt.Errorf("GPU installation is not supported on dev images for now; Please use LTS image."))
 		return subcommands.ExitFailure
 	}
