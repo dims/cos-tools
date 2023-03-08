@@ -182,13 +182,12 @@ func veritysetup(imageID string, oemFSSize4K uint64) (string, string, error) {
 func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4K uint64) error {
 	// from 4K blocks to 512B sectors
 	oemFSSizeSector := oemFSSize4K << 3
-	entryStringVersion0 := fmt.Sprintf("%s none ro 1, 0 %d verity payload=PARTUUID=%s hashtree=PARTUUID=%s "+
+	entryStringV0 := fmt.Sprintf("%s none ro 1, 0 %d verity payload=PARTUUID=%s hashtree=PARTUUID=%s "+
 		"hashstart=%d alg=sha256 root_hexdigest=%s salt=%s\"", name, oemFSSizeSector,
 		partUUID, partUUID, oemFSSizeSector, hash, salt)
-	entryStringVersion1 := fmt.Sprintf("%s,,,ro,0 %d verity 0 PARTUUID=%s PARTUUID=%s "+
+	entryStringV1 := fmt.Sprintf("%s,,,ro,0 %d verity 0 PARTUUID=%s PARTUUID=%s "+
 		"4096 4096 %d %d sha256 %s %s\"", name, oemFSSizeSector,
 		partUUID, partUUID, oemFSSize4K, oemFSSize4K, hash, salt)
-	entryString := entryStringVersion0
 	grubContent, err := ioutil.ReadFile(grubPath)
 	if err != nil {
 		return fmt.Errorf("cannot read grub.cfg at %q, "+
@@ -197,6 +196,7 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 	}
 	lines := strings.Split(string(grubContent), "\n")
 	// add the entry to all kernel command lines containing "dm="
+	dmVersion := 0
 	for idx, line := range lines {
 		if !strings.Contains(line, "dm=") &&
 		   !strings.Contains(line, "dm-mod.create=") {
@@ -205,13 +205,18 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 		var startPos = strings.Index(line, "dm=")
 		if startPos == -1 {
 			startPos = strings.Index(line, "dm-mod.create=")
-			entryString = entryStringVersion1
+			dmVersion = 1
 		}
 		// remove the end quote.
 		lineBuf := []rune(line[:len(line)-1])
-		// add number of entries.
-		lineBuf[startPos+4] = '2'
-		lines[idx] = strings.Join(append(strings.Split(string(lineBuf), ","), entryString), ",")
+		if dmVersion == 0 {
+			// add number of entries.
+			lineBuf[startPos+4] = '2'
+			lines[idx] = strings.Join(append(strings.Split(string(lineBuf), ","), entryStringV0), ",")
+		} else {
+			configs := []string {string(lineBuf), entryStringV1}
+			lines[idx] = strings.Join(configs, ";")
+		}
 	}
 	// new content of grub.cfg
 	grubContent = []byte(strings.Join(lines, "\n"))
