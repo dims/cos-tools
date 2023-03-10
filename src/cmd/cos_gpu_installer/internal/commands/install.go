@@ -245,7 +245,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	// We only want to cache drivers installed from official sources.
 	if c.nvidiaInstallerURL == "" {
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
-		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
+		if isCached, isOpen, err := cacher.IsCached(); isCached && isOpen == c.kernelOpen && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
 			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
@@ -398,6 +398,11 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 		return errors.Wrap(err, "failed to configure GPU driver installation dirs")
 	}
 	defer func() { callback <- 0 }()
+
+	// Skip driver installation if we are only populating build tools cache
+	if c.prepareBuildTools {
+		return nil
+	}
 
 	installerURL := fmt.Sprintf(installerURLTemplate, c.driverVersion)
 	installerFile, err := installer.DownloadToInstallDir(installerURL, "Downloading driver installer")
