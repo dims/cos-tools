@@ -586,7 +586,10 @@ func HandleFindReleasedBuildGerrit(w http.ResponseWriter, r *http.Request) {
 }
 
 func allowedOrigin(origin string) (string, bool) {
-	if origin == "https://cos-review.googlesource.com" || origin == "https://cos-internal-review.googlesource.com" {
+	if origin == "https://cos-review.googlesource.com" ||
+		origin == "https://cos-internal-review.googlesource.com" ||
+		origin == "https://cos-review.git.corp.google.com" ||
+		origin == "https://cos-internal-review.git.corp.google.com" {
 		return origin, true
 	}
 	return "", false
