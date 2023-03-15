@@ -7,7 +7,6 @@ import (
 	log "github.com/golang/glog"
 
 	"cloud.google.com/go/storage"
-	"google.golang.org/api/option"
 
 	"cos.googlesource.com/cos/tools.git/src/cmd/cos_gpu_driver_builder/internal/config"
 	"cos.googlesource.com/cos/tools.git/src/pkg/gpuconfig"
@@ -29,7 +28,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
+	client, err := storage.NewClient(ctx)
 	if err != nil {
 		log.Fatal("failed to setup client for GCS:", err)
 	}
