@@ -27,13 +27,13 @@ import (
 const (
 	gpuInstallDirContainer        = "/usr/local/nvidia"
 	gpuFirmwareDirContainer       = "/usr/local/nvidia/firmware/nvidia"
-	defaultGPUDriverFile          = "gpu_default_version"
-	latestGPUDriverFile           = "gpu_latest_version"
-	r470GPUDriverFile             = "gpu_R470_version"
+	templateGPUDriverFile         = "gpu_%s_version"
 	precompiledInstallerURLFormat = "https://storage.googleapis.com/nvidia-drivers-%s-public/nvidia-cos-project/%s/tesla/%s_00/%s/NVIDIA-Linux-x86_64-%s_%s-%s.cos"
 	defaultFilePermission         = 0755
 	signedURLKey                  = "Expires"
 	prebuiltModuleTemplate        = "nvidia-drivers-%s.tgz"
+	DefaultVersion                = "default"
+	LatestVersion                 = "latest"
 )
 
 var (
@@ -418,32 +418,13 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 	return nil
 }
 
-// GetDefaultGPUDriverVersion gets the default GPU driver version.
-func GetDefaultGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
-	log.Info("Getting the default GPU driver version")
-	content, err := downloader.GetArtifact(defaultGPUDriverFile)
+// GeGGPUDriverVersion gets the supplied GPU driver version.
+// Supports "default", "latest", "R470", "R525" aliases
+func GetGPUDriverVersion(downloader cos.ArtifactsDownloader, alias string) (string, error) {
+	log.Infof("Getting the %s GPU driver version", alias)
+	content, err := downloader.GetArtifact(fmt.Sprintf(templateGPUDriverFile, alias))
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get default GPU driver version")
-	}
-	return strings.Trim(string(content), "\n "), nil
-}
-
-// GetLatestGPUDriverVersion gets the latest GPU driver version.
-func GetLatestGPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
-	log.Info("Getting the latest GPU driver version")
-	content, err := downloader.GetArtifact(latestGPUDriverFile)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to get latest GPU driver version")
-	}
-	return strings.Trim(string(content), "\n "), nil
-}
-
-// GetR470GPUDriverVersion gets the R470 GPU driver version.
-func GetR470GPUDriverVersion(downloader cos.ArtifactsDownloader) (string, error) {
-	log.Info("Getting the R470 GPU driver version")
-	content, err := downloader.GetArtifact(r470GPUDriverFile)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to get R470 GPU driver version")
+		return "", errors.Wrapf(err, "failed to get %s GPU driver version", alias)
 	}
 	return strings.Trim(string(content), "\n "), nil
 }

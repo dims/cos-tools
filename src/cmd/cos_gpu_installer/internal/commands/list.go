@@ -57,12 +57,12 @@ func (c *ListCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfa
 		c.logError(errors.Wrap(err, "failed to list gpu extension artifacts"))
 		return subcommands.ExitFailure
 	}
-	defaultVersion, err := installer.GetDefaultGPUDriverVersion(downloader)
+	defaultVersion, err := installer.GetGPUDriverVersion(downloader, installer.DefaultVersion)
 	if err != nil {
 		c.logError(errors.Wrap(err, "failed to get default driver version"))
 		return subcommands.ExitFailure
 	}
-	latestVersion, err := installer.GetLatestGPUDriverVersion(downloader)
+	latestVersion, err := installer.GetGPUDriverVersion(downloader, installer.LatestVersion)
 	if err != nil {
 		c.logWarning(errors.Wrap(err, "failed to get latest driver version"))
 	}

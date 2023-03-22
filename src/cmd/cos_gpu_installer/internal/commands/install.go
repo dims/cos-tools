@@ -40,6 +40,7 @@ const (
 	P4
 	P100
 	V100
+	L4
 	Others
 )
 
@@ -53,6 +54,8 @@ func (g GPUType) String() string {
 		return "P100"
 	case V100:
 		return "V100"
+	case L4:
+		return "L4"
 	case Others:
 		return "Others"
 	default:
@@ -71,15 +74,22 @@ func (g GPUType) OpenSupported() bool {
 }
 
 type Fallback struct {
-	maxMajorVersion          int
-	getFallbackDriverVersion func(cos.ArtifactsDownloader) (string, error)
+	minMajorVersion       int
+	maxMajorVersion       int
+	fallbackDriverVersion string
 }
 
 var fallbackMap = map[GPUType]Fallback{
 	// R470 is the last driver family supporting K80 GPU devices.
 	K80: {
-		maxMajorVersion:          470,
-		getFallbackDriverVersion: installer.GetR470GPUDriverVersion,
+		maxMajorVersion:       470,
+		minMajorVersion:       450,
+		fallbackDriverVersion: "R470",
+	},
+	L4: {
+		minMajorVersion:       525,
+		maxMajorVersion:       525,
+		fallbackDriverVersion: "R525",
 	},
 }
 
@@ -241,6 +251,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		c.hostInstallDir = os.Getenv("NVIDIA_INSTALL_DIR_HOST")
 	}
 	hostInstallDir := filepath.Join(hostRootPath, c.hostInstallDir)
+
 	var cacher *installer.Cacher
 	// We only want to cache drivers installed from official sources.
 	if c.nvidiaInstallerURL == "" {
@@ -296,9 +307,9 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 func getDriverVersion(downloader *cos.GCSDownloader, argVersion string) (string, error) {
 	if argVersion == "" {
-		return installer.GetDefaultGPUDriverVersion(downloader)
+		return installer.GetGPUDriverVersion(downloader, installer.DefaultVersion)
 	} else if argVersion == "latest" {
-		return installer.GetLatestGPUDriverVersion(downloader)
+		return installer.GetGPUDriverVersion(downloader, installer.LatestVersion)
 	}
 	// argVersion is an acutal verson, return it as-is.
 	return argVersion, nil
@@ -453,6 +464,8 @@ func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
 		return true, V100, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 1bb3"), strings.Contains(out, "NVIDIA Corporation GP104GL"), strings.Contains(out, "[Tesla P4"):
 		return true, P4, nil
+	case strings.Contains(out, "NVIDIA Corporation Device 27b8"), strings.Contains(out, "NVIDIA Corporation AD104GL [L4]"):
+		return true, L4, nil
 	default:
 		return true, Others, nil
 	}
@@ -463,11 +476,10 @@ func (c *InstallCommand) checkDriverCompatibility(downloader *cos.GCSDownloader,
 	if err != nil {
 		return errors.Wrap(err, "failed to get driver major version")
 	}
-
 	fallback, found := fallbackMap[gpuType]
-	if found && driverMajorVersion > fallback.maxMajorVersion {
+	if found && (driverMajorVersion > fallback.maxMajorVersion || driverMajorVersion < fallback.minMajorVersion) {
 		log.Warningf("\n\nDriver version %s doesn't support %s GPU devices.\n\n", c.driverVersion, gpuType)
-		fallbackVersion, err := fallback.getFallbackDriverVersion(downloader)
+		fallbackVersion, err := installer.GetGPUDriverVersion(downloader, fallback.fallbackDriverVersion)
 		if err != nil {
 			return errors.Wrap(err, "failed to get fallback driver")
 		}
