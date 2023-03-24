@@ -41,6 +41,7 @@ const (
 	P100
 	V100
 	L4
+	NO_GPU
 	Others
 )
 
@@ -65,7 +66,7 @@ func (g GPUType) String() string {
 
 func (g GPUType) OpenSupported() bool {
 	switch g {
-	case K80, P4, P100, V100:
+	case NO_GPU, K80, P4, P100, V100:
 		return false
 	default:
 		return true
@@ -194,7 +195,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitFailure
 	}
 
-	var gpuType GPUType
+	var gpuType GPUType = NO_GPU
 
 	if !c.prepareBuildTools {
 		var isGpuConfigured bool
@@ -256,7 +257,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	// We only want to cache drivers installed from official sources.
 	if c.nvidiaInstallerURL == "" {
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
-		if isCached, isOpen, err := cacher.IsCached(); isCached && isOpen == c.kernelOpen && err == nil {
+		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
 			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
@@ -288,7 +289,8 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		return subcommands.ExitFailure
 	}
 
-	if prebuiltModulesAvailable {
+	// skip prebuilt module installation if preparing build tools
+	if !c.prepareBuildTools && prebuiltModulesAvailable {
 		log.V(2).Info("Found prebuilt kernel modules, installing additional components...")
 		if err := installDriverPrebuiltModules(c, cacher, envReader, downloader); err != nil {
 			c.logError(err)
@@ -410,11 +412,6 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 	}
 	defer func() { callback <- 0 }()
 
-	// Skip driver installation if we are only populating build tools cache
-	if c.prepareBuildTools {
-		return nil
-	}
-
 	installerURL := fmt.Sprintf(installerURLTemplate, c.driverVersion)
 	installerFile, err := installer.DownloadToInstallDir(installerURL, "Downloading driver installer")
 	if err != nil {
@@ -452,7 +449,7 @@ func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
 	cmd := "lspci | grep -i \"nvidia\""
 	outBytes, err := exec.Command("/bin/bash", "-c", cmd).Output()
 	if err != nil {
-		return false, Others, err
+		return false, NO_GPU, err
 	}
 	out := string(outBytes)
 	switch {
