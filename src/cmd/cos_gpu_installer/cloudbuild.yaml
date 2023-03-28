@@ -20,5 +20,5 @@ steps:
 # image after building it, because a subsequent `docker push` won't find the
 # image locally.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['buildx', 'build', '--platform', 'linux/amd64', '-f', 'src/cmd/cos_gpu_installer/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:${TAG_NAME}', '--push', '.']
+  args: ['buildx', 'build', '--platform', 'linux/amd64', '--build-arg', 'BUILDKIT_INLINE_CACHE=1', '-f', 'src/cmd/cos_gpu_installer/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:${TAG_NAME}', '--cache-from', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:latest', '--push', '.']
 timeout: 1800s

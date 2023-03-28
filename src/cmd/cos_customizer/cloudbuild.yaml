@@ -23,9 +23,9 @@ steps:
     RUN apt-get update && apt-get install -y mtools
     EOF
 - name: 'bazel'
-  args: ['test', '--spawn_strategy=standalone','--','...','-//src/pkg/tools/...']
+  args: ['test', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone','--','...','-//src/pkg/tools/...']
 - name: 'bazel'
-  args: ['run', '--spawn_strategy=standalone', ':cos_customizer', '--', '--norun']
+  args: ['run', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone', ':cos_customizer', '--', '--norun']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel:cos_customizer', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}']
 - name: 'gcr.io/cloud-builders/docker'
@@ -33,6 +33,8 @@ steps:
 options:
   machineType: 'N1_HIGHCPU_8'
   substitutionOption: 'MUST_MATCH'
+substitutions:
+  _BUILD_TOOLS_CACHE: 'https://storage.googleapis.com/cos-infra-prod_cloudbuild/cos-tools-cache'
 # 25 minute timeout; concurrent arm64/amd64 builds take time
 timeout: '1500s'
 images:

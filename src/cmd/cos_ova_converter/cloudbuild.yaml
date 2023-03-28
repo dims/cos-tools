@@ -12,17 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+options:
+  env:
+  - 'DOCKER_CLI_EXPERIMENTAL=enabled'
 steps:
 - name: 'gcr.io/cloud-builders/docker'
+  args: ['buildx', 'create', '--name', 'builder']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['buildx', 'use', 'builder']
+- name: 'gcr.io/cloud-builders/docker'
   args:
+  - 'buildx'
   - 'build'
+  - '--build-arg'
+  - 'BUILDKIT_INLINE_CACHE=1'
+  - '--cache-from'
+  - 'gcr.io/${_OUTPUT_PROJECT}/cos-ova-converter:latest'
   - '-f'
   - 'src/cmd/cos_ova_converter/Dockerfile'
   - '-t'
   - 'gcr.io/${_OUTPUT_PROJECT}/cos-ova-converter:latest'
   - '-t'
   - 'gcr.io/${_OUTPUT_PROJECT}/cos-ova-converter:${TAG_NAME}'
+  - '--push'
   - '.'
-images:
-- 'gcr.io/${_OUTPUT_PROJECT}/cos-ova-converter:latest'
-- 'gcr.io/${_OUTPUT_PROJECT}/cos-ova-converter:${TAG_NAME}'

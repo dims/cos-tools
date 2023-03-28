@@ -15,15 +15,27 @@
 # GCP Container Builder build request in YAML format.
 # See https://cloud.google.com/container-builder/docs/ for details.
 
+options:
+  env:
+  - 'DOCKER_CLI_EXPERIMENTAL=enabled'
 steps:
 - name: 'gcr.io/cloud-builders/docker'
+  args: ['buildx', 'create', '--name', 'builder']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['buildx', 'use', 'builder']
+- name: 'gcr.io/cloud-builders/docker'
   args:
+  - 'buildx'
   - 'build'
+  - '--build-arg'
+  - 'BUILDKIT_INLINE_CACHE=1'
+  - '-f'
+  - 'src/cmd/cos_gpu_installer_v1/cos-gpu-installer-docker/Dockerfile'
+  - '--cache-from'
+  - 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer-v1:latest'
   - '-t'
   - 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer-v1:latest'
   - '-t'
   - 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer-v1:${TAG_NAME}'
+  - '--push'
   - 'src/cmd/cos_gpu_installer_v1/cos-gpu-installer-docker/'
-images:
-- 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer-v1:latest'
-- 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer-v1:${TAG_NAME}'

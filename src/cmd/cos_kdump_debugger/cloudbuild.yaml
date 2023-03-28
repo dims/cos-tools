@@ -26,5 +26,5 @@ steps:
 # image after building it, because a subsequent `docker push` won't find the
 # image locally.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['buildx', 'build', '--platform', 'linux/amd64,linux/arm64', '-f', 'src/cmd/cos_kdump_debugger/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos_kdump_debugger:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos_kdump_debugger:${TAG_NAME}', '--push', 'src/cmd/cos_kdump_debugger']
+  args: ['buildx', 'build', '--platform', 'linux/amd64,linux/arm64', '--build-arg', 'BUILDKIT_INLINE_CACHE=1', '-f', 'src/cmd/cos_kdump_debugger/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos_kdump_debugger:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos_kdump_debugger:${TAG_NAME}', '--cache-from', 'gcr.io/${_OUTPUT_PROJECT}/cos_kdump_debugger:latest', '--push', 'src/cmd/cos_kdump_debugger']
 timeout: 1800s
