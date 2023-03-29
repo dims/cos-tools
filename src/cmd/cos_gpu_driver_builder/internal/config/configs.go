@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -18,7 +19,7 @@ func outputDriverFile(config gpuconfig.GPUPrecompilationConfig) string {
 	return fmt.Sprintf("%s/%s", config.ProtoConfig.GetDriverOutputGcsDir(), driverRunfile)
 }
 
-func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuconfig.GPUPrecompilationConfig) error {
+func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuconfig.GPUPrecompilationConfig, dryRun bool) error {
 	for _, config := range configs {
 		log.Printf("building precompiled GPU driver for %s:%s, driver version %s\n", config.VersionType, config.Version, config.DriverVersion)
 		if processed, _ := gcs.GCSObjectExists(ctx, client, outputDriverFile(config)); processed {
@@ -27,13 +28,21 @@ func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuco
 		dir, precompiledDriver, err := builder.BuildPrecompiledDriver(ctx, client, config)
 		defer os.RemoveAll(dir)
 		if err != nil {
-			log.Printf("precompilation failed for: %s, driver version %s\n", config.Version, config.DriverVersion)
+			log.Printf("precompilation failed for: %s, driver version %s: %v\n", config.Version, config.DriverVersion, err)
 			continue
 		}
-		outputDriverFile := filepath.Join(config.ProtoConfig.GetDriverOutputGcsDir(), precompiledDriver)
-		if err := gcs.UploadGCSObject(ctx, client, filepath.Join(dir, precompiledDriver), outputDriverFile); err != nil {
-			log.Printf("export failed for: %s, driver version %s\n", config.Version, config.DriverVersion)
-			continue
+		outputURL, err := url.Parse(config.ProtoConfig.GetDriverOutputGcsDir())
+		if err != nil {
+			log.Printf("failed to parse driver output gcs dir: %v\n", err)
+		}
+		outputURL.Path = filepath.Join(outputURL.Path, precompiledDriver)
+		outputDriverFile := outputURL.String()
+		if !dryRun {
+
+			if err := gcs.UploadGCSObject(ctx, client, filepath.Join(dir, precompiledDriver), outputDriverFile); err != nil {
+				log.Printf("export failed for: %s, driver version %s: %v\n", config.Version, config.DriverVersion, err)
+				continue
+			}
 		}
 	}
 	return nil

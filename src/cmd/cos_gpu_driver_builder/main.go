@@ -17,7 +17,8 @@ var (
 	bucket    = flag.String("watcher-gcs", "", "GCS bucket to watch for unprocessed configs.")
 	lookBack  = flag.Int("lookBackDays", 7, "read configs produced within the past <lookBack> days.")
 	// default to only building image CI precompiled drivers
-	mode = flag.String("mode", "image", "image, kernel, or both for processing image CI/kernel CI configs. Works only with watcher-gcs arg")
+	mode   = flag.String("mode", "image", "image, kernel, or both for processing image CI/kernel CI configs. Works only with watcher-gcs arg")
+	dryRun = flag.Bool("dry-run", false, "invoking the driver builder with -dry-run will not upload any build precompiled outputs")
 )
 
 func main() {
@@ -47,5 +48,5 @@ func main() {
 		configs = append(configs, config)
 	}
 
-	config.ProcessConfigs(ctx, client, configs)
+	config.ProcessConfigs(ctx, client, configs, *dryRun)
 }
