@@ -23,6 +23,7 @@ func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuco
 	for _, config := range configs {
 		log.Printf("building precompiled GPU driver for %s:%s, driver version %s\n", config.VersionType, config.Version, config.DriverVersion)
 		if processed, _ := gcs.GCSObjectExists(ctx, client, outputDriverFile(config)); processed {
+			log.Println("precompiled driver exists, skipping the build.")
 			continue
 		}
 		dir, precompiledDriver, err := builder.BuildPrecompiledDriver(ctx, client, config)
@@ -34,6 +35,7 @@ func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuco
 		outputURL, err := url.Parse(config.ProtoConfig.GetDriverOutputGcsDir())
 		if err != nil {
 			log.Printf("failed to parse driver output gcs dir: %v\n", err)
+			continue
 		}
 		outputURL.Path = filepath.Join(outputURL.Path, precompiledDriver)
 		outputDriverFile := outputURL.String()
@@ -43,6 +45,7 @@ func ProcessConfigs(ctx context.Context, client *storage.Client, configs []gpuco
 				log.Printf("export failed for: %s, driver version %s: %v\n", config.Version, config.DriverVersion, err)
 				continue
 			}
+			log.Printf("successfully uploaded precompiled GPU driver for %s:%s, driver version %s\n", config.VersionType, config.Version, config.DriverVersion)
 		}
 	}
 	return nil
