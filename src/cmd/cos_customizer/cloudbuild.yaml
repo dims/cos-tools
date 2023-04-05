@@ -30,13 +30,20 @@ steps:
   args: ['tag', 'bazel:cos_customizer', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['tag', 'bazel:cos_customizer', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:latest']
+- name: 'gcr.io/louhi-prod-1/louhi-helper-v2:latest'
+  args: ['sbom_scan_image', '--regex', 'gcr\\.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}']
 options:
   machineType: 'N1_HIGHCPU_8'
   substitutionOption: 'MUST_MATCH'
 substitutions:
   _BUILD_TOOLS_CACHE: 'https://storage.googleapis.com/cos-infra-prod_cloudbuild/cos-tools-cache'
+  _SBOM_BUCKET: 'cos-container-sbom-staging' # default value
 # 25 minute timeout; concurrent arm64/amd64 builds take time
 timeout: '1500s'
 images:
 - 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}'
 - 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:latest'
+artifacts:
+  objects:
+    location: 'gs://${_SBOM_BUCKET}/cos-customizer/'
+    paths: ['/workspace/cos-customizer:${TAG_NAME}_sbom.json']

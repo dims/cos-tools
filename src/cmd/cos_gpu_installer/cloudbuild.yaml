@@ -1,6 +1,8 @@
 options:
   env:
   - 'DOCKER_CLI_EXPERIMENTAL=enabled'
+substitutions:
+    _SBOM_BUCKET: 'cos-container-sbom-staging' # default value
 steps:
 # This step is needed to add a new entry to /proc/sys/fs/binfmt_misc. Docker
 # uses QEMU user emulation to run arm64 programs on x86 hosts. A QEMU
@@ -21,4 +23,12 @@ steps:
 # image locally.
 - name: 'gcr.io/cloud-builders/docker'
   args: ['buildx', 'build', '--platform', 'linux/amd64', '--build-arg', 'BUILDKIT_INLINE_CACHE=1', '-f', 'src/cmd/cos_gpu_installer/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:${TAG_NAME}', '--cache-from', 'gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:latest', '--push', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['pull','gcr.io/${_OUTPUT_PROJECT}/cos-gpu-installer:${TAG_NAME}']
+- name: 'gcr.io/louhi-prod-1/louhi-helper-v2:latest'
+  args: ['sbom_scan_image', '--regex', 'gcr\\.io/${_OUTPUT_PROJECT}/cos-gpu-installer:${TAG_NAME}']
+artifacts:
+  objects:
+    location: 'gs://${_SBOM_BUCKET}/cos-gpu-installer/'
+    paths: ['/workspace/cos-gpu-installer:${TAG_NAME}_sbom.json']
 timeout: 1800s
