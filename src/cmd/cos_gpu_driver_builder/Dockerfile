@@ -7,5 +7,5 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o cos-gpu-driv
 FROM ubuntu:latest
 LABEL maintainer="cos-containers@google.com"
 COPY --from=go-builder /work/src/cmd/cos_gpu_driver_builder/cos-gpu-driver-builder /cos-gpu-driver-builder
-RUN apt-get update && apt-get -y install ca-certificates xz-utils kmod make libc-dev libc6-dev libelf-dev
+RUN apt-get update && apt-get -y install ca-certificates xz-utils kmod make libc-dev libc6-dev libelf-dev binutils
 ENTRYPOINT ["/cos-gpu-driver-builder"]

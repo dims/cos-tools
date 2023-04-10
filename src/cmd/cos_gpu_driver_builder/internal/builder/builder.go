@@ -61,6 +61,15 @@ func BuildPrecompiledDriver(ctx context.Context, client *storage.Client, config 
 	if err = cos.ForceSymlinkLinker(filepath.Join(dirName, linkerLocation)); err != nil {
 		return "", "", fmt.Errorf("failed to create symlink to COS linker: %v", err)
 	}
+	cc := os.Getenv("CC")
+	if cc == "" {
+		return "", "", fmt.Errorf("failed to find CC in env")
+	} else {
+		// create a wrapper removing -Werror=strict-prototypes from the CC command line.
+		if err = cos.AddCCWrapperToPath(dirName, dirName, cc); err != nil {
+			return "", "", fmt.Errorf("failed to create CC wrapper: %v", err)
+		}
+	}
 	// run NVIDIA driver package
 	if err = os.Chmod(filepath.Join(dirName, nvidiaInstaller), defaultFilePermission); err != nil {
 		return "", "", err

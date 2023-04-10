@@ -258,3 +258,25 @@ func ForceSymlinkLinker(symlinkPath string) error {
 func symlinkLinker(symlinkPath string) error {
 	return os.Symlink("x86_64-cros-linux-gnu-ld", symlinkPath)
 }
+
+// Creates a CC wrapper and adds it to the env PATH. Newer versions of LLVM have
+// different -Wstrict-prototypes behavior that impacts the nvidia installer. The
+// kernel always uses -Werror=strict-prototypes by default. This wrapper removes
+// -Werror=strict-prototypes from the CC command line.
+func AddCCWrapperToPath(toolchainDir, workDir, cc string) error {
+	wrapper := `#!/bin/bash
+for arg; do
+  shift
+  if [[ "${arg}" == "-Werror=strict-prototypes" ]]; then continue; fi
+  set -- "$@" "${arg}"
+done
+`
+	wrapper += fmt.Sprintf("exec %s/bin/%s $@", toolchainDir, cc)
+	if err := os.WriteFile(filepath.Join(workDir, cc), []byte(wrapper), 0755); err != nil {
+		return err
+	}
+	log.V(2).Info("Creating a CC wrapper removing -Werror=strict-prototypes from the CC command line.")
+	log.V(2).Info(wrapper)
+	os.Setenv("PATH", fmt.Sprintf("%s:%s", workDir, os.Getenv("PATH")))
+	return nil
+}

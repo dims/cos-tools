@@ -23,7 +23,8 @@ var (
 
 func main() {
 	flag.Parse()
-
+	// always run driver builder with verbose logging.
+	flag.Set("v", "2")
 	if *bucket == "" && *configDir == "" {
 		log.Fatal("empty watcher gcs dir and config file dir")
 	}
