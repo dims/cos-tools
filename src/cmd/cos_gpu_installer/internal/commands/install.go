@@ -41,6 +41,7 @@ const (
 	P100
 	V100
 	L4
+	H100
 	NO_GPU
 	Others
 )
@@ -57,6 +58,8 @@ func (g GPUType) String() string {
 		return "V100"
 	case L4:
 		return "L4"
+	case H100:
+		return "H100"
 	case Others:
 		return "Others"
 	default:
@@ -88,6 +91,11 @@ var fallbackMap = map[GPUType]Fallback{
 		fallbackDriverVersion: "R470",
 	},
 	L4: {
+		minMajorVersion:       525,
+		maxMajorVersion:       525,
+		fallbackDriverVersion: "R525",
+	},
+	H100: {
 		minMajorVersion:       525,
 		maxMajorVersion:       525,
 		fallbackDriverVersion: "R525",
@@ -463,6 +471,8 @@ func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
 		return true, P4, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 27b8"), strings.Contains(out, "NVIDIA Corporation AD104GL [L4]"):
 		return true, L4, nil
+	case strings.Contains(out, "NVIDIA Corporation Device 2330"), strings.Contains(out, "NVIDIA Corporation GH100[H100"):
+		return true, H100, nil
 	default:
 		return true, Others, nil
 	}
