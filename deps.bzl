@@ -8,6 +8,12 @@ def go_mod_deps():
         version = "v0.0.1-2020.1.4",
     )
     go_repository(
+        name = "com_github_anchore_go_struct_converter",
+        importpath = "github.com/anchore/go-struct-converter",
+        sum = "h1:aM1rlcoLz8y5B2r4tTLMiVTrMtpfY0O8EScKJxaSaEc=",
+        version = "v0.0.0-20221118182256-c68fdcfa2092",
+    )
+    go_repository(
         name = "com_github_burntsushi_toml",
         importpath = "github.com/BurntSushi/toml",
         sum = "h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=",
@@ -222,6 +228,12 @@ def go_mod_deps():
         importpath = "github.com/rogpeppe/go-internal",
         sum = "h1:RR9dF3JtopPvtkroDZuVD7qquD0bnHlKSqaQhgwt8yk=",
         version = "v1.3.0",
+    )
+    go_repository(
+        name = "com_github_spdx_tools_golang",
+        importpath = "github.com/spdx/tools-golang",
+        sum = "h1:/fqihV2Jna7fmow65dHpgKNsilgLK7ICpd2tkCnPEyY=",
+        version = "v0.5.0",
     )
     go_repository(
         name = "com_github_stretchr_objx",

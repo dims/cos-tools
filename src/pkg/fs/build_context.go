@@ -66,3 +66,31 @@ func ArchiveHasObject(archive string, path string) (bool, error) {
 	}
 	return false, nil
 }
+
+// ReadObjectFromArchive reads the given object in the given tar archive.
+func ReadObjectFromArchive(archive string, path string) ([]byte, error) {
+	reader, err := os.Open(archive)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	tarReader := tar.NewReader(reader)
+	for {
+		hdr, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		if hdr.Name == path {
+			content := make([]byte, hdr.Size)
+			tarReader.Read(content)
+			return content, nil
+		}
+	}
+	return nil, fmt.Errorf("could not find file %q in build context", path)
+}

@@ -285,6 +285,62 @@ field should be specified. Zone should be specified if this field is specified.
 `-enable-cleanup`: If this flag is set, COS-Customizer will automatically delete old
 VMs created by previous invocations in the project and zone set by `-project` and `-zone`.
 
+`-sbom-input-path`: Path to the input JSON file for SBOM generation. This path is relative to
+`-build-context` set in step `start-image-build`. Schema for the input:
+
+    {
+      "outputImageName": <Optional>"customized-image",
+      "outputImageVersion": <Optional>"1.2.3",
+      "creators": <Required>["Organization: Google LLC"],
+      "supplier": <Optional>"Organization: Google LLC",
+      "SPDXPackages": <Optional>[
+        {
+          "name": <Required>"package-A",
+          "SPDXID": <Required>"SPDXRef-package-A",
+          "versionInfo": <Required>"1.2.3",
+          "supplier": <Optional>"Organization: Google LLC",
+          "filesAnalyzed": <Optional>false,
+          "licenseDeclared": <Optional>"BSD-3-Clause AND Apache-2.0 AND LicenseRef-A",
+          "licenseConcluded": <Optional>"BSD-3-Clause AND Apache-2.0 AND LicenseRef-A",
+          "downloadLocation": <Optional>"https://package/download/url",
+          "externalRefs": <Optional>[
+            {
+              "referenceCategory": <Required>"SECURITY",
+              "referenceLocator": <Required>"cpe:/a:vendor:package-A:1.2.3",
+              "referenceType": <Required>"cpe23Type"
+            }
+          ],
+          "checksums": <Optional>[
+            {
+              "algorithm": <Required>"SHA1",
+              "checksumValue": <Required>"11d7774ac38f40e009dcee453a760750aea75bbd"
+            }
+          ]
+        }
+      ],
+      "SBOMPackages": <Optional>[
+        {
+          "name": <Required>"package-B",
+          "spdxDocument": <Required>"URL to package-B SBOM",
+          "algorithm": <Required>"SHA1",
+          "checksumValue": <Required>"11d7774ac38f40e009dcee453a760750aea75bbd"
+        }
+      ],
+      "hasExtractedLicensingInfos": <Optional>[
+        {
+          "licenseId": <Required>"LicenseRef-A",
+          "extractedText": <Required>"extracted-license-text",
+          "crossRefs": <Optional>["https://package/download/url/LICENSE.txt"]
+        }
+      ]
+    }
+Note: `SPDXPackages` has the same schema as field `packages` in
+[SPDX JSON Schema](https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json).
+Field `filesAnalyzed` in `SPDXPackages` can be ambiguous in JSON format so it should be set explicitly.
+
+`-sbom-output-path`: The GCS path for storing the output SBOM. The complete output file path is
+`<sbom-output-path>/<outputImageName>-<outputImageVersion>_sbom.json`. If `outputImageName` is not
+set in the input, the path will be `<sbom-output-path>/<actualOutputImageName>_sbom.json`.
 
 An example `finish-image-build` step looks like the following:
 

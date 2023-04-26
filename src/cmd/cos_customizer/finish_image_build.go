@@ -30,6 +30,7 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/preloader"
 	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
 	"cos.googlesource.com/cos/tools.git/src/pkg/tools/partutil"
+	"cos.googlesource.com/cos/tools.git/src/pkg/tools/sbomutil"
 
 	"github.com/google/subcommands"
 )
@@ -63,6 +64,8 @@ type FinishImageBuild struct {
 	diskSize       int
 	timeout        time.Duration
 	enableCleanup  bool
+	sbomOutputPath string
+	sbomInputPath  string
 }
 
 // Name implements subcommands.Command.Name.
@@ -127,6 +130,8 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&f.timeout, "timeout", time.Hour, "Timeout value of the image build process. Must be formatted "+
 		"according to Golang's time.Duration string format.")
 	flags.BoolVar(&f.enableCleanup, "enable-cleanup", false, "Enable cleanup of old VM instances created by COS-Customizer.")
+	flags.StringVar(&f.sbomInputPath, "sbom-input-path", "", "The path to the SBOM input file.")
+	flags.StringVar(&f.sbomOutputPath, "sbom-output-path", "", "The GCS path to store the output SBOM file.")
 }
 
 func (f *FinishImageBuild) validate() error {
@@ -154,6 +159,8 @@ func (f *FinishImageBuild) validate() error {
 		return fmt.Errorf("'zone' must be set")
 	case f.project == "":
 		return fmt.Errorf("'project' must be set")
+	case (f.sbomInputPath == "") != (f.sbomOutputPath == ""):
+		return fmt.Errorf("sbom-input-path and sbom-output-path must be set together")
 	default:
 		return nil
 	}
@@ -368,6 +375,25 @@ func (f *FinishImageBuild) Execute(ctx context.Context, flags *flag.FlagSet, arg
 		log.Println(err)
 		return subcommands.ExitFailure
 	}
+
+	if f.sbomInputPath != "" {
+		log.Println("Start generting SBOM.")
+		sbom := sbomutil.NewSBOMCreator(ctx, gcsClient, files)
+		if err := sbom.ParseSBOMInput(f.sbomInputPath); err != nil {
+			log.Printf("failed to parse SBOM input file at %q, err: %v", f.sbomInputPath, err)
+			return subcommands.ExitFailure
+		}
+		if err := sbom.GenerateSBOM(outputImage.Image.Name); err != nil {
+			log.Printf("failed to generate SBOM, err: %v", err)
+			return subcommands.ExitFailure
+		}
+		if err := sbom.UploadSBOMToGCS(f.sbomOutputPath); err != nil {
+			log.Printf("failed to upload SBOM to %q, err: %v", f.sbomOutputPath, err)
+			return subcommands.ExitFailure
+		}
+		log.Println("Completed generting SBOM.")
+	}
+
 	if f.deprecateOld {
 		if err := gce.DeprecateInFamily(ctx, svc, outputImage, f.oldImageTTLSec); err != nil {
 			log.Printf("deprecating images failed: %s", err)

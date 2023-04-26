@@ -35,6 +35,7 @@ go_library(
         "//src/pkg/gce",
         "//src/pkg/preloader",
         "//src/pkg/provisioner",
+        "//src/pkg/tools/sbomutil",
         "//src/pkg/tools/partutil",
         "//src/pkg/utils",
         "@com_github_google_subcommands//:subcommands",

@@ -174,6 +174,16 @@ func TestValidateFailure(t *testing.T) {
 			flags:     []string{"-project=p", "-zone=z", "-image-name=out", "-image-project=p", "-image-family=f", "-disk-size-gb=11", "-oem-size=3072M"},
 			expectErr: true,
 			msg:       "disk size should be invalid",
+		}, {
+			name:      "NoSBOMInput",
+			flags:     []string{"-project=p", "-zone=z", "-image-name=out", "-image-project=p", "-image-family=f", "-sbom-output-path=gs://a"},
+			expectErr: true,
+			msg:       "sbom-input-path and sbom-output-path must be set together",
+		}, {
+			name:      "NoSBOMOutput",
+			flags:     []string{"-project=p", "-zone=z", "-image-name=out", "-image-project=p", "-image-family=f", "-sbom-input-path=file"},
+			expectErr: true,
+			msg:       "sbom-input-path and sbom-output-path must be set together",
 		},
 	}
 	for _, test := range tests {
