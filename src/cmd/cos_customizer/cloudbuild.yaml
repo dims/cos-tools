@@ -46,4 +46,4 @@ images:
 artifacts:
   objects:
     location: 'gs://${_SBOM_BUCKET}/cos-customizer/'
-    paths: ['/workspace/cos-customizer:${TAG_NAME}_sbom.json']
+    paths: ['/workspace/cos-customizer:${TAG_NAME}_sbom.spdx.json']

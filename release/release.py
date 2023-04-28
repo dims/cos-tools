@@ -11,7 +11,7 @@ import os
 
 _SBOM_BUCKET_STAGING = "gs://cos-container-sbom-staging"
 _SBOM_BUCKET_RELEASE = "gs://cos-container-sbom"
-_SBOM_SUFFIX = "_sbom.json"
+_SBOM_SUFFIX = "_sbom.spdx.json"
 _SBOM_STAGING_CONTAINER_NAMES = ["cos-customizer", "toolbox", "cos-gpu-installer"]
 
 def validate_config(release_config):

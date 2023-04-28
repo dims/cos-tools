@@ -31,5 +31,5 @@ steps:
 artifacts:
   objects:
     location: 'gs://${_SBOM_BUCKET}/toolbox/'
-    paths: ['/workspace/toolbox:${TAG_NAME}_sbom.json']
+    paths: ['/workspace/toolbox:${TAG_NAME}_sbom.spdx.json']
 timeout: 1800s

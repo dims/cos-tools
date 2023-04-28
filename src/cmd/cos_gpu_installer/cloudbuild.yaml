@@ -30,5 +30,5 @@ steps:
 artifacts:
   objects:
     location: 'gs://${_SBOM_BUCKET}/cos-gpu-installer/'
-    paths: ['/workspace/cos-gpu-installer:${TAG_NAME}_sbom.json']
+    paths: ['/workspace/cos-gpu-installer:${TAG_NAME}_sbom.spdx.json']
 timeout: 1800s
