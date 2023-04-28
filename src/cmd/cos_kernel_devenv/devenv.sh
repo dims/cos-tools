@@ -350,6 +350,25 @@ kmake() {
 }
 export -f kmake
 
+gpu_build() {
+  if [[ ${KERNEL_ARCH} != "x86_64" ]]; then
+    echo "GPU driver builds only tested for x86.
+    Current architecture detected: ${KERNEL_ARCH}"
+    exit 1
+  fi
+  make -C "/src/${GPU_DIR}" modules VERBOSE=1 V=1 \
+    SYSSRC="/src/" \
+    TARGET_ARCH=${KERNEL_ARCH} \
+    CC="x86_64-cros-linux-gnu-clang" \
+    LD="x86_64-cros-linux-gnu-ld.bfd" \
+    AR="x86_64-cros-linux-gnu-ar" \
+    CXX="x86_64-cros-linux-gnu-gcc" \
+    OBJCOPY="x86_64-cros-linux-gnu-objcopy" \
+    OBJDUMP="x86_64-cros-linux-gnu-objdump" \
+    NV_VERBOSE=1 IGNORE_CC_MISMATCH=yes \
+    "$@"
+}
+
 tar_kernel_headers() {
   local -r version=$(kmake "$@" -s kernelrelease)
   local -r tmpdir="$(mktemp -d)"
@@ -512,6 +531,11 @@ Options:
                 This mode requires either -R or -B/b options.
   -t            seed the toolchain from the Chromium OS upstream.
                 Example: 2021.06.26.094653
+  -x <src>      build the nvidia gpu modules from the specified source relative
+                to the kernel source directory. Output nvidia gpu modules
+                present in the <x>/kernel-open/ dir.
+                Example: -x nvidia/kernel-module-src, modules generated in:
+                nvidia/kernel-module-src/kernel-open as nvidia*.ko
 __EOUSAGE__
 
   exit $RETCODE_ERROR
@@ -521,7 +545,7 @@ main() {
   local build_target=""
   local custom_bucket=""
   get_cos_tools_bucket
-  while getopts "A:B:C:G:HO:R:b:cdhikmt:" o; do
+  while getopts "A:B:C:G:HO:R:b:cdhikmtx:" o; do
     case "${o}" in
       A) KERNEL_ARCH=${OPTARG} ;;
       B) BUILD_ID=${OPTARG} ;;
@@ -538,6 +562,8 @@ main() {
       k) build_target="kernel" ;;
       m) build_target="module" ;;
       t) CROS_TC_VERSION="${OPTARG}" ;;
+      x) build_target="gpu"
+        GPU_DIR=${OPTARG} ;;
       *) usage ;;
     esac
   done
@@ -637,6 +663,7 @@ main() {
       echo "Starting interactive shell for the kernel devenv"
       /bin/bash
       ;;
+    gpu) gpu_build -j"$(nproc)" ;;
     *) kmake -j"$(nproc)" "$@" ;;
   esac
 }
