@@ -272,6 +272,11 @@ Defaults to `n1-standard-1`. Useful for optimizing costs. Note that this is
 separate from the Cloud Build machine type option, which sets the machine type
 of the Cloud Build VM, which is different from the COS Customizer preload VM.
 
+`-gpu-type`: The GPU type attached to the COS Customizer preload VM e.g.
+`nvidia-tesla-t4`. Useful for installing GPU drivers via subcommand
+`run-script`. If this flag is set, it will overwrite the same flag set in
+step `install-gpu`.
+
 `-network`: The network/VPC to use for the COS Customizer preload VM.
 The network must have access to Google Cloud Storage. Defaults to
 default network `global/networks/default`.  If -subnet is also specified subnet 
@@ -424,12 +429,8 @@ md5sum.
 choose a directory that will persist across reboots; for the most part, this
 means a subdirectory of `/var` or `/home`.
 
-`-gpu-type`: The type of GPU to use to verify correct installation of GPU
-drivers. The valid values here are nvidia-tesla-k80, nvidia-tesla-p100, and
-nvidia-tesla-v100. This value has no impact on the drivers that are installed on
-the image; it is only used when verifying that the driver installation
-succeeded. Make sure that the zone you are running the image build in has quota
-for a GPU of this type.
+`-gpu-type`: This flag is deprecated, please use the same flag in step
+`finish-image-build`.
 
 An example `install-gpu` step looks like the following:
 

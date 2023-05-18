@@ -83,8 +83,7 @@ func (i *InstallGPU) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&i.NvidiaInstallDirHost, "install-dir", "/var/lib/nvidia",
 		"Location to install drivers on the image.")
 	f.StringVar(
-		&i.gpuType, "gpu-type", "nvidia-tesla-p100",
-		fmt.Sprintf("The type of GPU to verify drivers for. Must be one of: %v", validGPUs))
+		&i.gpuType, "gpu-type", "nvidia-tesla-p100", "This flag is deprecated, please use the same flag in step 'finish-image-build'.")
 	f.BoolVar(
 		&i.getValidDrivers, "get-valid-drivers", false,
 		"Print the list of supported GPU driver versions. If this flag is given, no other actions will be taken.")

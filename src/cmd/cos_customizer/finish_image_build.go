@@ -48,6 +48,7 @@ type FinishImageBuild struct {
 	zone           string
 	project        string
 	machineType    string
+	gpuType        string
 	imageName      string
 	imageSuffix    string
 	imageFamily    string
@@ -100,6 +101,7 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.StringVar(&f.zone, "zone", "", "Zone to make GCE resources in.")
 	flags.StringVar(&f.project, "project", "", "Project to make GCE resources in.")
 	flags.StringVar(&f.machineType, "machine-type", "n1-standard-1", "Machine type to use during the build.")
+	flags.StringVar(&f.gpuType, "gpu-type", "", "GPU type e.g. 'nvidia-tesla-t4' used for GPU driver installation via subcommand 'run-script'.")
 	flags.StringVar(&f.network, "network", "", "Network to use"+
 		" during the build. The network must have access to Google Cloud Storage."+
 		" If not specified, the network named default is used."+
@@ -187,6 +189,9 @@ func (f *FinishImageBuild) loadConfigs(files *fs.Files) (*config.Image, *config.
 	buildConfig.Network = f.network
 	buildConfig.Subnet = f.subnet
 	buildConfig.Timeout = f.timeout.String()
+	if f.gpuType != "" {
+		buildConfig.GPUType = f.gpuType
+	}
 	provConfig := &provisioner.Config{}
 	if err := config.LoadFromFile(files.ProvConfig, provConfig); err != nil {
 		return nil, nil, nil, nil, err
