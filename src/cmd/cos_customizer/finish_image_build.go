@@ -101,7 +101,8 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.StringVar(&f.zone, "zone", "", "Zone to make GCE resources in.")
 	flags.StringVar(&f.project, "project", "", "Project to make GCE resources in.")
 	flags.StringVar(&f.machineType, "machine-type", "n1-standard-1", "Machine type to use during the build.")
-	flags.StringVar(&f.gpuType, "gpu-type", "", "GPU type e.g. 'nvidia-tesla-t4' used for GPU driver installation via subcommand 'run-script'.")
+	flags.StringVar(&f.gpuType, "gpu-type", "", "GPU type e.g. 'nvidia-tesla-t4' used for GPU driver installation via subcommand 'run-script'. "+
+		"Please check https://cloud.google.com/compute/docs/gpus/gpu-regions-zones for GPU types and their region/zone availability.")
 	flags.StringVar(&f.network, "network", "", "Network to use"+
 		" during the build. The network must have access to Google Cloud Storage."+
 		" If not specified, the network named default is used."+

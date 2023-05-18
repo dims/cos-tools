@@ -197,19 +197,6 @@ func TestInstallGPUInvalidVersion(t *testing.T) {
 	}
 }
 
-func TestInstallGPUInvalidGPUType(t *testing.T) {
-	tmpDir, files, err := setupInstallGPUFiles()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-	gcs := fakes.GCSForTest(t)
-	defer gcs.Close()
-	if _, err := executeInstallGPU(context.Background(), files, gcs.Client, "-version=390.46", "-gpu-type=bad"); err == nil {
-		t.Error("install-gpu(-version=390.46 -gpu-type=bad); got nil, want error")
-	}
-}
-
 func TestInstallGPURunTwice(t *testing.T) {
 	tmpDir, files, err := setupInstallGPUFiles()
 	if err != nil {

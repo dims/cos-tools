@@ -42,11 +42,6 @@ const (
 	installerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20230117"
 )
 
-// TODO(b/121332360): Move most GPU functionality to cos-gpu-installer
-var (
-	validGPUs = []string{"nvidia-tesla-k80", "nvidia-tesla-p100", "nvidia-tesla-v100", "nvidia-tesla-t4"}
-)
-
 // InstallGPU implements subcommands.Command for the "install-gpu" command.
 // This command configures the current image build process to customize the result image
 // with GPU drivers.
@@ -116,16 +111,6 @@ func validDriverVersions(ctx context.Context, gcsClient *storage.Client) (map[st
 }
 
 func (i *InstallGPU) validate(ctx context.Context, gcsClient *storage.Client, files *fs.Files, provConfig *provisioner.Config) error {
-	isValidGPU := false
-	for _, g := range validGPUs {
-		if i.gpuType == g {
-			isValidGPU = true
-			break
-		}
-	}
-	if !isValidGPU {
-		return fmt.Errorf("%q is an invalid GPU type. Must be one of: %v", i.gpuType, validGPUs)
-	}
 	if i.NvidiaDriverVersion == "" {
 		return fmt.Errorf("version must be set")
 	}
