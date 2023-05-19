@@ -115,6 +115,7 @@ type InstallCommand struct {
 	test               bool
 	prepareBuildTools  bool
 	kernelOpen         bool
+	noVerify           bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -160,6 +161,7 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 		"Enable test mode. "+
 			"In test mode, `-nvidia-installer-url` can be used without `-allow-unsigned-driver`.")
 	f.BoolVar(&c.prepareBuildTools, "prepare-build-tools", false, "Whether to populate the build tools cache, i.e. to download and install the toolchain and the kernel headers. Drivers are NOT installed when this flag is set and running with this flag does not require GPU attached to the instance.")
+	f.BoolVar(&c.noVerify, "no-verify", false, "Skip kernel module loading and installation verification. Useful for preloading drivers without attached GPU.")
 
 }
 
@@ -206,15 +208,12 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	var gpuType GPUType = NO_GPU
 
 	if !c.prepareBuildTools {
-		var isGpuConfigured bool
-		if isGpuConfigured, gpuType, err = c.getGPUTypeInfo(); err != nil {
-			c.logError(errors.Wrapf(err, "failed to get GPU type information"))
-			return subcommands.ExitFailure
-		}
-
-		if !isGpuConfigured {
-			c.logError(fmt.Errorf("Please have GPU device configured"))
-			return subcommands.ExitFailure
+		if gpuType, err = c.getGPUTypeInfo(); err != nil {
+			if !c.noVerify {
+				c.logError(errors.Wrapf(err, "failed to get GPU type information"))
+				return subcommands.ExitFailure
+			}
+			log.Infof("No GPU device configured, continue driver preoloading without verification.")
 		}
 	}
 
@@ -267,11 +266,11 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
-			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen); err != nil {
+			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen, c.noVerify); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
 				return subcommands.ExitFailure
 			}
-			if err := installer.VerifyDriverInstallation(); err != nil {
+			if err := installer.VerifyDriverInstallation(c.noVerify); err != nil {
 				c.logError(errors.Wrap(err, "failed to verify GPU driver installation"))
 				return subcommands.ExitFailure
 			}
@@ -387,11 +386,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 
-	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false); err != nil {
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false, c.noVerify); err != nil {
 		if errors.Is(err, installer.ErrDriverLoad) {
 			// Drivers were linked, but couldn't load; try again with legacy linking
 			log.Infof("Failed to load kernel module, err: %v. Retrying driver installation with legacy linking", err)
-			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true); err != nil {
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true, c.noVerify); err != nil {
 				return fmt.Errorf("failed to run GPU driver installer: %v", err)
 			}
 		} else {
@@ -403,7 +402,7 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 			return errors.Wrap(err, "failed to cache installation")
 		}
 	}
-	if err := installer.VerifyDriverInstallation(); err != nil {
+	if err := installer.VerifyDriverInstallation(c.noVerify); err != nil {
 		return errors.Wrap(err, "failed to verify installation")
 	}
 	if err := modules.UpdateHostLdCache(hostRootPath, filepath.Join(c.hostInstallDir, "lib64")); err != nil {
@@ -426,7 +425,7 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 		return err
 	}
 
-	if err := installer.RunDriverInstallerPrebuiltModules(downloader, installerFile, c.driverVersion); err != nil {
+	if err := installer.RunDriverInstallerPrebuiltModules(downloader, installerFile, c.driverVersion, c.noVerify); err != nil {
 		return err
 	}
 
@@ -435,7 +434,7 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 			return errors.Wrap(err, "failed to cache installation")
 		}
 	}
-	if err := installer.VerifyDriverInstallation(); err != nil {
+	if err := installer.VerifyDriverInstallation(c.noVerify); err != nil {
 		return errors.Wrap(err, "failed to verify installation")
 	}
 	if err := modules.UpdateHostLdCache(hostRootPath, filepath.Join(c.hostInstallDir, "lib64")); err != nil {
@@ -453,28 +452,28 @@ func (c *InstallCommand) logError(err error) {
 	}
 }
 
-func (c *InstallCommand) getGPUTypeInfo() (bool, GPUType, error) {
+func (c *InstallCommand) getGPUTypeInfo() (GPUType, error) {
 	cmd := "lspci | grep -i \"nvidia\""
 	outBytes, err := exec.Command("/bin/bash", "-c", cmd).Output()
 	if err != nil {
-		return false, NO_GPU, err
+		return NO_GPU, err
 	}
 	out := string(outBytes)
 	switch {
 	case strings.Contains(out, "[Tesla K80]"):
-		return true, K80, nil
+		return K80, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 15f8"), strings.Contains(out, "NVIDIA Corporation GP100GL"), strings.Contains(out, "[Tesla P100"):
-		return true, P100, nil
+		return P100, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 1db1"), strings.Contains(out, "NVIDIA Corporation GV100GL"), strings.Contains(out, "[Tesla V100"):
-		return true, V100, nil
+		return V100, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 1bb3"), strings.Contains(out, "NVIDIA Corporation GP104GL"), strings.Contains(out, "[Tesla P4"):
-		return true, P4, nil
+		return P4, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 27b8"), strings.Contains(out, "NVIDIA Corporation AD104GL [L4]"):
-		return true, L4, nil
+		return L4, nil
 	case strings.Contains(out, "NVIDIA Corporation Device 2330"), strings.Contains(out, "NVIDIA Corporation GH100[H100"):
-		return true, H100, nil
+		return H100, nil
 	default:
-		return true, Others, nil
+		return Others, nil
 	}
 }
 
