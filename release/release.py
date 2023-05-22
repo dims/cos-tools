@@ -13,6 +13,8 @@ _SBOM_BUCKET_STAGING = "gs://cos-container-sbom-staging"
 _SBOM_BUCKET_RELEASE = "gs://cos-container-sbom"
 _SBOM_SUFFIX = "_sbom.spdx.json"
 _SBOM_STAGING_CONTAINER_NAMES = ["cos-customizer", "toolbox", "cos-gpu-installer"]
+_SBOM_TAG = "sbom"
+_COS_GPU_INSTALLER_STAGING_NAME = "cos-gpu-installer"
 
 def validate_config(release_config):
   for release_container in release_config:
@@ -48,6 +50,18 @@ def copy_container_sbom(staging_container_name, release_container_name, build_ta
   for release_tag in release_tags:
     subprocess.run(["gsutil", "cp", src_path + ":" + build_tag + _SBOM_SUFFIX, dst_path + ":" + release_tag + _SBOM_SUFFIX])
 
+# Add tag for generating and uploading SBOM for cos-gpu-installer via louhi workflow.
+def add_tag_for_sbom(src_bucket, staging_container_name, release_container_name, build_tag):
+  if staging_container_name != _COS_GPU_INSTALLER_STAGING_NAME:
+    return
+
+  assert validate_src_gcr_path(src_bucket), "cannot use address {}, only gcr.io/ addresses are supported".format(src_bucket)
+
+  src_path = os.path.join(src_bucket, staging_container_name)
+  dst_path = os.path.join(src_bucket, release_container_name)
+
+  subprocess.run(["gcloud", "container", "images", "add-tag", src_path + ":" + build_tag, dst_path + ":" + _SBOM_TAG, "-q"])
+
 def verify_and_release(src_bucket, dst_buckets, release):
   with open('release/release-versions.yaml', 'r') as file:
     try:
@@ -64,6 +78,7 @@ def verify_and_release(src_bucket, dst_buckets, release):
           for dst_bucket in dst_buckets:
             copy_container_image(src_bucket, dst_bucket, staging_container_name, release_container_name, build_tag, release_tags)
           copy_container_sbom(staging_container_name, release_container_name, build_tag, release_tags)
+          add_tag_for_sbom(src_bucket, staging_container_name, release_container_name, build_tag)
 
     except yaml.YAMLError as ex:
       raise Exception("Invalid YAML config: %s" % str(ex))
