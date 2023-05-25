@@ -16,12 +16,16 @@ package sbomutil
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
 	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
 	"cos.googlesource.com/cos/tools.git/src/pkg/gcs"
 	spdx_common "github.com/spdx/tools-golang/spdx/v2/common"
@@ -29,23 +33,25 @@ import (
 )
 
 const (
-	spdxDocID               = "SPDXRef-DOCUMENT"
-	spdxDocRef              = "DocumentRef-%s"
-	spdxRef                 = "SPDXRef-%s"
-	spdxNoAssert            = "NOASSERTION"
-	docNameSuffix           = "sbom.json"
-	creatorToolName         = "gcr.io/cos-cloud/cos-customizer"
-	spdxJsonFileNotAnalyzed = `      "filesAnalyzed": false,`
-	defaultRootPkgVersion   = "0"
+	spdxDocID             = "SPDXRef-DOCUMENT"
+	spdxDocRef            = "DocumentRef-%s"
+	spdxRef               = "SPDXRef-%s"
+	spdxNoAssert          = "NOASSERTION"
+	docNameSuffix         = "sbom.spdx.json"
+	creatorToolName       = "gcr.io/cos-cloud/cos-customizer"
+	defaultRootPkgVersion = "0"
+	cosCloud              = "cos-cloud"
+	cosTools              = "cos-tools"
+	cosToolsPublicURL     = "https://storage.googleapis.com/" + cosTools
+	cosImageSBOMName      = "sbom.spdx.json"
 )
 
 type SBOMCreator struct {
-	sbomInput               *SBOMInput
-	sbomOutput              *spdx2_2.Document
-	ctx                     context.Context
-	gcsClient               *storage.Client
-	files                   *fs.Files
-	filesNotAnalyzedPkgRefs []string
+	sbomInput  *SBOMInput
+	sbomOutput *spdx2_2.Document
+	ctx        context.Context
+	gcsClient  *storage.Client
+	files      *fs.Files
 }
 
 // NewSBOMCreator creates a new SBOMCreator.
@@ -104,6 +110,45 @@ func (s *SBOMCreator) ParseSBOMInput(sbomInputPath string) error {
 	return nil
 }
 
+func (s *SBOMCreator) findCOSImageSBOM(sourceImage *config.Image) (*SBOMPackage, error) {
+	parts := strings.Split(sourceImage.Name, "-")
+	buildNumber := strings.Join(parts[len(parts)-3:], ".")
+	subdir := "lakitu"
+	if strings.Contains(sourceImage.Name, "arm64") {
+		subdir = "lakitu-arm64"
+	}
+	sbomPath := fmt.Sprintf("%s/%s/%s", buildNumber, subdir, cosImageSBOMName)
+	sbomReader, err := s.gcsClient.Bucket(cosTools).Object(sbomPath).NewReader(s.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gcs object reader for gs://%s/%s, err: %v", cosTools, sbomPath, err)
+	}
+	defer sbomReader.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, sbomReader); err != nil {
+		return nil, fmt.Errorf("failed to copy SBOM reader to SHA writer, err: %v", err)
+	}
+
+	return &SBOMPackage{
+		Name:          sourceImage.Name,
+		SpdxDocument:  fmt.Sprintf("%s/%s", cosToolsPublicURL, sbomPath),
+		Algorithm:     spdx_common.SHA256,
+		ChecksumValue: fmt.Sprintf("%x", h.Sum(nil)),
+	}, nil
+}
+
+func (s *SBOMCreator) addExternalRef(pkg *SBOMPackage, rootPkg *spdx2_2.Package) {
+	extRef := pkg.toExternalRef()
+	s.sbomOutput.ExternalDocumentReferences = append(s.sbomOutput.ExternalDocumentReferences, extRef)
+	s.sbomOutput.Relationships = append(s.sbomOutput.Relationships, &spdx2_2.Relationship{
+		RefA: spdx_common.DocElementID{ElementRefID: rootPkg.PackageSPDXIdentifier},
+		RefB: spdx_common.DocElementID{
+			DocumentRefID: pkg.Name,
+			ElementRefID:  spdx_common.ElementID(spdxDocID),
+		},
+		Relationship: spdx_common.TypeRelationshipContains,
+	})
+}
+
 // Use NOASSERTION to fill required but empty fields.
 func (s *SBOMCreator) fillNoAssertion() {
 	for _, pkg := range s.sbomOutput.Packages {
@@ -127,26 +172,8 @@ var timeNow = func() string {
 	return fmt.Sprintf("%v", time.Now().UTC().Format(time.RFC3339))
 }
 
-// There is a bug in unmarshaling field "filesAnalyzed"
-// https://github.com/spdx/tools-golang/issues/209
-// Solve the issue manually until it is fixed upstream.
-func (s *SBOMCreator) addFilesNotAnalyzed(content string) string {
-	lines := strings.Split(content, "\n")
-	for _, ref := range s.filesNotAnalyzedPkgRefs {
-		for idx, line := range lines {
-			if line != ref {
-				continue
-			}
-			lines = append(lines[:idx+1], lines[idx:]...)
-			lines[idx] = spdxJsonFileNotAnalyzed
-			break
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
 // GenerateSBOM uses the parsed input to generate an SPDX SBOM.
-func (s *SBOMCreator) GenerateSBOM(actualOutputImageName string) error {
+func (s *SBOMCreator) GenerateSBOM(sourceImage, actualOutputImage *config.Image) error {
 	// Add SBOM creation info.
 	s.sbomOutput.CreationInfo = &spdx2_2.CreationInfo{
 		Created: timeNow(),
@@ -170,7 +197,7 @@ func (s *SBOMCreator) GenerateSBOM(actualOutputImageName string) error {
 
 	// Use the actual output image name as SBOM output image name.
 	if s.sbomInput.OutputImageName == "" {
-		s.sbomInput.OutputImageName = actualOutputImageName
+		s.sbomInput.OutputImageName = actualOutputImage.Name
 		s.sbomInput.OutputImageVersion = ""
 	}
 
@@ -199,8 +226,6 @@ func (s *SBOMCreator) GenerateSBOM(actualOutputImageName string) error {
 		s.sbomOutput.DocumentName = fmt.Sprintf("%s-%s_%s", s.sbomInput.OutputImageName, s.sbomInput.OutputImageVersion, docNameSuffix)
 	}
 
-	s.filesNotAnalyzedPkgRefs = append(s.filesNotAnalyzedPkgRefs, fmt.Sprintf("      \"SPDXID\": \"%s\",", rootPkg.PackageSPDXIdentifier))
-
 	// Add root package and relationship for doc describing root package.
 	s.sbomOutput.Packages = append(s.sbomOutput.Packages, rootPkg)
 	s.sbomOutput.Relationships = append(s.sbomOutput.Relationships, &spdx2_2.Relationship{
@@ -208,6 +233,19 @@ func (s *SBOMCreator) GenerateSBOM(actualOutputImageName string) error {
 		RefB:         spdx_common.DocElementID{ElementRefID: rootPkg.PackageSPDXIdentifier},
 		Relationship: spdx_common.TypeRelationshipDescribe,
 	})
+
+	// Add base image if using public COS images.
+	if sourceImage.Project == cosCloud {
+		log.Println("Using COS image from cos-cloud, trying to find image SBOM...")
+		baseImagePkg, err := s.findCOSImageSBOM(sourceImage)
+		if err != nil {
+			// Allow the workflow to continue when using COS images without public SBOMs.
+			log.Printf("Failed to find COS image SBOM, please add base image as a package to SBOM input file, err: %v", err)
+		} else {
+			s.addExternalRef(baseImagePkg, rootPkg)
+			log.Println("Successfully added COS image SBOM.")
+		}
+	}
 
 	// Add SPDX packages and relationship for root package containing all those pacakges.
 	for _, pkg := range s.sbomInput.SPDXPackages {
@@ -217,20 +255,11 @@ func (s *SBOMCreator) GenerateSBOM(actualOutputImageName string) error {
 			RefB:         spdx_common.DocElementID{ElementRefID: pkg.PackageSPDXIdentifier},
 			Relationship: spdx_common.TypeRelationshipContains,
 		})
-		if !pkg.FilesAnalyzed {
-			s.filesNotAnalyzedPkgRefs = append(s.filesNotAnalyzedPkgRefs, fmt.Sprintf("      \"SPDXID\": \"%s\",", fmt.Sprintf(spdxRef, pkg.PackageSPDXIdentifier)))
-		}
 	}
 
 	// Add SBOM packages and relationship for root package containing all those pacakges.
 	for _, pkg := range s.sbomInput.SBOMPackages {
-		extRef := pkg.toExternalRef()
-		s.sbomOutput.ExternalDocumentReferences = append(s.sbomOutput.ExternalDocumentReferences, extRef)
-		s.sbomOutput.Relationships = append(s.sbomOutput.Relationships, &spdx2_2.Relationship{
-			RefA:         spdx_common.DocElementID{ElementRefID: rootPkg.PackageSPDXIdentifier},
-			RefB:         spdx_common.DocElementID{ElementRefID: spdx_common.ElementID(extRef.DocumentRefID)},
-			Relationship: spdx_common.TypeRelationshipContains,
-		})
+		s.addExternalRef(pkg, rootPkg)
 	}
 
 	// Add extracted license info.
@@ -246,10 +275,8 @@ func (s *SBOMCreator) UploadSBOMToGCS(outputGCSPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to convert SBOM document into json: %v", err)
 	}
-	sbomOutputString := s.addFilesNotAnalyzed(string(sbomOutputBytes))
-
 	sbomOutputURL := fmt.Sprintf("%s/%s", outputGCSPath, s.sbomOutput.DocumentName)
-	if err := gcs.UploadGCSObjectString(s.ctx, s.gcsClient, sbomOutputString, sbomOutputURL); err != nil {
+	if err := gcs.UploadGCSObjectString(s.ctx, s.gcsClient, string(sbomOutputBytes), sbomOutputURL); err != nil {
 		return fmt.Errorf("Failed to upload SBOM to GCS %q, err: %v", outputGCSPath, err)
 	}
 	return nil

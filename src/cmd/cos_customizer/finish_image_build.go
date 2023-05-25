@@ -389,7 +389,7 @@ func (f *FinishImageBuild) Execute(ctx context.Context, flags *flag.FlagSet, arg
 			log.Printf("failed to parse SBOM input file at %q, err: %v", f.sbomInputPath, err)
 			return subcommands.ExitFailure
 		}
-		if err := sbom.GenerateSBOM(outputImage.Image.Name); err != nil {
+		if err := sbom.GenerateSBOM(sourceImage, outputImage); err != nil {
 			log.Printf("failed to generate SBOM, err: %v", err)
 			return subcommands.ExitFailure
 		}

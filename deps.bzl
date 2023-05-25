@@ -232,8 +232,8 @@ def go_mod_deps():
     go_repository(
         name = "com_github_spdx_tools_golang",
         importpath = "github.com/spdx/tools-golang",
-        sum = "h1:/fqihV2Jna7fmow65dHpgKNsilgLK7ICpd2tkCnPEyY=",
-        version = "v0.5.0",
+        sum = "h1:fJg3SVOGG+eIva9ZUBm/hvyA7PIPVFjRxUKe6fdAgwE=",
+        version = "v0.5.1",
     )
     go_repository(
         name = "com_github_stretchr_objx",

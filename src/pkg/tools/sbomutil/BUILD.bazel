@@ -20,6 +20,7 @@ go_library(
     importpath = "cos.googlesource.com/cos/tools.git/src/pkg/tools/sbomutil",
     visibility = ["//visibility:public"],
     deps = [
+        "//src/pkg/config",
         "//src/pkg/fs",
         "//src/pkg/gcs",
         "@com_github_spdx_tools_golang//spdx/v2/v2_2:go_default_library",

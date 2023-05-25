@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"cos.googlesource.com/cos/tools.git/src/pkg/config"
 	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 	"github.com/google/go-cmp/cmp"
 	spdx_common "github.com/spdx/tools-golang/spdx/v2/common"
@@ -88,7 +89,7 @@ func TestGenerateSBOM(t *testing.T) {
 				SPDXVersion:       "SPDX-2.2",
 				DataLicense:       "CC0-1.0",
 				SPDXIdentifier:    spdx_common.ElementID("SPDXRef-DOCUMENT"),
-				DocumentName:      "image1_sbom.json",
+				DocumentName:      "image1-123_sbom.spdx.json",
 				DocumentNamespace: "NOASSERTION",
 				ExternalDocumentReferences: []spdx2_2.ExternalDocumentRef{
 					{
@@ -206,7 +207,9 @@ func TestGenerateSBOM(t *testing.T) {
 			t.Parallel()
 			sbom := NewSBOMCreator(nil, nil, nil)
 			sbom.sbomInput = test.sbomInput
-			if err := sbom.GenerateSBOM(); (err != nil) != test.wantErr {
+			srcImage := &config.Image{}
+			outImage := &config.Image{}
+			if err := sbom.GenerateSBOM(srcImage, outImage); (err != nil) != test.wantErr {
 				t.Fatalf("Unexpected error status, want err: %v, got err: %v", test.wantErr, err)
 			}
 			if !test.wantErr {
@@ -250,7 +253,6 @@ func TestUploadSBOMToGCS(t *testing.T) {
   "name": "image1_sbom.json",
   "documentNamespace": "NOASSERTION",
   "creationInfo": {
-    "licenseListVersion": "",
     "creators": [
       "Tool: gcr.io/cos-cloud/cos-customizer",
       "Organization: G"

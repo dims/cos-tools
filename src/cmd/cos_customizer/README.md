@@ -342,6 +342,8 @@ VMs created by previous invocations in the project and zone set by `-project` an
 Note: `SPDXPackages` has the same schema as field `packages` in
 [SPDX JSON Schema](https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json).
 Field `filesAnalyzed` in `SPDXPackages` can be ambiguous in JSON format so it should be set explicitly.
+If COS images from project `cos-cloud` is used as base image, cos-customizer will automatically
+fetch the public SBOM from GCS bucket `cos-tools` if available.
 
 `-sbom-output-path`: The GCS path for storing the output SBOM. The complete output file path is
 `<sbom-output-path>/<outputImageName>-<outputImageVersion>_sbom.json`. If `outputImageName` is not
