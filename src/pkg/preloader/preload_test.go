@@ -200,7 +200,7 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 			testName:    "ScratchDisk",
 			outputImage: config.NewImage("", ""),
 			buildConfig: &config.Build{GCSBucket: "bucket", GPUType: "nvidia-tesla-k80", Project: "p", Zone: "z"},
-			provConfig:  &provisioner.Config{
+			provConfig: &provisioner.Config{
 				Steps: []provisioner.StepConfig{
 					{
 						Type: "InstallGPU",
@@ -210,8 +210,8 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 					},
 				},
 			},
-			workflow:    []byte("{{.ScratchDisks}} {{.ScratchDiskSource}}"),
-			want:        `{"Name":"scratch-disk","SourceImage":"scratch","Type":"${disk_type}","SizeGb":"5"},{"Source":"scratch-disk"},`,
+			workflow: []byte("{{.ScratchDisks}} {{.ScratchDiskSource}}"),
+			want:     `{"Name":"scratch-disk","SourceImage":"scratch","Type":"${disk_type}","SizeGb":"10"},{"Source":"scratch-disk"},`,
 		},
 	}
 	gcs := fakes.GCSForTest(t)
@@ -243,8 +243,8 @@ func TestDaisyArgsWorkflowTemplate(t *testing.T) {
 			gotStr = strings.Replace(gotStr, "\n", "", -1)
 			gotStr = strings.Replace(gotStr, " ", "", -1)
 
-			input.want = strings.Replace(input.want, "\n", "", -1) 
-			input.want = strings.Replace(input.want, " ", "", -1) 
+			input.want = strings.Replace(input.want, "\n", "", -1)
+			input.want = strings.Replace(input.want, " ", "", -1)
 			if !cmp.Equal(gotStr, input.want) {
 				t.Errorf("daisyArgs: template Daisy: got %s, want %s", gotStr, input.want)
 			}

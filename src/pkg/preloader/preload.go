@@ -125,12 +125,12 @@ func writeDaisyWorkflow(inputWorkflow string, outputImage *config.Image, buildSp
 	var scratchDiskJson string
 	var scratchDiskSource string
 	if needScratchDisk(provConfig) {
-		scratchDiskJson =  `
+		scratchDiskJson = `
       {
         "Name": "scratch-disk",
         "SourceImage": "scratch",
         "Type": "${disk_type}",
-        "SizeGb": "5"
+        "SizeGb": "10"
       },`
 		scratchDiskSource = `{"Source": "scratch-disk"},`
 	}
