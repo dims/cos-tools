@@ -364,6 +364,8 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 		scratchImgFileTar,
 		"-var:machine_type",
 		buildSpec.MachineType,
+		"-var:service_account",
+		buildSpec.ServiceAccount,
 		"-var:disk_type",
 		buildSpec.DiskType,
 		"-var:host_maintenance",

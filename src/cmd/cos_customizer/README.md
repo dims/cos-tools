@@ -272,6 +272,9 @@ Defaults to `n1-standard-1`. Useful for optimizing costs. Note that this is
 separate from the Cloud Build machine type option, which sets the machine type
 of the Cloud Build VM, which is different from the COS Customizer preload VM.
 
+`-service-account`: The service account to be used by the COS Customizer preload VM.
+If not set, the default GCE service account will be used.
+
 `-gpu-type`: The GPU type attached to the COS Customizer preload VM e.g.
 `nvidia-tesla-t4`. Useful for installing GPU drivers via subcommand
 `run-script`. If this flag is set, it will overwrite the same flag set in

@@ -48,6 +48,7 @@ type FinishImageBuild struct {
 	zone           string
 	project        string
 	machineType    string
+	serviceAccount string
 	gpuType        string
 	imageName      string
 	imageSuffix    string
@@ -101,6 +102,7 @@ func (f *FinishImageBuild) SetFlags(flags *flag.FlagSet) {
 	flags.StringVar(&f.zone, "zone", "", "Zone to make GCE resources in.")
 	flags.StringVar(&f.project, "project", "", "Project to make GCE resources in.")
 	flags.StringVar(&f.machineType, "machine-type", "n1-standard-1", "Machine type to use during the build.")
+	flags.StringVar(&f.serviceAccount, "service-account", "default", "Service account to be used by the preload VM.")
 	flags.StringVar(&f.gpuType, "gpu-type", "", "GPU type e.g. 'nvidia-tesla-t4' used for GPU driver installation via subcommand 'run-script'. "+
 		"Please check https://cloud.google.com/compute/docs/gpus/gpu-regions-zones for GPU types and their region/zone availability.")
 	flags.StringVar(&f.network, "network", "", "Network to use"+
@@ -185,6 +187,7 @@ func (f *FinishImageBuild) loadConfigs(files *fs.Files) (*config.Image, *config.
 	buildConfig.Project = f.project
 	buildConfig.Zone = f.zone
 	buildConfig.MachineType = f.machineType
+	buildConfig.ServiceAccount = f.serviceAccount
 	buildConfig.DiskType = f.diskType
 	buildConfig.DiskSize = f.diskSize
 	buildConfig.Network = f.network

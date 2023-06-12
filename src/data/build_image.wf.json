@@ -12,7 +12,8 @@
     "host_maintenance": {"Value": "MIGRATE", "Description": "VM behavior when there is maintenance."},
     "machine_type": {"Required": true, "Description": "Machine type of the preload VM."},
     "network": {"Value": "", "Description": "Network to use for preload VM."},
-    "subnet": {"Value": "", "Description":  "Subnetwork used for the preload VM."}
+    "subnet": {"Value": "", "Description":  "Subnetwork used for the preload VM."},
+    "service_account": {"Value": "default", "Description":  "Service account used for the preload VM."}
   },
   "Sources": {
     "cloud-config": "/data/startup.yaml",
@@ -70,6 +71,10 @@
           "Name": "preload-vm",
           "Disks": [{"Source": "boot-disk"}, {{.ScratchDiskSource}} {"Source": "cidata-disk"}],
           "Labels": {"cos-customizer-cleanup":""},
+          "ServiceAccounts":[{
+            "Email":  "${service_account}",
+            "Scopes": ["https://www.googleapis.com/auth/cloud-platform","https://www.googleapis.com/auth/devstorage.read_write"]
+          }],
           "MachineType": "${machine_type}",
           "guestAccelerators": {{.Accelerators}},
           "scheduling": {
