@@ -116,6 +116,7 @@ type InstallCommand struct {
 	prepareBuildTools  bool
 	kernelOpen         bool
 	noVerify           bool
+	kernelModuleParams modules.ModuleParameters
 }
 
 // Name implements subcommands.Command.Name.
@@ -162,7 +163,8 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 			"In test mode, `-nvidia-installer-url` can be used without `-allow-unsigned-driver`.")
 	f.BoolVar(&c.prepareBuildTools, "prepare-build-tools", false, "Whether to populate the build tools cache, i.e. to download and install the toolchain and the kernel headers. Drivers are NOT installed when this flag is set and running with this flag does not require GPU attached to the instance.")
 	f.BoolVar(&c.noVerify, "no-verify", false, "Skip kernel module loading and installation verification. Useful for preloading drivers without attached GPU.")
-
+	c.kernelModuleParams = modules.NewModuleParameters()
+	f.Var(&c.kernelModuleParams, "module-arg", "Kernel module parameters can be specified using this flag. These parameters are used while loading the specific kernel mode drivers into the kernel. Usage: -module-arg <module-x>.<parameter-y>=<value> -module-arg <module-y>.<parameter-z>=<value> ..    For eg: –module-arg nvidia_uvm.uvm_debug_prints=1 –module-arg nvidia.NVreg_EnableGpuFirmware=0.")
 }
 
 func (c *InstallCommand) validateFlags() error {
@@ -266,7 +268,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
-			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen, c.noVerify); err != nil {
+			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen, c.noVerify, c.kernelModuleParams); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
 				return subcommands.ExitFailure
 			}
@@ -386,11 +388,11 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 		}
 	}
 
-	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false, c.noVerify); err != nil {
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false, c.noVerify, c.kernelModuleParams); err != nil {
 		if errors.Is(err, installer.ErrDriverLoad) {
 			// Drivers were linked, but couldn't load; try again with legacy linking
 			log.Infof("Failed to load kernel module, err: %v. Retrying driver installation with legacy linking", err)
-			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true, c.noVerify); err != nil {
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true, c.noVerify, c.kernelModuleParams); err != nil {
 				return fmt.Errorf("failed to run GPU driver installer: %v", err)
 			}
 		} else {
@@ -425,7 +427,7 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 		return err
 	}
 
-	if err := installer.RunDriverInstallerPrebuiltModules(downloader, installerFile, c.driverVersion, c.noVerify); err != nil {
+	if err := installer.RunDriverInstallerPrebuiltModules(downloader, installerFile, c.driverVersion, c.noVerify, c.kernelModuleParams); err != nil {
 		return err
 	}
 

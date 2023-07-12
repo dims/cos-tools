@@ -151,3 +151,24 @@ key2=value2`
 		t.Errorf("Unexpected envs, want: %v, got: %v, diff: %v", expectedEnvs, envs, diff)
 	}
 }
+
+func TestCut(t *testing.T) {
+	for _, tt := range []struct {
+		s, sep        string
+		before, after string
+		found         bool
+	}{
+		{"abc", "b", "a", "c", true},
+		{"abc", "a", "", "bc", true},
+		{"abc", "c", "ab", "", true},
+		{"abc", "abc", "", "", true},
+		{"abc", "", "", "abc", true},
+		{"abc", "d", "abc", "", false},
+		{"", "d", "", "", false},
+		{"", "", "", "", true},
+	} {
+		if before, after, found := Cut(tt.s, tt.sep); before != tt.before || after != tt.after || found != tt.found {
+			t.Errorf("Cut(%q, %q) = %q, %q, %v, want %q, %q, %v", tt.s, tt.sep, before, after, found, tt.before, tt.after, tt.found)
+		}
+	}
+}

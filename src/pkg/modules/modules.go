@@ -31,7 +31,7 @@ var (
 )
 
 // LoadModule loads a given kernel module to kernel.
-func LoadModule(moduleName, modulePath string) error {
+func LoadModule(moduleName, modulePath string, moduleParams ModuleParameters) error {
 	loaded, err := isModuleLoaded(moduleName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to load module %s (%s)", moduleName, modulePath)
@@ -39,7 +39,7 @@ func LoadModule(moduleName, modulePath string) error {
 	if loaded {
 		return nil
 	}
-	if err := loadModule(modulePath); err != nil {
+	if err := loadModule(modulePath, moduleParams[moduleName]); err != nil {
 		return errors.Wrapf(err, "failed to load module %s (%s)", moduleName, modulePath)
 	}
 	return nil
@@ -165,9 +165,12 @@ func isModuleLoaded(moduleName string) (bool, error) {
 	return false, nil
 }
 
-func loadModule(modulePath string) error {
-	if err := execCommand("insmod", modulePath).Run(); err != nil {
-		return errors.Wrapf(err, "failed to run command `insmod %s`", modulePath)
+func loadModule(modulePath string, moduleParams []string) error {
+	insmodArgs := append([]string{modulePath}, moduleParams...)
+	cmd := execCommand("insmod", insmodArgs...)
+	log.Infof("loading module: %v", cmd)
+	if err := cmd.Run(); err != nil {
+		return errors.Wrapf(err, "failed to run command `insmod %v`", insmodArgs)
 	}
 	return nil
 }
