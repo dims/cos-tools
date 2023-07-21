@@ -2,6 +2,7 @@
 package signing
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,11 +17,30 @@ const (
 	gpuDriverPubKeyPem = "gpu-driver-cert.pem"
 	gpuDriverPubKeyDer = "gpu-driver-cert.der"
 	gpuDriverDummyKey  = "dummy-key"
+	signatureTemplate  = "nvidia-drivers-%s-signature.tar.gz"
 )
 
 var (
 	gpuDriverSigningDir = "/build/sign-gpu-driver"
 )
+
+// DownloadDriverSignaturesV2 downloads GPU driver signatures from COS build artifacts.
+func DownloadDriverSignaturesV2(downloader *cos.GCSDownloader, driverVersion string) error {
+	if err := os.MkdirAll(gpuDriverSigningDir, 0755); err != nil {
+		return errors.Wrapf(err, "failed to create signing dir %s", gpuDriverSigningDir)
+	}
+	log.Infof("Downloading driver signature for version %s", driverVersion)
+	signatureName := fmt.Sprintf(signatureTemplate, driverVersion)
+	if err := downloader.DownloadArtifact(gpuDriverSigningDir, signatureName); err != nil {
+		return errors.Wrapf(err, "failed to download driver signature for version %s", driverVersion)
+	}
+
+	if err := decompressSignature(signatureName); err != nil {
+		return errors.Wrapf(err, "failed to decompress driver signature for version %s.", driverVersion)
+	}
+
+	return nil
+}
 
 // DownloadDriverSignatures downloads GPU driver signatures.
 func DownloadDriverSignatures(downloader cos.ExtensionsDownloader, driverVersion string) error {

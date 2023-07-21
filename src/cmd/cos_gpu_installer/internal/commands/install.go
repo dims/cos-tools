@@ -116,6 +116,7 @@ type InstallCommand struct {
 	kernelOpen         bool
 	noVerify           bool
 	kernelModuleParams modules.ModuleParameters
+	selfPrecompiled    bool
 }
 
 // Name implements subcommands.Command.Name.
@@ -207,7 +208,6 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 	}
 
 	var gpuType GPUType = NO_GPU
-
 	if !c.prepareBuildTools {
 		if gpuType, err = c.getGPUTypeInfo(); err != nil {
 			if !c.noVerify {
@@ -218,23 +218,17 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		}
 	}
 
+	if milestone := envReader.Milestone(); selfPrecompiledCandidate(milestone) {
+		c.selfPrecompiled = true
+	}
+
 	downloader := cos.NewGCSDownloader(envReader, c.gcsDownloadBucket, c.gcsDownloadPrefix)
 	if c.nvidiaInstallerURL == "" {
 		versionInput := c.driverVersion
-		milestone, err := strconv.Atoi(envReader.Milestone())
-		if err != nil {
-			c.logError(errors.Wrap(err, "failed to parse milestone number"))
-			return subcommands.ExitFailure
-		}
 		c.driverVersion, err = getDriverVersion(downloader, c.driverVersion)
 		if err != nil {
-			if versionInput == "latest" && milestone < 93 {
-				c.logError(errors.Wrap(err, "'--version=latest' is only supported on COS M93 and onwards, please unset this flag"))
-				return subcommands.ExitFailure
-			} else {
-				c.logError(errors.Wrap(err, "failed to get default driver version"))
-				return subcommands.ExitFailure
-			}
+			c.logError(errors.Wrap(err, fmt.Sprintf("failed to get %s driver version", versionInput)))
+			return subcommands.ExitFailure
 		}
 		if err := c.checkDriverCompatibility(downloader, gpuType); err != nil {
 			c.logError(errors.Wrap(err, "failed to check driver compatibility"))
@@ -267,7 +261,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
-			if err := installer.ConfigureCachedInstalltion(hostInstallDir, !c.unsignedDriver, c.test, isOpen, c.noVerify, c.kernelModuleParams); err != nil {
+			if err := installer.ConfigureCachedInstallation(hostInstallDir, !c.unsignedDriver, c.test, isOpen, c.noVerify, c.selfPrecompiled, c.kernelModuleParams); err != nil {
 				c.logError(errors.Wrap(err, "failed to configure cached installation"))
 				return subcommands.ExitFailure
 			}
@@ -362,8 +356,12 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 
 	var installerFile string
 	if c.nvidiaInstallerURL == "" {
-		installerFile, err = installer.DownloadDriverInstaller(
-			c.driverVersion, envReader.Milestone(), envReader.BuildNumber())
+		if c.selfPrecompiled {
+			installerFile, err = installer.DownloadDriverInstallerV2(downloader, c.driverVersion)
+		} else {
+			installerFile, err = installer.DownloadDriverInstaller(
+				c.driverVersion, envReader.Milestone(), envReader.BuildNumber())
+		}
 		if err != nil {
 			return errors.Wrap(err, "failed to download GPU driver installer")
 		}
@@ -379,19 +377,27 @@ func installDriver(c *InstallCommand, cacher *installer.Cacher, envReader *cos.E
 			if err := signing.DownloadDriverSignaturesFromURL(c.signatureURL); err != nil {
 				return errors.Wrap(err, "failed to download driver signature")
 			}
-		} else if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
-			if strings.Contains(err.Error(), "404 Not Found") {
-				return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
+		} else {
+			if c.selfPrecompiled {
+				if err = signing.DownloadDriverSignaturesV2(downloader, c.driverVersion); err != nil {
+					return errors.Wrap(err, "failed to download driver signature")
+				}
+			} else {
+				if err := signing.DownloadDriverSignatures(downloader, c.driverVersion); err != nil {
+					if strings.Contains(err.Error(), "404 Not Found") {
+						return fmt.Errorf("The GPU driver is not available for the COS version. Please wait for half a day and retry.")
+					}
+					return errors.Wrap(err, "failed to download driver signature")
+				}
 			}
-			return errors.Wrap(err, "failed to download driver signature")
 		}
 	}
 
-	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false, c.noVerify, c.kernelModuleParams); err != nil {
+	if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, false, c.noVerify, c.selfPrecompiled, c.kernelModuleParams); err != nil {
 		if errors.Is(err, installer.ErrDriverLoad) {
 			// Drivers were linked, but couldn't load; try again with legacy linking
 			log.Infof("Failed to load kernel module, err: %v. Retrying driver installation with legacy linking", err)
-			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true, c.noVerify, c.kernelModuleParams); err != nil {
+			if err := installer.RunDriverInstaller(toolchainPkgDir, installerFile, c.driverVersion, !c.unsignedDriver, c.test, true, c.noVerify, c.selfPrecompiled, c.kernelModuleParams); err != nil {
 				return fmt.Errorf("failed to run GPU driver installer: %v", err)
 			}
 		} else {
@@ -494,4 +500,13 @@ func (c *InstallCommand) checkDriverCompatibility(downloader *cos.GCSDownloader,
 		return nil
 	}
 	return nil
+}
+
+func selfPrecompiledCandidate(milestone string) bool {
+	for _, v := range []string{"93", "97", "101", "105"} {
+		if v == milestone {
+			return false
+		}
+	}
+	return true
 }
