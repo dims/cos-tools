@@ -26,11 +26,10 @@ import (
 )
 
 const (
-	grepFound            = 0
-	hostRootPath         = "/root"
-	kernelSrcDir         = "/build/usr/src/linux"
-	toolchainPkgDir      = "/build/cos-tools"
-	installerURLTemplate = "https://us.download.nvidia.com/tesla/%[1]s/NVIDIA-Linux-x86_64-%[1]s.run"
+	grepFound       = 0
+	hostRootPath    = "/root"
+	kernelSrcDir    = "/build/usr/src/linux"
+	toolchainPkgDir = "/build/cos-tools"
 )
 
 type GPUType int
@@ -421,8 +420,7 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 	}
 	defer func() { callback <- 0 }()
 
-	installerURL := fmt.Sprintf(installerURLTemplate, c.driverVersion)
-	installerFile, err := installer.DownloadToInstallDir(installerURL, "Downloading driver installer")
+	installerFile, err := installer.DownloadGenericDriverInstaller(c.driverVersion)
 	if err != nil {
 		return err
 	}

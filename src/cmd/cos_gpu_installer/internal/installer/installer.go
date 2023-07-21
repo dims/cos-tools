@@ -34,6 +34,7 @@ const (
 	prebuiltModuleTemplate        = "nvidia-drivers-%s.tgz"
 	DefaultVersion                = "default"
 	LatestVersion                 = "latest"
+	installerURLTemplate          = "https://storage.googleapis.com/nvidia-drivers-%[1]s-public/tesla/%[2]s/NVIDIA-Linux-x86_64-%[2]s.run"
 )
 
 var (
@@ -670,4 +671,24 @@ func PrebuiltModulesAvailable(downloader *cos.GCSDownloader, driverVersion strin
 
 	prebuiltModulesArtifactPath := fmt.Sprintf(prebuiltModuleTemplate, driverVersion)
 	return downloader.ArtifactExists(prebuiltModulesArtifactPath)
+}
+
+func getGenericDriverInstallerURL(driverVersion string) (string, error) {
+	metadataZone, err := utils.GetGCEMetadata("zone")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get GCE metadata zone")
+	}
+	downloadLocation := getInstallerDownloadLocation(metadataZone)
+
+	return fmt.Sprintf(installerURLTemplate, downloadLocation, driverVersion), nil
+}
+
+// DownloadGenericDriverInstaller downloads the generic GPU driver installer given driver version.
+func DownloadGenericDriverInstaller(driverVersion string) (string, error) {
+	log.Infof("Downloading GPU driver installer version %s", driverVersion)
+	downloadURL, err := getGenericDriverInstallerURL(driverVersion)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get driver installer URL")
+	}
+	return DownloadToInstallDir(downloadURL, "GPU driver installer")
 }

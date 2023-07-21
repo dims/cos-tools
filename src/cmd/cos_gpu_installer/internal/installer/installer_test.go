@@ -45,3 +45,14 @@ func TestGetPrecompiledInstallerURL(t *testing.T) {
 		t.Errorf("Unexpected return, want: %s, got: %s", expectedRet, ret)
 	}
 }
+
+func TestGetGenericDriverInstallerURL(t *testing.T) {
+	ret, err := getGenericDriverInstallerURL("525.125.06")
+	if err != nil {
+		t.Errorf("Unexpected err, want: nil, got: %v", err)
+	}
+	expectedRet := "https://storage.googleapis.com/nvidia-drivers-us-public/tesla/525.125.06/NVIDIA-Linux-x86_64-525.125.06.run"
+	if ret != expectedRet {
+		t.Errorf("Unexpected return, want: %s, got: %s", expectedRet, ret)
+	}
+}
