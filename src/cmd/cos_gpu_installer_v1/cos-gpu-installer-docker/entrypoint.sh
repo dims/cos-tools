@@ -34,7 +34,7 @@ ROOT_MOUNT_DIR="${ROOT_MOUNT_DIR:-/root}"
 CACHE_FILE="${NVIDIA_INSTALL_DIR_CONTAINER}/.cache"
 LOCK_FILE="${ROOT_MOUNT_DIR}/tmp/cos_gpu_installer_lock"
 LOCK_FILE_FD=20
-GSP_FIRMWARE_FILES=("gsp.bin" "gsp_tu10x.bin" "gsp_ad10x.bin")
+GSP_FIRMWARE_FILES=("gsp.bin" "gsp_tu10x.bin" "gsp_ad10x.bin" "gsp_ga10x.bin")
 set +x
 
 # TOOLCHAIN_DOWNLOAD_URL, CC and CXX are set by

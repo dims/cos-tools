@@ -39,7 +39,7 @@ const (
 )
 
 var (
-	gspFileNames = []string{"gsp.bin", "gsp_tu10x.bin", "gsp_ad10x.bin"}
+	gspFileNames = []string{"gsp.bin", "gsp_tu10x.bin", "gsp_ad10x.bin", "gsp_ga10x.bin"}
 	// ErrDriverLoad indicates that installed GPU drivers could not be loaded into
 	// the kernel.
 	ErrDriverLoad = stderrors.New("failed to load GPU drivers")

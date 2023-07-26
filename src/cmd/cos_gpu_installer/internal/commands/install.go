@@ -91,12 +91,12 @@ var fallbackMap = map[GPUType]Fallback{
 	},
 	L4: {
 		minMajorVersion:       525,
-		maxMajorVersion:       525,
+		maxMajorVersion:       535,
 		fallbackDriverVersion: "R525",
 	},
 	H100: {
 		minMajorVersion:       525,
-		maxMajorVersion:       525,
+		maxMajorVersion:       535,
 		fallbackDriverVersion: "R525",
 	},
 }
