@@ -1,3 +1,5 @@
+substitutions:
+    _TAG_NAME: ${COMMIT_SHA}
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
@@ -17,7 +19,7 @@ steps:
       echo "Building $d ... "
       (
         logfile="${d::-1}.log"
-        gcloud builds submit --config=${config} --project=${PROJECT_ID} --substitutions=_OUTPUT_PROJECT=${_OUTPUT_PROJECT},TAG_NAME=${COMMIT_SHA} > ${logfile} 2>&1
+        gcloud builds submit --config=${config} --project=${PROJECT_ID} --substitutions=_OUTPUT_PROJECT=${_OUTPUT_PROJECT},TAG_NAME=${_TAG_NAME} > ${logfile} 2>&1
         if [[ $? -ne 0 ]]; then
           echo "$d failed" | tee -a ${failure_file}
           cat ${logfile}
