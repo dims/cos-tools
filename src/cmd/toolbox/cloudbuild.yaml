@@ -1,8 +1,6 @@
 options:
   env:
   - 'DOCKER_CLI_EXPERIMENTAL=enabled'
-substitutions:
-    _SBOM_BUCKET: 'cos-container-sbom-staging' # default value
 steps:
 # Build toolbox image
 # This step is needed to add a new entry to /proc/sys/fs/binfmt_misc. Docker
@@ -26,10 +24,4 @@ steps:
   args: ['buildx', 'build', '--platform', 'linux/amd64,linux/arm64', '--build-arg', 'BUILDKIT_INLINE_CACHE=1', '-f', 'src/cmd/toolbox/Dockerfile', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:latest', '-t', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:${TAG_NAME}', '--cache-from', 'gcr.io/${_OUTPUT_PROJECT}/toolbox:latest', '--push', 'src/cmd/toolbox']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['pull','gcr.io/${_OUTPUT_PROJECT}/toolbox:${TAG_NAME}']
-- name: 'gcr.io/louhi-prod-1/louhi-helper-v2@sha256:fbbe0b03e00a783350d06c97e0ac6dbcd0d52e6053fafd14c7a8f3d6725e4517'
-  args: ['sbom_scan_image', '--regex', 'gcr\\.io/${_OUTPUT_PROJECT}/toolbox:${TAG_NAME}']
-artifacts:
-  objects:
-    location: 'gs://${_SBOM_BUCKET}/toolbox/'
-    paths: ['/workspace/toolbox:${TAG_NAME}_sbom.spdx.json']
 timeout: 1800s
