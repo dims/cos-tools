@@ -655,6 +655,9 @@ func RunDriverInstallerPrebuiltModules(downloader *cos.GCSDownloader, installerF
 	if err := exec.Command("tar", "--overwrite", "--xattrs", "--xattrs-include=*", "-xf", tarballPath, "-C", gpuInstallDirContainer).Run(); err != nil {
 		return fmt.Errorf("failed to extract prebuilt modules: %v", err)
 	}
+	if err := os.Chmod(gpuInstallDirContainer, defaultFilePermission); err != nil {
+		return fmt.Errorf("failed to change permission of install dir: %v", err)
+	}
 
 	// load the prebuilt kernel modules
 	if err := loadGPUDrivers(moduleParameters, false, false, true, noVerify, true); err != nil {
