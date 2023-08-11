@@ -50,7 +50,7 @@ func SealOEMPartition(veritysetupImgPath string, oemFSSize4K uint64) error {
 	grubPath, err := partutil.MountEFIPartition()
 	log.Println("EFI partition mounted.")
 	if err != nil {
-		return fmt.Errorf("cannot mount EFI partition (/dev/sda12), error msg:(%v)", err)
+		return fmt.Errorf("cannot mount EFI partition (/dev/disk/by-partlabel/EFI-SYSTEM), error msg:(%v)", err)
 	}
 	defer partutil.UnmountEFIPartition()
 	partUUID, err := partutil.GetPartUUID("/dev/sda8")
@@ -199,7 +199,7 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 	dmVersion := 0
 	for idx, line := range lines {
 		if !strings.Contains(line, "dm=") &&
-		   !strings.Contains(line, "dm-mod.create=") {
+			!strings.Contains(line, "dm-mod.create=") {
 			continue
 		}
 		var startPos = strings.Index(line, "dm=")
@@ -214,7 +214,7 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 			lineBuf[startPos+4] = '2'
 			lines[idx] = strings.Join(append(strings.Split(string(lineBuf), ","), entryStringV0), ",")
 		} else {
-			configs := []string {string(lineBuf), entryStringV1}
+			configs := []string{string(lineBuf), entryStringV1}
 			lines[idx] = strings.Join(configs, ";")
 		}
 	}

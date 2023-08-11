@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	espPartition      = "/dev/sda12"
+	espPartition      = "/dev/disk/by-partlabel/EFI-SYSTEM"
 	utsFilepath       = "include/generated/utsrelease.h"
 	toolchainBinPath  = "bin"
 	kernelHeadersPath = "usr/src/linux-headers*"

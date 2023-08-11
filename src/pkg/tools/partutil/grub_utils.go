@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// MountEFIPartition mounts the EFI partition (/dev/sda12)
+// MountEFIPartition mounts the EFI partition (/dev/disk/by-partlabel/EFI-SYSTEM)
 // and returns the path where grub.cfg is at.
 func MountEFIPartition() (string, error) {
 	dir, err := ioutil.TempDir("", "")
@@ -30,23 +30,23 @@ func MountEFIPartition() (string, error) {
 		return "", fmt.Errorf("error in creating tempDir, "+
 			"error msg: (%v)", err)
 	}
-	cmd := exec.Command("sudo", "mount", "/dev/sda12", dir)
+	cmd := exec.Command("sudo", "mount", "/dev/disk/by-partlabel/EFI-SYSTEM", dir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("error in mounting /dev/sda12 at %q, "+
+		return "", fmt.Errorf("error in mounting /dev/disk/by-partlabel/EFI-SYSTEM at %q, "+
 			"error msg: (%v)", dir, err)
 	}
 	return dir + "/efi/boot/grub.cfg", nil
 }
 
-// UnmountEFIPartition unmounts the EFI partition (/dev/sda12)
+// UnmountEFIPartition unmounts the EFI partition (/dev/disk/by-partlabel/EFI-SYSTEM)
 func UnmountEFIPartition() error {
-	cmd := exec.Command("sudo", "umount", "/dev/sda12")
+	cmd := exec.Command("sudo", "umount", "/dev/disk/by-partlabel/EFI-SYSTEM")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error in unmounting /dev/sda12"+
+		return fmt.Errorf("error in unmounting /dev/disk/by-partlabel/EFI-SYSTEM"+
 			"error msg: (%v)", err)
 	}
 	return nil

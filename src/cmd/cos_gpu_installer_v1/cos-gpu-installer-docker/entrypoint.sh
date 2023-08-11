@@ -119,7 +119,7 @@ is_secure_boot_enabled() {
 
 configure_kernel_module_locking() {
   info "Checking if third party kernel modules can be installed"
-  local -r esp_partition="/dev/sda12"
+  local -r esp_partition="/dev/disk/by-partlabel/EFI-SYSTEM"
   local -r mount_path="/tmp/esp"
   local -r grub_cfg="efi/boot/grub.cfg"
   local sed_cmds=()
