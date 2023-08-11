@@ -437,6 +437,8 @@ means a subdirectory of `/var` or `/home`.
 `-gpu-type`: This flag is deprecated, please use the same flag in step
 `finish-image-build`.
 
+`-installer-container`: (optional) The installer container to use.
+
 An example `install-gpu` step looks like the following:
 
     - name: 'gcr.io/cos-cloud/cos-customizer'

@@ -38,8 +38,8 @@ import (
 )
 
 const (
-	gpuScript          = "install_gpu.sh"
-	installerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20230117"
+	gpuScript                 = "install_gpu.sh"
+	defaultInstallerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20230117"
 )
 
 // InstallGPU implements subcommands.Command for the "install-gpu" command.
@@ -52,6 +52,7 @@ type InstallGPU struct {
 	gpuType              string
 	getValidDrivers      bool
 	gpuDataDir           string
+	installerContainer   string
 }
 
 // Name implements subcommands.Command.Name.
@@ -85,6 +86,7 @@ func (i *InstallGPU) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&i.gpuDataDir, "deps-dir", "", "If provided, the local directory to search for cos-gpu-installer data dependencies. "+
 		"The exact data dependencies that must be present in this directory depends on the version of cos-gpu-installer "+
 		"used by cos-customizer. Do not expect this flag to be stable; it exists for compatibility with pre-release COS images.")
+	f.StringVar(&i.installerContainer, "installer-container", defaultInstallerContainer, "Use the provided cos-gpu-installer-v1 container, for e.g. gcr.io/cos-cloud/cos-gpu-installer:latest")
 }
 
 func validDriverVersions(ctx context.Context, gcsClient *storage.Client) (map[string]bool, error) {
@@ -214,7 +216,7 @@ func (i *InstallGPU) updateProvConfig(provConfig *provisioner.Config) error {
 		NvidiaDriverVersion:      i.NvidiaDriverVersion,
 		NvidiaDriverMD5Sum:       i.NvidiaDriverMd5sum,
 		NvidiaInstallDirHost:     i.NvidiaInstallDirHost,
-		NvidiaInstallerContainer: installerContainer,
+		NvidiaInstallerContainer: i.installerContainer,
 		// GCSDepsPrefix will be converted into a gs:// address by the preloader
 		// package.
 		GCSDepsPrefix: i.gpuDataDir,

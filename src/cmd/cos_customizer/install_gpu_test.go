@@ -231,7 +231,7 @@ func TestInstallGPUProvisionerConfig(t *testing.T) {
 				Args: mustMarshalJSON(t, &provisioner.InstallGPUStep{
 					NvidiaDriverVersion:      "390.46",
 					NvidiaInstallDirHost:     "/var/lib/nvidia",
-					NvidiaInstallerContainer: installerContainer,
+					NvidiaInstallerContainer: defaultInstallerContainer,
 				}),
 			},
 		},
