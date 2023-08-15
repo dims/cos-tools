@@ -39,7 +39,7 @@ import (
 
 const (
 	gpuScript                 = "install_gpu.sh"
-	defaultInstallerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20230117"
+	defaultInstallerContainer = "gcr.io/cos-cloud/cos-gpu-installer:v20230815"
 )
 
 // InstallGPU implements subcommands.Command for the "install-gpu" command.
