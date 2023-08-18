@@ -67,8 +67,14 @@ func (c *ListCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfa
 		c.logWarning(errors.Wrap(err, "failed to get latest driver version"))
 	}
 	for _, artifact := range artifacts {
+		driverVersion := ""
 		if strings.HasSuffix(artifact, ".signature.tar.gz") {
-			driverVersion := strings.TrimSuffix(artifact, ".signature.tar.gz")
+			driverVersion = strings.TrimSuffix(artifact, ".signature.tar.gz")
+		} else if strings.HasPrefix(artifact, "nvidia-drivers-") && strings.HasSuffix(artifact, "-signature.tar.gz") {
+			driverVersion = strings.TrimPrefix(artifact, "nvidia-drivers-")
+			driverVersion = strings.TrimSuffix(driverVersion, "-signature.tar.gz")
+		}
+		if driverVersion != "" {
 			if defaultVersion == driverVersion {
 				if latestVersion == driverVersion {
 					fmt.Printf("%s [default][latest]\n", driverVersion)

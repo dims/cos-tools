@@ -113,10 +113,10 @@ func DownloadDriverInstaller(driverVersion, cosMilestone, cosBuildNumber string)
 }
 
 // DownloadDriverInstallerV2 downloads GPU driver installer given driver version from COS build artifacts.
-func DownloadDriverInstallerV2(downloader *cos.GCSDownloader, driverVersion string) (string, error) {
+func DownloadDriverInstallerV2(downloader cos.ExtensionsDownloader, driverVersion string) (string, error) {
 	log.Infof("Downloading GPU driver installer version %s", driverVersion)
 	installerFilename := fmt.Sprintf(precompiledDriverTemplate, driverVersion)
-	err := downloader.DownloadArtifact(gpuInstallDirContainer, installerFilename)
+	err := downloader.DownloadExtensionArtifact(gpuInstallDirContainer, cos.GPUExtension, installerFilename)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to download installer")
 	}

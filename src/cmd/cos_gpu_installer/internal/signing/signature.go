@@ -25,13 +25,13 @@ var (
 )
 
 // DownloadDriverSignaturesV2 downloads GPU driver signatures from COS build artifacts.
-func DownloadDriverSignaturesV2(downloader *cos.GCSDownloader, driverVersion string) error {
+func DownloadDriverSignaturesV2(downloader cos.ExtensionsDownloader, driverVersion string) error {
 	if err := os.MkdirAll(gpuDriverSigningDir, 0755); err != nil {
 		return errors.Wrapf(err, "failed to create signing dir %s", gpuDriverSigningDir)
 	}
 	log.Infof("Downloading driver signature for version %s", driverVersion)
 	signatureName := fmt.Sprintf(signatureTemplate, driverVersion)
-	if err := downloader.DownloadArtifact(gpuDriverSigningDir, signatureName); err != nil {
+	if err := downloader.DownloadExtensionArtifact(gpuDriverSigningDir, cos.GPUExtension, signatureName); err != nil {
 		return errors.Wrapf(err, "failed to download driver signature for version %s", driverVersion)
 	}
 
