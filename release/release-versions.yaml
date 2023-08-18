@@ -18,9 +18,9 @@
     - "v20230815"
 - staging_container_name: "cos-gpu-installer"
   release_container_name: "cos-gpu-installer"
-  build_commit: "20e7a848a3708557268a8e30ef1a44e16106200d"
+  build_commit: "483a2701e0711e04bae8d235101a3b4e0f70e9df"
   release_tags:
-    - "v2.1.4"
+    - "v2.1.5"
 - staging_container_name: "cos-gpu-driver-builder"
   release_container_name: "cos-gpu-driver-builder"
   build_commit: "d742bf7c5f9b3081f8467ce7236c2fa8c0a3cb63"
