@@ -75,7 +75,7 @@ func VerifyDriverInstallation(noVerify bool) error {
 }
 
 // ConfigureCachedInstallation updates ldconfig and installs the cached GPU driver kernel modules.
-func ConfigureCachedInstallation(gpuInstallDirHost string, needSigned, test, kernelOpen, noVerify, selfPrecompiled bool, moduleParameters modules.ModuleParameters) error {
+func ConfigureCachedInstallation(gpuInstallDirHost string, needSigned, test, kernelOpen, noVerify bool, moduleParameters modules.ModuleParameters) error {
 	log.V(2).Info("Configuring cached driver installation")
 
 	if err := createHostDirBindMount(gpuInstallDirHost, gpuInstallDirContainer); err != nil {
@@ -84,7 +84,7 @@ func ConfigureCachedInstallation(gpuInstallDirHost string, needSigned, test, ker
 	if err := updateContainerLdCache(); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
-	if err := loadGPUDrivers(moduleParameters, needSigned, test, kernelOpen, noVerify, selfPrecompiled); err != nil {
+	if err := loadGPUDrivers(moduleParameters, needSigned, test, kernelOpen, noVerify); err != nil {
 		return errors.Wrap(err, "failed to configure cached driver installation")
 	}
 
@@ -321,7 +321,7 @@ func installUserLibs(nvidiaDir string) error {
 
 // RunDriverInstaller runs GPU driver installer. Only works if the provided
 // installer includes precompiled drivers.
-func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, needSigned, test, legacyLink, noVerify, selfPrecompiled bool, moduleParameters modules.ModuleParameters) error {
+func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, needSigned, test, legacyLink, noVerify bool, moduleParameters modules.ModuleParameters) error {
 	log.Info("Running GPU driver installer")
 
 	// Extract files to a fixed path first to make sure md5sum of generated gpu drivers are consistent.
@@ -379,12 +379,6 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 				}
 			}
 		}
-		// Copy public key.
-		if !selfPrecompiled {
-			if err := utils.CopyFile(signing.GetPublicKeyDer(), filepath.Join(gpuInstallDirContainer, "pubkey.der")); err != nil {
-				return errors.Wrapf(err, "failed to copy file %s", signing.GetPublicKeyDer())
-			}
-		}
 	} else if !legacyLink {
 		// Copy drivers to the desired end directory. This is done as part of
 		// `modules.AppendSignature` in the above signing block, but we need to do
@@ -408,7 +402,7 @@ func RunDriverInstaller(toolchainDir, installerFilename, driverVersion string, n
 	// The legacy linking method does this when the installer doesn't fail (i.e.
 	// module signature verification isn't enforced).
 	if (legacyLink && legacyInstallerFailed) || !legacyLink {
-		if err := loadGPUDrivers(moduleParameters, needSigned, test, false, noVerify, selfPrecompiled); err != nil {
+		if err := loadGPUDrivers(moduleParameters, needSigned, test, false, noVerify); err != nil {
 			return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 		}
 	}
@@ -537,17 +531,7 @@ func createOverlayFS(lowerDir, upperDir, workDir string) error {
 	return nil
 }
 
-func loadGPUDrivers(moduleParams modules.ModuleParameters, needSigned, test, kernelOpen, noVerify, selfPrecompiled bool) error {
-	// Don't need to load public key in test mode. Platform key is used.
-	if needSigned && !test && !kernelOpen && !selfPrecompiled {
-		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der"), modules.SecondaryKeyring); err != nil {
-			return errors.Wrap(err, "failed to load public key")
-		}
-		// Load public key to IMA keyring for GSP firmware. For backward compatibility, it's OK if pubkey cannot be loaded.
-		if err := modules.LoadPublicKey("gpu-key", filepath.Join(gpuInstallDirContainer, "pubkey.der"), modules.IMAKeyring); err != nil {
-			log.Infof("Falied to load public key to IMA keyring, err: %v", err)
-		}
-	}
+func loadGPUDrivers(moduleParams modules.ModuleParameters, needSigned, test, kernelOpen, noVerify bool) error {
 	if noVerify {
 		log.Infof("Flag --no-verify is set, skip kernel module loading.")
 		return nil
@@ -660,7 +644,7 @@ func RunDriverInstallerPrebuiltModules(downloader *cos.GCSDownloader, installerF
 	}
 
 	// load the prebuilt kernel modules
-	if err := loadGPUDrivers(moduleParameters, false, false, true, noVerify, true); err != nil {
+	if err := loadGPUDrivers(moduleParameters, false, false, true, noVerify); err != nil {
 		return fmt.Errorf("%w: %v", ErrDriverLoad, err)
 	}
 
