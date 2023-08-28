@@ -1,6 +1,21 @@
 substitutions:
     _TAG_NAME: ${COMMIT_SHA}
+    _BUILD_TOOLS_CACHE: 'https://storage.googleapis.com/cos-infra-prod_cloudbuild/cos-tools-cache'
 steps:
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    cat <<EOF | docker build -t bazel -
+    FROM gcr.io/cloud-builders/bazel
+    RUN apt-get update && apt-get install -y mtools
+    EOF
+- name: 'bazel'
+  args: [ 'test', '--test_output=all', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone','--','...','-//src/pkg/tools/...' ]
+- name: 'golang'
+  entrypoint: 'bash'
+  args: [ './run_unit_tests.sh' ]
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
   args:
