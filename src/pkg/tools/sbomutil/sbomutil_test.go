@@ -174,7 +174,7 @@ func TestGenerateSBOM(t *testing.T) {
 					},
 					{
 						RefA:         spdx_common.DocElementID{ElementRefID: spdx_common.ElementID("SPDXRef-image1")},
-						RefB:         spdx_common.DocElementID{ElementRefID: spdx_common.ElementID("DocumentRef-pkg2")},
+						RefB:         spdx_common.DocElementID{DocumentRefID: "pkg2", ElementRefID: spdx_common.ElementID("SPDXRef-DOCUMENT")},
 						Relationship: "CONTAINS",
 					},
 				},

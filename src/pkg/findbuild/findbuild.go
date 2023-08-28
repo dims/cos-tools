@@ -628,7 +628,7 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 	// access secretmanager
 	client, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		log.Error("failed to create secretmanager client: %v", err)
+		log.Errorf("failed to create secretmanager client: %v", err)
 		return nil, utils.InternalServerError
 	}
 	var (
@@ -649,7 +649,7 @@ func FindReleasedBuild(request *BuildRequest) (*BuildResponse, utils.ChangelogEr
 		{instanceSecretName, &instanceName},
 		{dbProjectSecretName, &dbProjectID},
 	}); err != nil {
-		log.Error("failed to retrieve secrets from secretmanager: %v", err)
+		log.Errorf("failed to retrieve secrets from secretmanager: %v", err)
 		return nil, utils.InternalServerError
 	}
 	connectionName := dbProjectID + ":" + zone + ":" + instanceName

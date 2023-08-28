@@ -54,7 +54,7 @@ const (
 func getHTTPClient() (*http.Client, error) {
 	log.Debug("Creating HTTP client")
 	creds, err := google.FindDefaultCredentials(context.Background(), gerrit.OAuthScope)
-	if err != nil || len(creds.JSON) == 0 {
+	if err != nil {
 		return nil, fmt.Errorf("no application default credentials found - run `gcloud auth application-default login` and try again")
 	}
 	return oauth2.NewClient(oauth2.NoContext, creds.TokenSource), nil

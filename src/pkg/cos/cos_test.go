@@ -105,8 +105,8 @@ func TestDownloadKernelSrc(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	downloder := fakeDownloader{}
-	if err := downloadKernelSrc(&downloder, tmpDir); err != nil {
+	downloader := fakeDownloader{}
+	if err := downloadKernelSrc(&downloader, tmpDir); err != nil {
 		t.Fatalf("Failed to run downloadKernelSrc: %v", err)
 	}
 
@@ -132,8 +132,8 @@ func TestSetCompilationEnv(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	os.Setenv("TMPDIR", tmpDir)
 
-	downloder := fakeDownloader{}
-	if err := SetCompilationEnv(&downloder); err != nil {
+	downloader := fakeDownloader{}
+	if err := SetCompilationEnv(&downloader); err != nil {
 		t.Fatalf("Failed to run SetCompilationEnv: %v", err)
 	}
 
@@ -167,8 +167,8 @@ func TestInstallCrossToolchain(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	origPath := os.Getenv("PATH")
 
-	downloder := fakeDownloader{}
-	if err := InstallCrossToolchain(&downloder, tmpDir); err != nil {
+	downloader := fakeDownloader{}
+	if err := InstallCrossToolchain(&downloader, tmpDir); err != nil {
 		t.Fatalf("Failed to run InstallCrossToolchain: %v", err)
 	}
 
@@ -298,3 +298,5 @@ func (*fakeDownloader) DownloadKernelHeaders(destDir string) error {
 func (*fakeDownloader) DownloadArtifact(string, string) error { return nil }
 
 func (*fakeDownloader) GetArtifact(string) ([]byte, error) { return nil, nil }
+
+func (*fakeDownloader) ArtifactExists(string) (bool, error) { return false, nil }

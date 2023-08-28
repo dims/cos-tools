@@ -46,7 +46,7 @@ func TestReadConfigs(t *testing.T) {
 	timeNow = func() time.Time { return time.Date(2022, time.October, 10, 0, 0, 0, 0, time.UTC) }
 
 	// read configs from [2022-10-10 to 2022-10-10 minus 3 days]
-	got, err := ReadConfigs(ctx, gcs.Client, "cos-gpu-configs-test", 3)
+	got, err := ReadConfigs(ctx, gcs.Client, "cos-gpu-configs-test", 3, "kernel")
 	if err != nil {
 		log.Fatalf("ReadConfigs() failed:%v\n", err)
 	}
