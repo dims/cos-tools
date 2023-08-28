@@ -103,20 +103,21 @@ var fallbackMap = map[GPUType]Fallback{
 
 // InstallCommand is the subcommand to install GPU drivers.
 type InstallCommand struct {
-	driverVersion      string
-	hostInstallDir     string
-	unsignedDriver     bool
-	gcsDownloadBucket  string
-	gcsDownloadPrefix  string
-	nvidiaInstallerURL string
-	signatureURL       string
-	debug              bool
-	test               bool
-	prepareBuildTools  bool
-	kernelOpen         bool
-	noVerify           bool
-	kernelModuleParams modules.ModuleParameters
-	selfPrecompiled    bool
+	driverVersion          string
+	hostInstallDir         string
+	unsignedDriver         bool
+	gcsDownloadBucket      string
+	gcsDownloadPrefix      string
+	nvidiaInstallerURL     string
+	signatureURL           string
+	debug                  bool
+	test                   bool
+	prepareBuildTools      bool
+	kernelOpen             bool
+	noVerify               bool
+	kernelModuleParams     modules.ModuleParameters
+	selfPrecompiled        bool
+	nvidiaInstallerURLOpen string
 }
 
 // Name implements subcommands.Command.Name.
@@ -156,6 +157,7 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 			"This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging and testing.")
 	f.StringVar(&c.signatureURL, "signature-url", "",
 		"A URL to the driver signature. This flag can only be used together with `-test` and `-nvidia-installer-url` for for debugging and testing.")
+	f.StringVar(&c.nvidiaInstallerURLOpen, "nvidia-installer-url-open", "", "This can be used to specify the location of the GSP firmware and user-space NVIDIA GPU driver components from a corresponding driver release of the OSS kernel modules. This flag is only for debugging and testing.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 	f.BoolVar(&c.test, "test", false,
@@ -176,6 +178,9 @@ func (c *InstallCommand) validateFlags() error {
 	}
 	if c.signatureURL != "" && (c.nvidiaInstallerURL == "" || c.test == false) {
 		return stderrors.New("-signature-url must be used with -nvidia-installer-url and -test")
+	}
+	if c.nvidiaInstallerURLOpen != "" && (c.driverVersion == "" || c.test == false) {
+		return stderrors.New("-nvidia-installer-url-open must be used with -test and -version")
 	}
 	return nil
 }
@@ -257,7 +262,7 @@ func (c *InstallCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...inte
 
 	var cacher *installer.Cacher
 	// We only want to cache drivers installed from official sources.
-	if c.nvidiaInstallerURL == "" {
+	if c.nvidiaInstallerURL == "" && c.nvidiaInstallerURLOpen == "" {
 		cacher = installer.NewCacher(hostInstallDir, envReader.BuildNumber(), c.driverVersion)
 		if isCached, isOpen, err := cacher.IsCached(); isCached && err == nil {
 			log.V(2).Info("Found cached version, NOT building the drivers.")
@@ -426,7 +431,12 @@ func installDriverPrebuiltModules(c *InstallCommand, cacher *installer.Cacher, e
 	}
 	defer func() { callback <- 0 }()
 
-	installerFile, err := installer.DownloadGenericDriverInstaller(c.driverVersion)
+	var installerFile string
+	if c.nvidiaInstallerURLOpen == "" {
+		installerFile, err = installer.DownloadGenericDriverInstaller(c.driverVersion)
+	} else {
+		installerFile, err = installer.DownloadToInstallDir(c.nvidiaInstallerURLOpen, "Unofficial GPU driver installer")
+	}
 	if err != nil {
 		return err
 	}
