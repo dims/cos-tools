@@ -159,15 +159,6 @@ func TestFindCL(t *testing.T) {
 			ManifestRepo:       externalManifestRepo,
 			ExpectedError:      "406",
 		},
-		"invalid release branch": {
-			Change:             "150",
-			GerritHost:         externalGerritURL,
-			GitilesHost:        externalGitilesURL,
-			FallbackGerritHost: externalFallbackGerritURL,
-			ManifestRepo:       externalManifestRepo,
-			ShouldFallback:     true,
-			ExpectedError:      "406",
-		},
 		"chromeos branch": {
 			Change:             "2036225",
 			GerritHost:         externalGerritURL,

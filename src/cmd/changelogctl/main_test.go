@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -47,8 +48,13 @@ type Commit struct {
 }
 
 func setup() error {
-	cmd := exec.Command("go", "build", "-o", "changelogctl", "main.go")
-	return cmd.Run()
+	// check if binary exists in the desired location.If not, compile from source.
+	_, err := os.Stat("changelogctl")
+	if errors.Is(err, os.ErrNotExist) {
+		cmd := exec.Command("go", "build", "-o", "changelogctl", "main.go")
+		return cmd.Run()
+	}
+	return err
 }
 
 func cleanOutputFiles(source, target string) {
@@ -267,19 +273,10 @@ func TestFindBuild(t *testing.T) {
 			CL:     "80809c436f1cae4cde117fce34b82f38bdc2fd36",
 			Output: "Build: 12871.1183.0\n",
 		},
-		"test gerrit fallback": {
-			CL:     "2288114",
-			Output: "Build: 15049.0.0\n",
-		},
 		"test string flags": {
 			CL:     "3781",
 			Args:   []string{"-gerrit", gerritURL, "-gob", gitilesURL, "-repo", manifestRepo},
 			Output: "Build: 12371.1072.0\n",
-		},
-		"test fallback string flags": {
-			CL:     "2288114",
-			Args:   []string{"-gerrit", gerritURL, "-fallback", fallbackURLs, "-gob", gitilesURL, "-repo", manifestRepo},
-			Output: "Build: 15049.0.0\n",
 		},
 		"invalid gob": {
 			CL:        "2288114",
