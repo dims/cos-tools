@@ -14,50 +14,11 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
-genrule(
-    name = "scratch",
-    outs = ["scratch.img"],
-    cmd = "\
-fallocate -l 512M $@;\
-mkfs.ext4 $@;\
-tune2fs -c0 -i0 $@;\
-e2label $@ SCRATCH",
-)
-
-genrule(
-    name = "cidata",
-    srcs = [
-        "//:src/data/startup.yaml",
-        "//src/cmd/provisioner:provisioner_amd64",
-        "//src/cmd/provisioner:provisioner_arm64",
-        "//src/cmd/metadata_watcher:metadata_watcher_amd64",
-        "//src/cmd/metadata_watcher:metadata_watcher_arm64",
-    ],
-    outs = ["cidata.img"],
-    cmd = "\
-$(location @dosfstools//:mkfs.fat) -n CIDATA -S 512 -s 8 -C $@ 131072;\
-touch meta-data;\
-$(location @mtools//:mcopy) -i $@ $(location //:src/data/startup.yaml) ::/user-data;\
-$(location @mtools//:mcopy) -i $@ meta-data ::/meta-data;\
-$(location @mtools//:mcopy) -i $@ $(location //src/cmd/provisioner:provisioner_amd64) ::/provisioner_amd64;\
-$(location @mtools//:mcopy) -i $@ $(location //src/cmd/provisioner:provisioner_arm64) ::/provisioner_arm64;\
-$(location @mtools//:mcopy) -i $@ $(location //src/cmd/metadata_watcher:metadata_watcher_amd64) ::/metadata_watcher_amd64;\
-$(location @mtools//:mcopy) -i $@ $(location //src/cmd/metadata_watcher:metadata_watcher_arm64) ::/metadata_watcher_arm64;",
-    tools = [
-        "@dosfstools//:mkfs.fat",
-        "@mtools//:mcopy",
-    ],
-)
-
 go_library(
     name = "preloader",
     srcs = [
         "gcs.go",
         "preload.go",
-    ],
-    embedsrcs = [
-        ":cidata",
-	":scratch"
     ],
     importpath = "cos.googlesource.com/cos/tools.git/src/pkg/preloader",
     visibility = ["//visibility:public"],

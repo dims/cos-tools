@@ -13,90 +13,90 @@
 # limitations under the License.
 
 substitutions:
-  "_TEST_1": "smoke_test"
-  "_INPUT_IMAGE_1": "cos-dev-69-10895-0-0"
-  "_TEST_2": "gpu_test"
-  "_INPUT_IMAGE_2": "cos-89-16108-798-1"
-  "_INPUT_PROJECT": "cos-cloud"
+  '_TEST_1': 'smoke_test'
+  '_INPUT_IMAGE_1': 'cos-93-16623-461-15'
+  '_TEST_2': 'gpu_test'
+  '_INPUT_IMAGE_2': 'cos-89-16108-798-1'
+  '_INPUT_PROJECT': 'cos-cloud'
 steps:
-- name: 'gcr.io/cloud-builders/bazel'
-  id: "docker-build"
-  args: ["run", "--spawn_strategy=standalone", ":cos_customizer", "--", "--norun"]
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'docker-build'
+  args: ['build', '-f', 'src/cmd/cos_customizer/Dockerfile', '-t', 'cos_customizer', '.']
 # TEST_1 workflow
-- name: 'bazel:cos_customizer'
-  waitFor: "docker-build"
-  id: "test-1-start-build"
-  args: ["-local-state-workdir=.${_TEST_1}",
-         "start-image-build",
-         "-build-context=testing/${_TEST_1}",
-         "-image-name=${_INPUT_IMAGE_1}",
-         "-image-project=${_INPUT_PROJECT}",
-         "-gcs-bucket=${PROJECT_ID}_cloudbuild",
-         "-gcs-workdir=customizer-${_TEST_1}-$BUILD_ID"]
-- name: 'bazel:cos_customizer'
-  waitFor: "test-1-start-build"
-  id: "test-1-run-script"
-  args: ["-local-state-workdir=.${_TEST_1}",
-         "run-script",
-         "-script=preload.sh"]
-- name: 'bazel:cos_customizer'
-  waitFor: "test-1-run-script"
-  id: "test-1-finish-build"
-  args: ["-local-state-workdir=.${_TEST_1}",
-         "finish-image-build",
-         "-zone=us-west1-b",
-         "-project=$PROJECT_ID",
-         "-image-name=preload-test-t1-$BUILD_ID",
-         "-image-project=$PROJECT_ID"]
+- name: 'cos_customizer'
+  waitFor: 'docker-build'
+  id: 'test-1-start-build'
+  args: ['-local-state-workdir=.${_TEST_1}',
+         'start-image-build',
+         '-build-context=testing/${_TEST_1}',
+         '-image-name=${_INPUT_IMAGE_1}',
+         '-image-project=${_INPUT_PROJECT}',
+         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-workdir=customizer-${_TEST_1}-$BUILD_ID']
+- name: 'cos_customizer'
+  waitFor: 'test-1-start-build'
+  id: 'test-1-run-script'
+  args: ['-local-state-workdir=.${_TEST_1}',
+         'run-script',
+         '-script=preload.sh']
+- name: 'cos_customizer'
+  waitFor: 'test-1-run-script'
+  id: 'test-1-finish-build'
+  args: ['-local-state-workdir=.${_TEST_1}',
+         'finish-image-build',
+         '-zone=us-west1-b',
+         '-project=$PROJECT_ID',
+         '-image-name=preload-test-t1-$BUILD_ID',
+         '-image-project=$PROJECT_ID']
 - name: 'gcr.io/compute-image-tools/daisy'
-  waitFor: "test-1-finish-build"
-  id: "test-1-test-build"
-  args: ["-project=$PROJECT_ID", "-zone=us-west1-b", "-var:image_name",
-         "preload-test-t1-$BUILD_ID", "-var:image_project", "$PROJECT_ID",
-         "-var:test_cfg", "../${_TEST_1}/preload_test.cfg", "testing/util/run_test.wf.json"]
+  waitFor: 'test-1-finish-build'
+  id: 'test-1-test-build'
+  args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
+         'preload-test-t1-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:test_cfg', '../${_TEST_1}/preload_test.cfg', 'testing/util/run_test.wf.json']
 # TEST_2 workflow
 - name: 'busybox'
-  args: ["sed", "-i", "-e", "s|%s|'450.216.04'|",
-         "testing/${_TEST_2}/preload_test.cfg"]
-- name: 'bazel:cos_customizer'
-  waitFor: "docker-build"
-  id: "test-2-start-build"
-  args: ["-local-state-workdir=.${_TEST_2}",
-         "start-image-build",
-         "-build-context=testing/${_TEST_2}",
-         "-image-name=${_INPUT_IMAGE_2}",
-         "-image-project=${_INPUT_PROJECT}",
-         "-gcs-bucket=${PROJECT_ID}_cloudbuild",
-         "-gcs-workdir=customizer-${_TEST_2}-$BUILD_ID"]
-- name: 'bazel:cos_customizer'
-  waitFor: "test-2-start-build"
-  id: "test-2-install-gpu"
-  args: ["-local-state-workdir=.${_TEST_2}",
-         "install-gpu",
-         "-version=450.216.04",
-         "-gpu-type=nvidia-tesla-t4"]
-- name: 'bazel:cos_customizer'
-  waitFor: "test-2-install-gpu"
-  id: "test-2-run-script"
-  args: ["-local-state-workdir=.${_TEST_2}",
-         "run-script",
-         "-script=preload.sh"]
-- name: 'bazel:cos_customizer'
-  waitFor: "test-2-run-script"
-  id: "test-2-finish-build"
-  args: ["-local-state-workdir=.${_TEST_2}",
-         "finish-image-build",
-         "-zone=us-west1-b",
-         "-project=$PROJECT_ID",
-         "-image-name=preload-test-t2-$BUILD_ID",
-         "-image-project=$PROJECT_ID"]
+  args: ['sed', '-i', '-e', 's|%s|"450.216.04"|',
+         'testing/${_TEST_2}/preload_test.cfg']
+- name: 'cos_customizer'
+  waitFor: 'docker-build'
+  id: 'test-2-start-build'
+  args: ['-local-state-workdir=.${_TEST_2}',
+         'start-image-build',
+         '-build-context=testing/${_TEST_2}',
+         '-image-name=${_INPUT_IMAGE_2}',
+         '-image-project=${_INPUT_PROJECT}',
+         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-workdir=customizer-${_TEST_2}-$BUILD_ID']
+- name: 'cos_customizer'
+  waitFor: 'test-2-start-build'
+  id: 'test-2-install-gpu'
+  args: ['-local-state-workdir=.${_TEST_2}',
+         'install-gpu',
+         '-version=450.216.04',
+         '-gpu-type=nvidia-tesla-t4']
+- name: 'cos_customizer'
+  waitFor: 'test-2-install-gpu'
+  id: 'test-2-run-script'
+  args: ['-local-state-workdir=.${_TEST_2}',
+         'run-script',
+         '-script=preload.sh']
+- name: 'cos_customizer'
+  waitFor: 'test-2-run-script'
+  id: 'test-2-finish-build'
+  args: ['-local-state-workdir=.${_TEST_2}',
+         'finish-image-build',
+         '-zone=us-west1-b',
+         '-project=$PROJECT_ID',
+         '-image-name=preload-test-t2-$BUILD_ID',
+         '-image-project=$PROJECT_ID']
 - name: 'gcr.io/compute-image-tools/daisy'
-  waitFor: "test-2-finish-build"
-  id: "test-2-test-build"
-  args: ["-project=$PROJECT_ID", "-zone=us-west1-b", "-var:image_name",
-         "preload-test-t2-$BUILD_ID", "-var:image_project", "$PROJECT_ID",
-         "-var:test_cfg", "../${_TEST_2}/preload_test.cfg", "-var:vm_workflow",
-         "./gpu_vm.wf.json", "testing/util/run_test.wf.json"]
+  waitFor: 'test-2-finish-build'
+  id: 'test-2-test-build'
+  args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
+         'preload-test-t2-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:test_cfg', '../${_TEST_2}/preload_test.cfg', '-var:vm_workflow',
+         './gpu_vm.wf.json', 'testing/util/run_test.wf.json']
 options:
   machineType: 'N1_HIGHCPU_32'
-timeout: "7200s"
+timeout: '7200s'

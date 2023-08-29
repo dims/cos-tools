@@ -73,13 +73,14 @@ func SealOEMPartition(veritysetupImgPath string, oemFSSize4K uint64) error {
 // loadVeritysetupImage loads the docker image of veritysetup.
 // return the image ID.
 func loadVeritysetupImage(imgPath string) (string, error) {
-	cmd := exec.Command("sudo", "docker", "load", "-i", imgPath)
+	tag := "veritysetup:veritysetup_" + runtime.GOARCH
+	cmd := exec.Command("sudo", "docker", "import", imgPath, tag)
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("error in loading docker image, "+
 			"input: imgPath=%q, error msg: (%v)", imgPath, err)
 	}
 	var idBuf bytes.Buffer
-	cmd = exec.Command("sudo", "docker", "images", "veritysetup:veritysetup_"+runtime.GOARCH, "-q")
+	cmd = exec.Command("sudo", "docker", "images", tag, "-q")
 	cmd.Stdout = &idBuf
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -199,7 +200,7 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 	dmVersion := 0
 	for idx, line := range lines {
 		if !strings.Contains(line, "dm=") &&
-		   !strings.Contains(line, "dm-mod.create=") {
+			!strings.Contains(line, "dm-mod.create=") {
 			continue
 		}
 		var startPos = strings.Index(line, "dm=")
@@ -214,7 +215,7 @@ func appendDMEntryToGRUB(grubPath, name, partUUID, hash, salt string, oemFSSize4
 			lineBuf[startPos+4] = '2'
 			lines[idx] = strings.Join(append(strings.Split(string(lineBuf), ","), entryStringV0), ",")
 		} else {
-			configs := []string {string(lineBuf), entryStringV1}
+			configs := []string{string(lineBuf), entryStringV1}
 			lines[idx] = strings.Join(configs, ";")
 		}
 	}
