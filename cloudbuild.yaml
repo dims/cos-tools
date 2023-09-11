@@ -9,7 +9,7 @@ steps:
   - |
     cat <<EOF | docker build -t bazel -
     FROM gcr.io/cloud-builders/bazel
-    RUN apt-get update && apt-get install -y mtools
+    RUN apt-get update && apt-get install -y mtools dosfstools
     EOF
 - name: 'bazel'
   args: [ 'test', '--test_output=all', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone','--','...','-//src/pkg/tools/...' ]

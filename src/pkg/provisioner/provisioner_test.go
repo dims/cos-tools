@@ -27,8 +27,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const trueExecutable = "#!/bin/bash\ntrue"
-
 func testDataDir(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs("testdata")
@@ -73,9 +71,9 @@ func TestStateExists(t *testing.T) {
 		GCSClient:           nil,
 		TarCmd:              "",
 		SystemctlCmd:        "",
-		DockerCredentialGCR: []byte(trueExecutable),
-		VeritySetupImage:    []byte(trueExecutable),
-		HandleDiskLayoutBin: []byte(trueExecutable),
+		DockerCredentialGCR: "/bin/true",
+		VeritySetupImage:    "/bin/true",
+		HandleDiskLayoutBin: "/bin/true",
 	}
 	config := Config{}
 	if err := Run(ctx, deps, dir, config); err != errStateAlreadyExists {
@@ -118,9 +116,9 @@ func TestRunInvalidArgs(t *testing.T) {
 				TarCmd:              "tar",
 				SystemctlCmd:        "/bin/true",
 				RootDir:             tempDir,
-				DockerCredentialGCR: []byte(trueExecutable),
-				VeritySetupImage:    []byte(trueExecutable),
-				HandleDiskLayoutBin: []byte(trueExecutable),
+				DockerCredentialGCR: "/bin/true",
+				VeritySetupImage:    "/bin/true",
+				HandleDiskLayoutBin: "/bin/true",
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {
@@ -193,9 +191,9 @@ func TestRunFailure(t *testing.T) {
 				TarCmd:              "tar",
 				SystemctlCmd:        "/bin/true",
 				RootDir:             tempDir,
-				DockerCredentialGCR: []byte(trueExecutable),
-				VeritySetupImage:    []byte(trueExecutable),
-				HandleDiskLayoutBin: []byte(trueExecutable),
+				DockerCredentialGCR: "/bin/true",
+				VeritySetupImage:    "/bin/true",
+				HandleDiskLayoutBin: "/bin/true",
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {
@@ -276,9 +274,9 @@ func TestRunSuccess(t *testing.T) {
 				TarCmd:              "tar",
 				SystemctlCmd:        "/bin/true",
 				RootDir:             tempDir,
-				DockerCredentialGCR: []byte(trueExecutable),
-				VeritySetupImage:    []byte(trueExecutable),
-				HandleDiskLayoutBin: []byte(trueExecutable),
+				DockerCredentialGCR: "/bin/true",
+				VeritySetupImage:    "/bin/true",
+				HandleDiskLayoutBin: "/bin/true",
 			}
 			stateDir := filepath.Join(tempDir, "var", "lib", ".cos-customizer")
 			if err := stubMountInfo(filepath.Join(tempDir, "proc", "self", "mountinfo"), filepath.Join(stateDir, "bin")); err != nil {

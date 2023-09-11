@@ -26,7 +26,7 @@ steps:
     - |
       cat <<EOF | docker build -t bazel -
       FROM gcr.io/cloud-builders/bazel
-      RUN apt-get update && apt-get install -y mtools
+      RUN apt-get update && apt-get install -y mtools dosfstools
       EOF
   # Run bash script that builds the metadata.json
   # Run bazel tests and redirect to output.txt

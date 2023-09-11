@@ -30,7 +30,7 @@ setup_test() {
   # build changelogctl binary
   go build -o src/cmd/changelogctl/changelogctl src/cmd/changelogctl/main.go
 
-  apt-get update && apt-get install -y sudo fdisk sysstat mtools
+  apt-get update && apt-get install -y sudo fdisk sysstat mtools dosfstools
 
   # clean up to save disk space
   rm -rf "$(readlink -f bazel-bin)"
