@@ -82,6 +82,17 @@ type Fallback struct {
 	fallbackDriverVersion string
 }
 
+// Checks compatibilty of input driverVersion with Fallback for GPU device type
+func (f Fallback) Compatible(driverMajorVersion int) bool {
+	if f.maxMajorVersion != 0 && driverMajorVersion > f.maxMajorVersion {
+		return false
+	}
+	if f.minMajorVersion != 0 && driverMajorVersion < f.minMajorVersion {
+		return false
+	}
+	return true
+}
+
 var fallbackMap = map[GPUType]Fallback{
 	// R470 is the last driver family supporting K80 GPU devices.
 	K80: {
@@ -91,13 +102,11 @@ var fallbackMap = map[GPUType]Fallback{
 	},
 	L4: {
 		minMajorVersion:       525,
-		maxMajorVersion:       535,
-		fallbackDriverVersion: "R525",
+		fallbackDriverVersion: "R535",
 	},
 	H100: {
 		minMajorVersion:       525,
-		maxMajorVersion:       535,
-		fallbackDriverVersion: "R525",
+		fallbackDriverVersion: "R535",
 	},
 }
 
@@ -480,7 +489,7 @@ func (c *InstallCommand) checkDriverCompatibility(downloader *cos.GCSDownloader,
 		return errors.Wrap(err, "failed to get driver major version")
 	}
 	fallback, found := fallbackMap[gpuType]
-	if found && (driverMajorVersion > fallback.maxMajorVersion || driverMajorVersion < fallback.minMajorVersion) {
+	if found && !fallback.Compatible(driverMajorVersion) {
 		log.Warningf("\n\nDriver version %s doesn't support %s GPU devices.\n\n", c.driverVersion, gpuType)
 		fallbackVersion, err := installer.GetGPUDriverVersion(downloader, fallback.fallbackDriverVersion)
 		if err != nil {
