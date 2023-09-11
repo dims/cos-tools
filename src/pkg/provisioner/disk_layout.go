@@ -101,11 +101,7 @@ func setupOnShutdownUnit(deps Deps, runState *state) (err error) {
 	if err := mountFunc("", filepath.Join(deps.RootDir, "tmp"), "", unix.MS_REMOUNT|unix.MS_NOSUID|unix.MS_NODEV, ""); err != nil {
 		return fmt.Errorf("error remounting /tmp as exec: %v", err)
 	}
-	out := filepath.Join(deps.RootDir, "tmp", "handle_disk_layout.bin")
-	if err := utils.CopyFile(deps.HandleDiskLayoutBin, out); err != nil {
-		return err
-	}
-	if err := os.Chmod(out, 755); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(deps.RootDir, "tmp", "handle_disk_layout.bin"), deps.HandleDiskLayoutBin, 0744); err != nil {
 		return err
 	}
 	data := fmt.Sprintf(`[Unit]

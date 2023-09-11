@@ -14,22 +14,22 @@
 
 substitutions:
   '_TEST': 'timeout_test'
-  '_INPUT_IMAGE': 'cos-93-16623-461-15'
+  '_INPUT_IMAGE': 'cos-dev-69-10895-0-0'
   '_INPUT_PROJECT': 'cos-cloud'
 steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-f', 'src/cmd/cos_customizer/Dockerfile', '-t', 'cos_customizer', '.']
-- name: 'cos_customizer'
+- name: 'gcr.io/cloud-builders/bazel'
+  args: ['run', '--spawn_strategy=standalone', ':cos_customizer', '--', '--norun']
+- name: 'bazel:cos_customizer'
   args: ['start-image-build',
          '-build-context=testing/${_TEST}',
          '-image-name=${_INPUT_IMAGE}',
          '-image-project=${_INPUT_PROJECT}',
          '-gcs-bucket=${PROJECT_ID}_cloudbuild',
          '-gcs-workdir=customizer-$BUILD_ID']
-- name: 'cos_customizer'
+- name: 'bazel:cos_customizer'
   args: ['run-script',
          '-script=preload.sh']
-- name: 'cos_customizer'
+- name: 'bazel:cos_customizer'
   args: ['finish-image-build',
          '-zone=us-west1-b',
          '-project=$PROJECT_ID',

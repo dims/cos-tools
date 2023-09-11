@@ -32,9 +32,6 @@ var (
 	stateDir = flag.String("state-dir", "/var/lib/.cos-customizer", "Absolute path to the directory to use for provisioner state. "+
 		"This directory is used for persisting internal state across reboots, unpacking inputs, and running provisioning scripts. "+
 		"The size of the directory scales with the size of the inputs.")
-	dockerCredentialGCR = flag.String("docker-credential-gcr", "", "Path to the docker-credential-gcr executable to use during provisioning.")
-	veritySetupImage    = flag.String("veritysetup-image", "", "Path to the veritysetup file system tarball to use as a Docker container during provisioning.")
-	handleDiskLayoutBin = flag.String("handle-disk-layout-bin", "", "Path to the handle_disk_layout executable to use during provisioning.")
 )
 
 func main() {
@@ -59,9 +56,9 @@ func main() {
 		Resize2fsCmd:        "resize2fs",
 		E2fsckCmd:           "e2fsck",
 		RootDir:             "/",
-		DockerCredentialGCR: *dockerCredentialGCR,
-		VeritySetupImage:    *veritySetupImage,
-		HandleDiskLayoutBin: *handleDiskLayoutBin,
+		DockerCredentialGCR: dockerCredentialGCR,
+		VeritySetupImage:    veritySetupImage,
+		HandleDiskLayoutBin: handleDiskLayoutBin,
 	}
 	var exitCode int
 	ret := subcommands.Execute(ctx, deps, &exitCode)

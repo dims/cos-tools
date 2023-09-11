@@ -20,13 +20,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"cos.googlesource.com/cos/tools.git/src/pkg/config"
 	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
-	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"
@@ -102,16 +100,6 @@ func setupFinishBuildFiles() (string, *fs.Files, error) {
 	files.SourceImageConfig = sourceImageFile.Name()
 	files.DaisyBin = "/bin/true"
 	files.UserBuildContextArchive, err = createTempFile(tmpDir)
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, err
-	}
-	files.CIDataImg = filepath.Join(tmpDir, "cidata.img")
-	if err := utils.RunCommand([]string{"mkfs.fat", "-n", "CIDATA", "-S", "512", "-s", "8", "-C", files.CIDataImg, "131072"}, tmpDir, nil); err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, err
-	}
-	files.ScratchImg, err = createTempFile(tmpDir)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return "", nil, err

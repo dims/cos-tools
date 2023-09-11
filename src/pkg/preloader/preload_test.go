@@ -28,7 +28,6 @@ import (
 	"cos.googlesource.com/cos/tools.git/src/pkg/fakes"
 	"cos.googlesource.com/cos/tools.git/src/pkg/fs"
 	"cos.googlesource.com/cos/tools.git/src/pkg/provisioner"
-	"cos.googlesource.com/cos/tools.git/src/pkg/utils"
 
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
@@ -62,16 +61,6 @@ func setupFiles() (string, *fs.Files, error) {
 		return "", nil, err
 	}
 	files.DaisyWorkflow, err = createTempFile(tmpDir)
-	if err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, err
-	}
-	files.CIDataImg = filepath.Join(tmpDir, "cidata.img")
-	if err := utils.RunCommand([]string{"mkfs.fat", "-n", "CIDATA", "-S", "512", "-s", "8", "-C", files.CIDataImg, "131072"}, tmpDir, nil); err != nil {
-		os.RemoveAll(tmpDir)
-		return "", nil, err
-	}
-	files.ScratchImg, err = createTempFile(tmpDir)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return "", nil, err

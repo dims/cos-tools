@@ -101,17 +101,9 @@ write_files:
       status mkdir -p /mnt/disks/cidata
       status mount /dev/disk/by-label/CIDATA /mnt/disks/cidata
       if [[ ! -d /var/lib/.cos-customizer ]]; then
-        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} \
-          --docker-credential-gcr=/mnt/disks/cidata/docker-credential-gcr_${ARCH} \
-          --veritysetup-image=/mnt/disks/cidata/veritysetup_${ARCH}.tar.gz \
-          --handle-disk-layout-bin=/mnt/disks/cidata/handle_disk_layout_bin_${ARCH} \
-          run --config=/mnt/disks/cidata/config.json
+        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} run --config=/mnt/disks/cidata/config.json
       else
-        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} \
-          --docker-credential-gcr=/mnt/disks/cidata/docker-credential-gcr_${ARCH} \
-          --veritysetup-image=/mnt/disks/cidata/veritysetup_${ARCH}.tar.gz \
-          --handle-disk-layout-bin=/mnt/disks/cidata/handle_disk_layout_bin_${ARCH} \
-          resume
+        run_provisioner /mnt/disks/cidata/provisioner_${ARCH} resume
       fi
     }
 

@@ -13,39 +13,39 @@
 # limitations under the License.
 
 substitutions:
-  '_TEST': 'image_test'
-  '_INPUT_IMAGE': 'cos-93-16623-461-15'
-  '_INPUT_PROJECT': 'cos-cloud'
+  "_TEST": "image_test"
+  "_INPUT_IMAGE": "cos-dev-69-10895-0-0"
+  "_INPUT_PROJECT": "cos-cloud"
 steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-f', 'src/cmd/cos_customizer/Dockerfile', '-t', 'cos_customizer', '.']
-- name: 'cos_customizer'
-  args: ['start-image-build',
-         '-build-context=testing/${_TEST}',
-         '-image-name=${_INPUT_IMAGE}',
-         '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
-         '-gcs-workdir=customizer-$BUILD_ID']
-- name: 'cos_customizer'
-  args: ['finish-image-build',
-         '-zone=us-west1-b',
-         '-labels=hello=world,test_key=test_value',
-         '-licenses=projects/cos-cloud/global/licenses/cos-gpu',
-         '-disk-size-gb=50',
-         '-project=$PROJECT_ID',
-         '-image-name=preload-test-$BUILD_ID',
-         '-image-family=test-family',
-         '-image-project=$PROJECT_ID']
+- name: 'gcr.io/cloud-builders/bazel'
+  args: ["run", "--spawn_strategy=standalone", ":cos_customizer", "--", "--norun"]
+- name: 'bazel:cos_customizer'
+  args: ["start-image-build",
+         "-build-context=testing/${_TEST}",
+         "-image-name=${_INPUT_IMAGE}",
+         "-image-project=${_INPUT_PROJECT}",
+         "-gcs-bucket=${PROJECT_ID}_cloudbuild",
+         "-gcs-workdir=customizer-$BUILD_ID"]
+- name: 'bazel:cos_customizer'
+  args: ["finish-image-build",
+         "-zone=us-west1-b",
+         "-labels=hello=world,test_key=test_value",
+         "-licenses=projects/cos-cloud/global/licenses/cos-gpu",
+         "-disk-size-gb=50",
+         "-project=$PROJECT_ID",
+         "-image-name=preload-test-$BUILD_ID",
+         "-image-family=test-family",
+         "-image-project=$PROJECT_ID"]
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: '/bin/bash'
   env:
-  - 'IMAGE=preload-test-$BUILD_ID'
-  - 'PROJECT=$PROJECT_ID'
-  - 'LABELS=hello=world;test_key=test_value'
-  - 'FAMILY=test-family'
-  - 'DISK_SIZE_GB=50'
-  - 'LICENSES=https://www.googleapis.com/compute/v1/projects/cos-cloud-shielded/global/licenses/shielded-cos;https://www.googleapis.com/compute/v1/projects/cos-cloud/global/licenses/cos-pcid;https://www.googleapis.com/compute/v1/projects/cos-cloud/global/licenses/cos;https://www.googleapis.com/compute/v1/projects/cos-cloud/global/licenses/cos-gpu'
-  args: ['/workspace/testing/${_TEST}/run_test.sh']
+  - "IMAGE=preload-test-$BUILD_ID"
+  - "PROJECT=$PROJECT_ID"
+  - "LABELS=hello=world;test_key=test_value"
+  - "FAMILY=test-family"
+  - "DISK_SIZE_GB=50"
+  - "LICENSES=https://www.googleapis.com/compute/v1/projects/cos-cloud/global/licenses/cos-gpu;https://www.googleapis.com/compute/v1/projects/cos-cloud/global/licenses/cos"
+  args: ["/workspace/testing/${_TEST}/run_test.sh"]
 options:
   machineType: 'N1_HIGHCPU_8'
-timeout: '7200s'
+timeout: "7200s"

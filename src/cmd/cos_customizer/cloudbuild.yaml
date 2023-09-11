@@ -20,17 +20,16 @@ steps:
   - |
     cat <<EOF | docker build -t bazel -
     FROM gcr.io/cloud-builders/bazel
-    RUN apt-get update && apt-get install -y mtools dosfstools
+    RUN apt-get update && apt-get install -y mtools
     EOF
 - name: 'bazel'
   args: ['test', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone','--','...','-//src/pkg/tools/...']
+- name: 'bazel'
+  args: ['run', '--remote_cache=${_BUILD_TOOLS_CACHE}', '--google_default_credentials', '--spawn_strategy=standalone', ':cos_customizer', '--', '--norun']
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build',
-         '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}',
-         '-t', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:latest',
-         '-f', 'src/cmd/cos_customizer/Dockerfile',
-         '--build-arg', '_BUILD_TOOLS_CACHE=${_BUILD_TOOLS_CACHE}',
-         '.']
+  args: ['tag', 'bazel:cos_customizer', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:${TAG_NAME}']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'bazel:cos_customizer', 'gcr.io/${_OUTPUT_PROJECT}/cos-customizer:latest']
 options:
   machineType: 'N1_HIGHCPU_8'
   substitutionOption: 'MUST_MATCH'

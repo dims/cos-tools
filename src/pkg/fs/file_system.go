@@ -61,12 +61,6 @@ type Files struct {
 	DaisyWorkflow string
 	// DaisyBin points to the Daisy binary.
 	DaisyBin string
-	// CIDataImg points to the vfat image that delivers the provisioner and its
-	// dependencies to the build VM.
-	CIDataImg string
-	// ScratchImg points to an empty ext4 file system image that is used by the
-	// provisioner for scratch space.
-	ScratchImg string
 }
 
 // DefaultFiles builds a Files struct with a default file layout.
@@ -80,8 +74,6 @@ func DefaultFiles(persistentDir string) *Files {
 		ProvConfig:              filepath.Join(persistentDir, provConfig),
 		DaisyWorkflow:           filepath.Join(volatileDir, daisyWorkflow),
 		DaisyBin:                daisyBin,
-		CIDataImg:               "/cidata.img",
-		ScratchImg:              "/scratch.img",
 	}
 }
 

@@ -115,10 +115,7 @@ func setup(runState *state, deps Deps, systemd *systemdClient) error {
 		}
 	}
 	if _, err := os.Stat(dockerCredentialGCRPath); os.IsNotExist(err) {
-		if err := utils.CopyFile(deps.DockerCredentialGCR, dockerCredentialGCRPath); err != nil {
-			return err
-		}
-		if err := os.Chmod(dockerCredentialGCRPath, 0755); err != nil {
+		if err := ioutil.WriteFile(dockerCredentialGCRPath, deps.DockerCredentialGCR, 0744); err != nil {
 			return err
 		}
 	}
@@ -337,15 +334,15 @@ type Deps struct {
 	// RootDir is the path to the root file system. Should be "/" in all real
 	// runtime situations.
 	RootDir string
-	// DockerCredentialGCR is a path to a docker-credential-gcr program to use as a Docker
+	// DockerCredentialGCR is an embedded docker-credential-gcr program to use as a Docker
 	// credential helper.
-	DockerCredentialGCR string
-	// VeritySetupImage is a path to a file system tarball (which can be imported
-	// as a Docker image) that contains the "veritysetup" tool.
-	VeritySetupImage string
-	// HandleDiskLayoutBin is a path to a program for reformatting a COS disk
+	DockerCredentialGCR []byte
+	// VeritySetupImage is an embedded Docker image that contains the
+	// "veritysetup" tool.
+	VeritySetupImage []byte
+	// HandleDiskLayoutBin is an embedded program for reformatting a COS disk
 	// image.
-	HandleDiskLayoutBin string
+	HandleDiskLayoutBin []byte
 }
 
 func run(ctx context.Context, deps Deps, runState *state) (err error) {

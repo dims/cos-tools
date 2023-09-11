@@ -18,6 +18,7 @@ package preloader
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -38,6 +39,12 @@ import (
 
 	"cloud.google.com/go/storage"
 )
+
+//go:embed cidata.img
+var ciDataImg []byte
+
+//go:embed scratch.img
+var scratchImg []byte
 
 // storeInGCS stores the given files in GCS using the given gcsManager.
 // Files to store are provided in a map where each key is a file on the local
@@ -196,16 +203,18 @@ func mcopyFiles(path string, files *fs.Files) (err error) {
 	return utils.RunCommand([]string{"mcopy", "-i", path, files.ProvConfig, "::/config.json"}, "", nil)
 }
 
-func writeImage(fileName string) (path string, err error) {
+func writeImage(imgData *[]byte) (path string, err error) {
 	img, err := ioutil.TempFile(fs.ScratchDir, "img-")
 	if err != nil {
 		return "", err
 	}
-	if err := img.Close(); err != nil {
-		return "", err
+	_, writeErr := img.Write(*imgData)
+	closeErr := img.Close()
+	if writeErr != nil {
+		return "", writeErr
 	}
-	if err := utils.CopyFile(fileName, img.Name()); err != nil {
-		return "", err
+	if closeErr != nil {
+		return "", closeErr
 	}
 	return img.Name(), err
 }
@@ -296,7 +305,7 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 	if err := updateProvConfig(provConfig, buildSpec, buildContexts, gcs, files); err != nil {
 		return nil, err
 	}
-	ciDataFile, err := writeImage(files.CIDataImg)
+	ciDataFile, err := writeImage(&ciDataImg)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +316,11 @@ func daisyArgs(ctx context.Context, gcs *gcsManager, files *fs.Files, input *con
 	if err != nil {
 		return nil, err
 	}
-	scratchImgFileTar, err := tarImage(files.ScratchImg)
+	scratchImgFile, err := writeImage(&scratchImg)
+	if err != nil {
+		return nil, err
+	}
+	scratchImgFileTar, err := tarImage(scratchImgFile)
 	if err != nil {
 		return nil, err
 	}
