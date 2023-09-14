@@ -75,9 +75,9 @@ func NewGCSDownloader(e *EnvReader, bucket, prefix string) *GCSDownloader {
 			}
 		}
 	}
-	// Use build number as the default GCS download prefix.
+	// Use {build number}/{board} as the default GCS download prefix.
 	if prefix == "" {
-		prefix = e.BuildNumber()
+		prefix = path.Join(e.BuildNumber(), e.Board())
 	}
 	return &GCSDownloader{e, bucket, prefix}
 }

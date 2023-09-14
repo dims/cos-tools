@@ -150,7 +150,7 @@ func (c *InstallCommand) SetFlags(f *flag.FlagSet) {
 			"Those are the public COS artifacts buckets.")
 	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
 		"The GCS path prefix when downloading COS artifacts."+
-			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
+			"If not set then the COS build number and board (e.g. 13310.1041.38/lakitu) will be used.")
 	f.StringVar(&c.nvidiaInstallerURL, "nvidia-installer-url", "",
 		"A URL to an nvidia-installer to use for driver installation. This flag is mutually exclusive with `-version`. "+
 			"This flag must be used with `-allow-unsigned-driver`. This flag is only for debugging and testing.")

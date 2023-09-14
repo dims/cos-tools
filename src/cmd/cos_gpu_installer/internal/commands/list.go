@@ -38,7 +38,7 @@ func (c *ListCommand) SetFlags(f *flag.FlagSet) {
 			"For example, the default value is 'cos-tools' which is the public COS artifacts bucket.")
 	f.StringVar(&c.gcsDownloadPrefix, "gcs-download-prefix", "",
 		"The GCS path prefix when downloading COS artifacts."+
-			"If not set then the COS version build number (e.g. 13310.1041.38) will be used.")
+			"If not set then the COS build number and board (e.g. 13310.1041.38/lakitu) will be used.")
 	f.BoolVar(&c.debug, "debug", false,
 		"Enable debug mode.")
 }

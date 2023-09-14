@@ -59,6 +59,9 @@ func (c *EnvReader) OsRelease() map[string]string { return c.osRelease }
 // ReleaseTrack returns the COS release track.
 func (c *EnvReader) ReleaseTrack() string { return c.lsbRelease[releaseTrack] }
 
+// Board returns the COS board name. Retrieved from /etc/lsb-release.
+func (c *EnvReader) Board() string { return c.lsbRelease["CHROMEOS_RELEASE_BOARD"] }
+
 // BuildNumber returns COS build number.
 func (c *EnvReader) BuildNumber() string { return c.osRelease[buildID] }
 
