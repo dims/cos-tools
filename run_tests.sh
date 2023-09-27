@@ -67,7 +67,7 @@ get_log_url() {
 
 start_build() {
   local -r config="$1"
-  gcloud builds submit --config="${config}" --project="${PROJECT}" --async --format='value(ID)' .
+  gcloud builds submit --config="${config}" --project="${PROJECT}" --substitutions=_PROJECT_NAME="${PROJECT_NAME}" --async --format='value(ID)' .
 }
 
 wait_for_build() {
@@ -104,6 +104,7 @@ main() {
     usage
     return 1
   fi
+  PROJECT_NAME=${PROJECT//google.com:/elgoog_com_}
   for config in testing/*.yaml; do
     build_ids+=("$(start_build "${config}")")
   done

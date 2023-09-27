@@ -47,13 +47,13 @@ steps:
     qemu-img convert -O raw *.vmdk disk.raw
     tar czf ubuntu_gce.tar.gz disk.raw
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['cp', 'ova/ubuntu_gce.tar.gz', 'gs://${PROJECT_ID}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz']
+  args: ['cp', 'ova/ubuntu_gce.tar.gz', 'gs://${_PROJECT_NAME}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz']
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['compute', 'images', 'create', 'input-${BUILD_ID}',
-         '--source-uri', 'gs://${PROJECT_ID}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz',
+         '--source-uri', 'gs://${_PROJECT_NAME}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz',
          '--project', '${PROJECT_ID}']
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['rm', 'gs://${PROJECT_ID}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz']
+  args: ['rm', 'gs://${_PROJECT_NAME}_cloudbuild/build-ova-${BUILD_ID}/ubuntu_gce.tar.gz']
 
 # Run cos-customizer
 - name: 'cos_customizer'
@@ -61,7 +61,7 @@ steps:
          '-build-context=testing/${_TEST}',
          '-image-name=input-${BUILD_ID}',
          '-image-project=${PROJECT_ID}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-$BUILD_ID']
 - name: 'cos_customizer'
   args: ['run-script',
@@ -81,6 +81,7 @@ steps:
 - name: 'gcr.io/compute-image-tools/daisy'
   args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
          'preload-test-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:daisy_gcs_bucket', '${_PROJECT_NAME}-daisy-bkt',
          '-var:test_cfg', '../${_TEST}/preload_test.cfg', 'testing/util/run_test.wf.json']
 options:
   machineType: 'N1_HIGHCPU_8'

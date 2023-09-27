@@ -22,6 +22,6 @@ steps:
   args: ["-m", "cp", "gs://nvidia-drivers-us-public/tesla/418.67/NVIDIA-Linux-x86_64-418.67.run", "deps_dir"]
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ["builds", "submit", "--config=testing/gpu_test/gpu_test.yaml",
-         "--substitutions=_DRIVER_VERSION=NVIDIA-Linux-x86_64-418.67.run,_INPUT_IMAGE=cos-dev-83-12998-0-0,_DEPS_DIR=deps_dir",
+         "--substitutions=_DRIVER_VERSION=NVIDIA-Linux-x86_64-418.67.run,_INPUT_IMAGE=cos-dev-83-12998-0-0,_DEPS_DIR=deps_dir,_PROJECT_NAME=${_PROJECT_NAME}",
          "."]
 timeout: "7200s"

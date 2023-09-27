@@ -31,7 +31,7 @@ steps:
          '-build-context=testing/${_TEST_1}',
          '-image-name=${_INPUT_IMAGE_1}',
          '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-${_TEST_1}-$BUILD_ID']
 - name: 'cos_customizer'
   waitFor: 'test-1-start-build'
@@ -53,6 +53,7 @@ steps:
   id: 'test-1-test-build'
   args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
          'preload-test-t1-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:daisy_gcs_bucket', '${_PROJECT_NAME}-daisy-bkt',
          '-var:test_cfg', '../${_TEST_1}/preload_test.cfg', 'testing/util/run_test.wf.json']
 # TEST_2 workflow
 - name: 'busybox'
@@ -66,7 +67,7 @@ steps:
          '-build-context=testing/${_TEST_2}',
          '-image-name=${_INPUT_IMAGE_2}',
          '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-${_TEST_2}-$BUILD_ID']
 - name: 'cos_customizer'
   waitFor: 'test-2-start-build'
@@ -95,6 +96,7 @@ steps:
   id: 'test-2-test-build'
   args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
          'preload-test-t2-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:daisy_gcs_bucket', '${_PROJECT_NAME}-daisy-bkt',
          '-var:test_cfg', '../${_TEST_2}/preload_test.cfg', '-var:vm_workflow',
          './gpu_vm.wf.json', 'testing/util/run_test.wf.json']
 options:

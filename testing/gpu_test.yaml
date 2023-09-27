@@ -20,19 +20,19 @@ steps:
   - '-c'
   - |
     test_list=("gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-81-12871-1196-0\
+                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-81-12871-1196-0,_PROJECT_NAME=${_PROJECT_NAME}\
                   --async --format='value(ID)' ."
                "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-rc-85-13310-1040-0\
+                  --substitutions=_DRIVER_VERSION=450.51.06,_INPUT_IMAGE=cos-rc-85-13310-1040-0,_PROJECT_NAME=${_PROJECT_NAME}\
                   --async --format='value(ID)' ."
                 "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=460.32.03,_INPUT_IMAGE=cos-89-16108-403-42\
+                  --substitutions=_DRIVER_VERSION=460.32.03,_INPUT_IMAGE=cos-89-16108-403-42,_PROJECT_NAME=${_PROJECT_NAME}\
                   --async --format='value(ID)' ."
                 "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=450.172.01,_INPUT_IMAGE=cos-93-16623-171-1\
+                  --substitutions=_DRIVER_VERSION=450.172.01,_INPUT_IMAGE=cos-93-16623-171-1,_PROJECT_NAME=${_PROJECT_NAME}\
                   --async --format='value(ID)' ."
                 "gcloud builds submit --config=testing/gpu_test/gpu_test.yaml\
-                  --substitutions=_DRIVER_VERSION=470.82.01,_INPUT_IMAGE=cos-97-16919-29-2\
+                  --substitutions=_DRIVER_VERSION=470.82.01,_INPUT_IMAGE=cos-97-16919-29-2,_PROJECT_NAME=${_PROJECT_NAME}\
                   --async --format='value(ID)' .")
     build_ids=()
     exit_code=0

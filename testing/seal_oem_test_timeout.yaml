@@ -24,7 +24,7 @@ steps:
          '-build-context=testing/${_TEST}',
          '-image-name=${_INPUT_IMAGE}',
          '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-$BUILD_ID']
 - name: 'cos_customizer'
   args: ['run-script',
@@ -50,7 +50,8 @@ steps:
   - |
     /daisy -default_timeout=5m -project=$PROJECT_ID -zone=us-west1-b \
     -var:image_name preload-test-$BUILD_ID -var:image_project $PROJECT_ID \
-    -var:test_cfg /preload_test.cfg /run_test.wf.json | tee /build.log
+    -var:daisy_gcs_bucket $_PROJECT_NAME-daisy-bkt -var:test_cfg /preload_test.cfg \
+    /run_test.wf.json | tee /build.log
     if ( grep "did not complete within the specified timeout" /build.log > /dev/null ); \
     then exit 0; else echo "error: timemout expected"; exit 1; fi
 options:

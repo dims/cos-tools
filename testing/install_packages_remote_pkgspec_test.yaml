@@ -23,17 +23,17 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-f', 'src/cmd/cos_customizer/Dockerfile', '-t', 'cos_customizer', '.']
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: [ '-m', 'cp', '${_INPUT_PKGSPEC}', 'gs://${PROJECT_ID}_cloudbuild/' ]
+  args: [ '-m', 'cp', '${_INPUT_PKGSPEC}', 'gs://${_PROJECT_NAME}_cloudbuild/' ]
 - name: 'cos_customizer'
   args: ['start-image-build',
          '-build-context=testing/${_TEST}',
          '-image-name=${_INPUT_IMAGE}',
          '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-$BUILD_ID']
 - name: 'cos_customizer'
   args: ['anthos-installer-install',
-         '-pkgspec-url=gs://${PROJECT_ID}_cloudbuild/${_INPUT_PKGSPEC_FILE}']
+         '-pkgspec-url=gs://${_PROJECT_NAME}_cloudbuild/${_INPUT_PKGSPEC_FILE}']
 - name: 'cos_customizer'
   args: ['finish-image-build',
          '-zone=us-west1-b',
@@ -44,9 +44,10 @@ steps:
 - name: 'gcr.io/compute-image-tools/daisy'
   args: ['-project=$PROJECT_ID', '-zone=us-west1-b', '-var:image_name',
          'preload-test-$BUILD_ID', '-var:image_project', '$PROJECT_ID',
+         '-var:daisy_gcs_bucket', '${_PROJECT_NAME}-daisy-bkt',
          '-var:test_cfg', '../${_TEST}/preload_test.cfg', 'testing/util/run_test.wf.json']
 - name: 'gcr.io/cloud-builders/gsutil'
-  args: ['rm', 'gs://${PROJECT_ID}_cloudbuild/kubernetes_pkg_spec.tar.gz' ]
+  args: ['rm', 'gs://${_PROJECT_NAME}_cloudbuild/kubernetes_pkg_spec.tar.gz' ]
 options:
   machineType: 'N1_HIGHCPU_32'
 timeout: '7200s'

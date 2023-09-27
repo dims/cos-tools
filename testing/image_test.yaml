@@ -24,7 +24,7 @@ steps:
          '-build-context=testing/${_TEST}',
          '-image-name=${_INPUT_IMAGE}',
          '-image-project=${_INPUT_PROJECT}',
-         '-gcs-bucket=${PROJECT_ID}_cloudbuild',
+         '-gcs-bucket=${_PROJECT_NAME}_cloudbuild',
          '-gcs-workdir=customizer-$BUILD_ID']
 - name: 'cos_customizer'
   args: ['finish-image-build',
